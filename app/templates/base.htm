@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lottie{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-secondary: #131b2e;
+            --bg-card: #1a2332;
+            --text-primary: #ffffff;
+            --text-secondary: #8b92a7;
+            --accent-teal: #00d9b5;
+            --accent-green: #00d084;
+            --border-color: #2d3748;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+        
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 250px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 30px 0;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        
+        .sidebar-brand {
+            padding: 0 25px 30px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .sidebar-brand h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-teal);
+            margin: 0;
+        }
+        
+        .sidebar-brand p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        
+        .sidebar-menu {
+            padding: 30px 0;
+        }
+        
+        .menu-section {
+            margin-bottom: 30px;
+        }
+        
+        .menu-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 0 25px;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 25px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .menu-item:hover,
+        .menu-item.active {
+            background-color: rgba(0, 217, 181, 0.1);
+            color: var(--accent-teal);
+            border-left: 3px solid var(--accent-teal);
+        }
+        
+        .menu-item i {
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .top-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 30px 20px 30px;
+            background-color: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        
+        .page-title h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+        }
+        
+        .page-title p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 5px 0 0 0;
+        }
+        
+        .logout-btn {
+            padding: 10px 20px;
+            background-color: rgba(255, 81, 47, 0.2);
+            color: #ff512f;
+            border: 1px solid #ff512f;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background-color: #ff512f;
+            color: white;
+        }
+        
+        .content-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 30px;
+        }
+        
+        .content-wrapper::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        
+        .content-wrapper::-webkit-scrollbar-thumb {
+            background: transparent;
+        }
+        
+        /* For Firefox */
+        .content-wrapper {
+            scrollbar-width: none;
+        }
+        
+        /* For IE and Edge */
+        .content-wrapper {
+            -ms-overflow-style: none;
+        }
+        
+        /* Common card styles */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-teal), var(--accent-green));
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .stat-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 217, 181, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-teal);
+            font-size: 20px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .stat-change {
+            font-size: 12px;
+            color: var(--accent-green);
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .chart-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 250px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .chart-container {
+                height: 200px;
+            }
+        }
+        
+        .activity-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-teal);
+            border-radius: 50%;
+            margin-right: 15px;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-title {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .activity-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .activity-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .badge-review {
+            background-color: rgba(0, 208, 132, 0.2);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+        
+        .badge-completed {
+            background-color: rgba(0, 208, 132, 0.2);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+        
+        .badge-pending {
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+        
+        /* Quick Actions */
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .action-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            white-space: nowrap;
+        }
+        
+        .action-btn-primary {
+            background-color: var(--accent-teal);
+            color: var(--bg-primary);
+        }
+        
+        .action-btn-primary:hover {
+            background-color: #00f5cc;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 217, 181, 0.3);
+        }
+        
+        .action-btn-secondary {
+            background-color: transparent;
+            color: var(--accent-teal);
+            border: 1px solid var(--accent-teal);
+        }
+        
+        .action-btn-secondary:hover {
+            background-color: rgba(0, 217, 181, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .action-btn-tertiary {
+            background-color: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .action-btn-tertiary:hover {
+            background-color: var(--bg-card);
+            border-color: var(--text-secondary);
+            transform: translateY(-2px);
+        }
+        
+        .action-btn-quaternary {
+            background-color: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .action-btn-quaternary:hover {
+            background-color: var(--bg-card);
+            border-color: var(--text-secondary);
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 992px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .quick-actions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Category Cards */
+        .category-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+        
+        .category-card:hover {
+            border-color: var(--accent-teal);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 217, 181, 0.2);
+        }
+        
+        .category-header {
+            margin-bottom: 15px;
+        }
+        
+        .category-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 10px 0;
+        }
+        
+        .category-updated {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .category-updated i {
+            font-size: 13px;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            background-color: rgba(0, 217, 181, 0.15);
+            color: var(--accent-teal);
+            border: 1px solid var(--accent-teal);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+        
+        .category-btn {
+            width: 100%;
+            padding: 12px 20px;
+            background-color: transparent;
+            color: var(--accent-teal);
+            border: 1px solid var(--accent-teal);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: auto;
+        }
+        
+        .category-btn:hover {
+            background-color: rgba(0, 217, 181, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .category-btn i {
+            font-size: 16px;
+        }
+        
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <h2>Lottie Agent</h2>
+            <p>AI Content Assistant</p>
+        </div>
+        
+        <div class="sidebar-menu">
+            <div class="menu-section">
+                <div class="menu-section-title">Main</div>
+                <a href="/user/dashboard" class="menu-item {% block nav_dashboard %}{% endblock %}">
+                    <i class="bi bi-grid-fill"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+            
+            <div class="menu-section">
+                <div class="menu-section-title">Website Content</div>
+                <a href="/user/understanding" class="menu-item {% block nav_understanding %}{% endblock %}">
+                    <i class="bi bi-book"></i>
+                    <span>Understanding</span>
+                </a>
+                <a href="#" class="menu-item {% block nav_projects %}{% endblock %}">
+                    <i class="bi bi-folder"></i>
+                    <span>Projects</span>
+                </a>
+                <a href="#" class="menu-item {% block nav_resources %}{% endblock %}">
+                    <i class="bi bi-file-text"></i>
+                    <span>Resources</span>
+                </a>
+                <a href="#" class="menu-item {% block nav_policy %}{% endblock %}">
+                    <i class="bi bi-shield-check"></i>
+                    <span>Policy</span>
+                </a>
+            </div>
+            
+            <div class="menu-section">
+                <div class="menu-section-title">Content Generation</div>
+                <a href="#" class="menu-item {% block nav_lots %}{% endblock %}">
+                    <i class="bi bi-list-ul"></i>
+                    <span>Lots</span>
+                </a>
+                <a href="#" class="menu-item {% block nav_newsletter %}{% endblock %}">
+                    <i class="bi bi-envelope"></i>
+                    <span>Newsletter</span>
+                </a>
+                <a href="#" class="menu-item {% block nav_social %}{% endblock %}">
+                    <i class="bi bi-share"></i>
+                    <span>Social Media</span>
+                </a>
+            </div>
+            
+            <div class="menu-section">
+                <div class="menu-section-title">Configuration</div>
+                <a href="#" class="menu-item {% block nav_settings %}{% endblock %}">
+                    <i class="bi bi-gear"></i>
+                    <span>Agent Settings</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-header">
+            <div class="page-title">
+                <h1>{% block page_title %}Lottie Agent{% endblock %}</h1>
+                <p>{% block page_subtitle %}AI Content Assistant{% endblock %}</p>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
+        </div>
+        
+        <!-- Scrollable Content Area -->
+        <div class="content-wrapper">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Logout function
+        async function logout() {
+            const token = localStorage.getItem('access_token');
+            
+            if (token) {
+                try {
+                    await fetch('/auth/logout', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            }
+            
+            localStorage.removeItem('access_token');
+            window.location.replace('/');
+        }
+        
+        {% block extra_scripts %}{% endblock %}
+    </script>
+</body>
+</html>

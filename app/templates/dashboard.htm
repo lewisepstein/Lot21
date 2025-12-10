@@ -1,0 +1,296 @@
+{% extends "base.htm" %}
+
+{% block title %}Lottie Dashboard{% endblock %}
+
+{% block nav_dashboard %}active{% endblock %}
+
+{% block page_title %}Lottie Dashboard{% endblock %}
+{% block page_subtitle %}Monitor AI performance and manage content workflows{% endblock %}
+
+{% block content %}
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-title">AI Accuracy</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="bi bi-bullseye"></i>
+                    </div>
+                </div>
+                <div class="stat-value">90%</div>
+                <div class="stat-change">+20% from start</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-title">Tasks Completed</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+                <div class="stat-value">47</div>
+                <div class="stat-change">Last 7 days</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-title">Next Task</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-event"></i>
+                    </div>
+                </div>
+                <div class="stat-value">2h 15m</div>
+                <div class="stat-change">Scheduled</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-title">Pending Approvals</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="bi bi-file-earmark-check"></i>
+                    </div>
+                </div>
+                <div class="stat-value">3</div>
+                <div class="stat-change">Requires review</div>
+            </div>
+        </div>
+        
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">AI Learning Progress</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="learningChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Activity</h3>
+                </div>
+                <ul class="activity-list">
+                    <li class="activity-item">
+                        <div class="activity-icon"></div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                Generated weekly newsletter draft
+                                <span class="activity-badge badge-review">Review</span>
+                            </div>
+                            <div class="activity-time">2 min ago</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon"></div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                Updated 'Understanding' section
+                                <span class="activity-badge badge-completed">Completed</span>
+                            </div>
+                            <div class="activity-time">18 min ago</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon"></div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                Scheduled social media post
+                                <span class="activity-badge badge-pending">Pending</span>
+                            </div>
+                            <div class="activity-time">1 hour ago</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon"></div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                Analyzed new policy document
+                                <span class="activity-badge badge-completed">Completed</span>
+                            </div>
+                            <div class="activity-time">3 hours ago</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon"></div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                Generated project summary
+                                <span class="activity-badge badge-completed">Completed</span>
+                            </div>
+                            <div class="activity-time">5 hours ago</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Quick Actions Section -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title" style="color: #ffffff;">Quick Actions</h3>
+            </div>
+            <div class="row g-3">
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                    <button class="action-btn action-btn-primary w-100">
+                        Approve Content
+                    </button>
+                </div>
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                    <button class="action-btn action-btn-secondary w-100">
+                        View Newsletter Draft
+                    </button>
+                </div>
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                    <button class="action-btn action-btn-tertiary w-100">
+                        Review Social Posts
+                    </button>
+                </div>
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                    <button class="action-btn action-btn-quaternary w-100">
+                        Check Analytics
+                    </button>
+                </div>
+            </div>
+        </div>
+{% endblock %}
+
+{% block extra_scripts %}
+        // Check authentication immediately on page load
+        (async function() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return;
+            }
+            
+            // Verify token with backend
+            try {
+                const response = await fetch('/user/dashboard-data', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    localStorage.removeItem('access_token');
+                    window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
+                    return;
+                }
+            } catch (error) {
+                localStorage.removeItem('access_token');
+                window.location.replace('/?error=' + encodeURIComponent('Authentication failed. Please login again.'));
+                return;
+            }
+        })();
+        
+        // Create the learning progress chart after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('learningChart');
+            console.log('Canvas element:', canvas);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                console.log('Canvas context:', ctx);
+                const learningChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7'],
+                        datasets: [{
+                            label: 'Learning Progress',
+                            data: [69, 73, 76, 81, 86, 89, 95],
+                            borderColor: '#00d9b5',
+                            backgroundColor: 'rgba(0, 217, 181, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#00d9b5',
+                            pointBorderColor: '#00d9b5',
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 65,
+                                max: 100,
+                                ticks: {
+                                    color: '#8b92a7',
+                                    font: {
+                                        size: 11
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.05)',
+                                    drawBorder: false
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#8b92a7',
+                                    font: {
+                                        size: 11
+                                    }
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Chart created successfully:', learningChart);
+            } else {
+                console.error('Canvas element not found!');
+            }
+        });
+        
+        // Load dashboard data
+        async function loadDashboard() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return;
+            }
+            
+            try {
+                const response = await fetch('/user/dashboard-data', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.removeItem('access_token');
+                        window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        // Load dashboard on page load
+        loadDashboard();
+    {% endblock %}
