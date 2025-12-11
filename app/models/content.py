@@ -47,11 +47,12 @@ class Content(Base):
     accuracy = Column(Float, nullable=True)
     comments = Column(Text, nullable=True)
     quarter = Column(String(50), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Relationships
     task_run = relationship("TaskRun", backref="contents")
     category = relationship("Category", backref="contents")
-
+    created_by_user = relationship("User", backref="contents_created")
     def __repr__(self):
         return f"<Content(id={self.id}, task_run_id={self.task_run_id}, category_id={self.category_id}, approval_status={self.approval_status.value})>"
 

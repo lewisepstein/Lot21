@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from models.base import metadata
 # Import all models to register them with metadata
-from models import User, Category, Scheduler, Task, TaskRun, Content
+from models import User, Category, Scheduler, Task, TaskRun, Content, PromptHistory, TaskProcess
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

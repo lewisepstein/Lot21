@@ -6,8 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
 
-from auth_module.auth import router as auth_router
-from dashboard_module.dashboard import router as dashboard_router
+from service_utils.routers import register_routers
 
 
 # Load environment variables
@@ -20,8 +19,7 @@ app = FastAPI(title="Lottie", version="1.0.0")
 templates = Jinja2Templates(directory="templates")
 
 # Register routers
-app.include_router(auth_router, tags=["auth"])
-app.include_router(dashboard_router, tags=["user"])
+register_routers(app)
 
 
 # Default route - Login page

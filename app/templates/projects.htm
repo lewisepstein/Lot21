@@ -1,0 +1,389 @@
+{% extends "base.htm" %}
+
+{% block title %}Global Project Finder - Lottie{% endblock %}
+
+{% block nav_projects %}active{% endblock %}
+
+{% block page_title %}Restore - Global Project Finder{% endblock %}
+{% block page_subtitle %}AI-discovered climate projects with relevance scoring{% endblock %}
+
+{% block content %}
+<style>
+    /* Project Table Styles */
+    .projects-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .search-new-btn {
+        padding: 12px 24px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .search-new-btn:hover {
+        background-color: #00f5cc;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 217, 181, 0.3);
+    }
+    
+    .projects-table-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .projects-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .projects-table thead {
+        background-color: var(--bg-secondary);
+    }
+    
+    .projects-table th {
+        padding: 18px 20px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .projects-table tbody tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+    }
+    
+    .projects-table tbody tr:hover {
+        background-color: rgba(0, 217, 181, 0.05);
+    }
+    
+    .projects-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    
+    .projects-table td {
+        padding: 20px;
+        color: var(--text-primary);
+        font-size: 14px;
+        vertical-align: top;
+    }
+    
+    .project-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+    
+    .project-source {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--accent-teal);
+        font-size: 13px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    
+    .project-source:hover {
+        color: #00f5cc;
+        text-decoration: underline;
+    }
+    
+    .project-source i {
+        font-size: 12px;
+    }
+    
+    .match-score {
+        display: inline-block;
+        padding: 6px 12px;
+        background-color: rgba(0, 217, 181, 0.15);
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    
+    .project-summary {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        max-width: 450px;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        text-align: center;
+        min-width: 100px;
+    }
+    
+    .status-approved {
+        background-color: rgba(0, 208, 132, 0.15);
+        color: var(--accent-green);
+        border: 1px solid var(--accent-green);
+    }
+    
+    .status-pending {
+        background-color: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+        border: 1px solid #3b82f6;
+    }
+    
+    .project-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+    
+    .action-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+    }
+    
+    .action-edit {
+        color: var(--text-secondary);
+    }
+    
+    .action-edit:hover {
+        color: var(--accent-teal);
+        background-color: rgba(0, 217, 181, 0.1);
+    }
+    
+    .action-approve {
+        color: var(--accent-green);
+    }
+    
+    .action-approve:hover {
+        background-color: rgba(0, 208, 132, 0.1);
+    }
+    
+    .action-reject {
+        color: #ff512f;
+    }
+    
+    .action-reject:hover {
+        background-color: rgba(255, 81, 47, 0.1);
+    }
+    
+    .action-link i {
+        font-size: 14px;
+    }
+    
+    @media (max-width: 1200px) {
+        .projects-table {
+            font-size: 13px;
+        }
+        
+        .projects-table th,
+        .projects-table td {
+            padding: 15px;
+        }
+        
+        .project-summary {
+            max-width: 300px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .projects-table-card {
+            overflow-x: auto;
+        }
+        
+        .projects-table {
+            min-width: 900px;
+        }
+    }
+</style>
+
+        <!-- Header with Search Button -->
+        <div class="projects-header">
+            <div></div>
+            <button class="search-new-btn">
+                <i class="bi bi-stars"></i> Search New Projects
+            </button>
+        </div>
+        
+        <!-- Projects Table -->
+        <div class="projects-table-card">
+            <table class="projects-table">
+                <thead>
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Source</th>
+                        <th>Match Score</th>
+                        <th>Summary</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Project 1 - Climeworks Orca Plant -->
+                    <tr>
+                        <td>
+                            <div class="project-name">Climeworks Orca Plant</div>
+                        </td>
+                        <td>
+                            <a href="#" class="project-source">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                View
+                            </a>
+                        </td>
+                        <td>
+                            <span class="match-score">95%</span>
+                        </td>
+                        <td>
+                            <div class="project-summary">
+                                World's largest direct air capture facility in Iceland, removing 4,000 tons of CO2 annually.
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-approved">Approved</span>
+                        </td>
+                        <td>
+                            <div class="project-actions">
+                                <a href="#" class="action-link action-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Project 2 - Project Vesta -->
+                    <tr>
+                        <td>
+                            <div class="project-name">Project Vesta</div>
+                        </td>
+                        <td>
+                            <a href="#" class="project-source">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                View
+                            </a>
+                        </td>
+                        <td>
+                            <span class="match-score">88%</span>
+                        </td>
+                        <td>
+                            <div class="project-summary">
+                                Coastal carbon removal through enhanced olivine weathering on beaches.
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-pending">Pending Review</span>
+                        </td>
+                        <td>
+                            <div class="project-actions">
+                                <a href="#" class="action-link action-approve">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </a>
+                                <a href="#" class="action-link action-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                <a href="#" class="action-link action-reject">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Project 3 - Running Tide -->
+                    <tr>
+                        <td>
+                            <div class="project-name">Running Tide</div>
+                        </td>
+                        <td>
+                            <a href="#" class="project-source">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                View
+                            </a>
+                        </td>
+                        <td>
+                            <span class="match-score">92%</span>
+                        </td>
+                        <td>
+                            <div class="project-summary">
+                                Ocean-based carbon removal using kelp and biomass sequestration.
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-pending">Pending Review</span>
+                        </td>
+                        <td>
+                            <div class="project-actions">
+                                <a href="#" class="action-link action-approve">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </a>
+                                <a href="#" class="action-link action-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                <a href="#" class="action-link action-reject">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Project 4 - Charm Industrial -->
+                    <tr>
+                        <td>
+                            <div class="project-name">Charm Industrial</div>
+                        </td>
+                        <td>
+                            <a href="#" class="project-source">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                View
+                            </a>
+                        </td>
+                        <td>
+                            <span class="match-score">90%</span>
+                        </td>
+                        <td>
+                            <div class="project-summary">
+                                Bio-oil sequestration converting biomass waste into carbon-negative fuel.
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-approved">Approved</span>
+                        </td>
+                        <td>
+                            <div class="project-actions">
+                                <a href="#" class="action-link action-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+{% endblock %}

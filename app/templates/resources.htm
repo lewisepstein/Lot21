@@ -1,0 +1,383 @@
+{% extends "base.htm" %}
+
+{% block title %}Resources - Lottie{% endblock %}
+
+{% block nav_resources %}active{% endblock %}
+
+{% block page_title %}Resources{% endblock %}
+{% block page_subtitle %}AI-curated materials and tools with automated quality checks{% endblock %}
+
+{% block content %}
+<style>
+    /* Resources Page Styles */
+    .resources-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .scan-btn {
+        padding: 12px 24px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .scan-btn:hover {
+        background-color: #00f5cc;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 217, 181, 0.3);
+    }
+    
+    /* Tabs */
+    .resources-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 30px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .tab-btn {
+        padding: 12px 24px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: none;
+        border-bottom: 2px solid transparent;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .tab-btn.active {
+        color: var(--text-primary);
+        border-bottom-color: var(--accent-teal);
+    }
+    
+    .tab-btn:hover {
+        color: var(--text-primary);
+    }
+    
+    /* Resource Cards */
+    .resources-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .resource-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 25px;
+        transition: all 0.3s ease;
+    }
+    
+    .resource-card:hover {
+        border-color: var(--accent-teal);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 217, 181, 0.1);
+    }
+    
+    .resource-card.flagged {
+        border-color: #ff512f;
+    }
+    
+    .resource-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+    
+    .resource-title-section {
+        flex: 1;
+    }
+    
+    .resource-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .alert-icon {
+        color: #ff512f;
+        font-size: 16px;
+    }
+    
+    .resource-description {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+    
+    .resource-meta {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .view-source-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--accent-teal);
+        font-size: 13px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    
+    .view-source-link:hover {
+        color: #00f5cc;
+        text-decoration: underline;
+    }
+    
+    .view-source-link i {
+        font-size: 12px;
+    }
+    
+    .confidence-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .confidence-high {
+        background-color: rgba(0, 208, 132, 0.15);
+        color: var(--accent-green);
+        border: 1px solid var(--accent-green);
+    }
+    
+    .confidence-medium {
+        background-color: rgba(255, 193, 7, 0.15);
+        color: #ffc107;
+        border: 1px solid #ffc107;
+    }
+    
+    .confidence-low {
+        background-color: rgba(255, 81, 47, 0.15);
+        color: #ff512f;
+        border: 1px solid #ff512f;
+    }
+    
+    .status-badge-new {
+        display: inline-block;
+        padding: 4px 12px;
+        background-color: rgba(0, 217, 181, 0.15);
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .resource-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .action-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        background: transparent;
+        text-decoration: none;
+    }
+    
+    .action-flag {
+        color: #ff512f;
+        border: 1px solid #ff512f;
+    }
+    
+    .action-flag:hover {
+        background-color: rgba(255, 81, 47, 0.1);
+    }
+    
+    .action-add {
+        color: var(--accent-green);
+        border: 1px solid var(--accent-green);
+    }
+    
+    .action-add:hover {
+        background-color: rgba(0, 208, 132, 0.1);
+    }
+    
+    .action-approve {
+        color: var(--accent-green);
+    }
+    
+    .action-approve:hover {
+        background-color: rgba(0, 208, 132, 0.1);
+    }
+    
+    .action-edit {
+        color: var(--text-secondary);
+    }
+    
+    .action-edit:hover {
+        color: var(--accent-teal);
+        background-color: rgba(0, 217, 181, 0.1);
+    }
+    
+    .action-reject {
+        color: #ff512f;
+    }
+    
+    .action-reject:hover {
+        background-color: rgba(255, 81, 47, 0.1);
+    }
+    
+    .resource-bottom-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    @media (max-width: 768px) {
+        .resource-header {
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .resource-meta {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .resource-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+</style>
+
+        <!-- Header with Scan Button -->
+        <div class="resources-header">
+            <div></div>
+            <button class="scan-btn">
+                <i class="bi bi-stars"></i> Scan for Updates
+            </button>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="resources-tabs">
+            <button class="tab-btn active">Materials</button>
+            <button class="tab-btn">Tools</button>
+        </div>
+        
+        <!-- Resources List -->
+        <div class="resources-list">
+            
+            <!-- Resource 1 - IPCC Sixth Assessment Report -->
+            <div class="resource-card">
+                <div class="resource-header">
+                    <div class="resource-title-section">
+                        <h3 class="resource-title">IPCC Sixth Assessment Report</h3>
+                    </div>
+                </div>
+                <p class="resource-description">
+                    Comprehensive climate science assessment covering physical science, impacts, and mitigation.
+                </p>
+                <div class="resource-meta">
+                    <a href="#" class="view-source-link">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                        View Source
+                    </a>
+                    <span class="confidence-badge confidence-high">98% Confidence</span>
+                </div>
+            </div>
+            
+            <!-- Resource 2 - Carbon Removal Methods Database (Flagged) -->
+            <div class="resource-card flagged">
+                <div class="resource-header">
+                    <div class="resource-title-section">
+                        <h3 class="resource-title">
+                            Carbon Removal Methods Database
+                            <i class="bi bi-exclamation-circle alert-icon"></i>
+                        </h3>
+                    </div>
+                    <div class="resource-actions">
+                        <button class="action-button action-flag">
+                            <i class="bi bi-flag-fill"></i> Flag
+                        </button>
+                    </div>
+                </div>
+                <p class="resource-description">
+                    Outdated database from 2019 - needs replacement.
+                </p>
+                <div class="resource-meta">
+                    <a href="#" class="view-source-link">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                        View Source
+                    </a>
+                    <span class="confidence-badge confidence-low">45% Confidence</span>
+                </div>
+            </div>
+            
+            <!-- Resource 3 - State of CDR 2024 (New) -->
+            <div class="resource-card">
+                <div class="resource-header">
+                    <div class="resource-title-section">
+                        <h3 class="resource-title">
+                            State of CDR 2024
+                            <span class="status-badge-new">Newly Deployed</span>
+                        </h3>
+                    </div>
+                    <div class="resource-actions">
+                        <button class="action-button action-add">
+                            <i class="bi bi-plus-circle"></i> Add
+                        </button>
+                    </div>
+                </div>
+                <p class="resource-description">
+                    Latest comprehensive report on carbon dioxide removal technologies and deployment.
+                </p>
+                <div class="resource-meta">
+                    <a href="#" class="view-source-link">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                        View Source
+                    </a>
+                    <span class="confidence-badge confidence-high">92% Confidence</span>
+                </div>
+                <div class="resource-bottom-actions">
+                    <button class="action-button action-approve">
+                        <i class="bi bi-check-circle"></i> Approve
+                    </button>
+                    <button class="action-button action-edit">
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button class="action-button action-reject">
+                        <i class="bi bi-x-circle"></i> Reject
+                    </button>
+                </div>
+            </div>
+            
+        </div>
+{% endblock %}
