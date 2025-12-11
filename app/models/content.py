@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, Enum as SQLAlchemyEnum, func
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import enum
 from models.base import Base
 
@@ -35,19 +34,19 @@ class Content(Base):
     __tablename__ = "content"
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    task_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=False)
+    task_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     prompt_data = Column(Text, nullable=True)
     generated_content = Column(Text, nullable=True)
-    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
-    action = Column(SQLAlchemyEnum(ContentActionEnum), nullable=False, default=ContentActionEnum.DRAFT)
-    approval_status = Column(SQLAlchemyEnum(ContentApprovalStatusEnum), nullable=False, default=ContentApprovalStatusEnum.PENDING)
+    action = Column(SQLAlchemyEnum(ContentActionEnum), nullable=True, default=ContentActionEnum.DRAFT)
+    approval_status = Column(SQLAlchemyEnum(ContentApprovalStatusEnum), nullable=True, default=ContentApprovalStatusEnum.PENDING)
     approval_status_date = Column(DateTime(timezone=True), nullable=True)
     accuracy = Column(Float, nullable=True)
     comments = Column(Text, nullable=True)
     quarter = Column(String(50), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Relationships
     task_run = relationship("TaskRun", backref="contents")

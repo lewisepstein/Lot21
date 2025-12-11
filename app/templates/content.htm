@@ -245,6 +245,41 @@
         margin-top: 10px;
     }
     
+    .user-prompt {
+        padding: 15px;
+        background-color: rgba(100, 100, 100, 0.15);
+        border-radius: 8px;
+        margin-bottom: 5px;
+        font-size: 14px;
+        line-height: 1.8;
+        color: var(--text-primary);
+        width: 80%;
+        margin-left: auto;
+        margin-right: 0;
+        transition: all 0.3s ease;
+    }
+    
+    .user-prompt.success {
+        background-color: rgba(0, 217, 181, 0.1);
+        border-left: 3px solid var(--accent-teal);
+        color: var(--accent-teal);
+    }
+    
+    .user-prompt.error {
+        background-color: rgba(255, 81, 47, 0.1);
+        border-left: 3px solid #ff512f;
+        color: #ff512f;
+    }
+    
+    .prompt-timestamp {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-left: auto;
+        width: 80%;
+        text-align: right;
+        margin-bottom: 15px;
+    }
+    
     .ai-actions {
         display: flex;
         gap: 10px;
@@ -289,7 +324,7 @@
         color: var(--text-primary);
         font-size: 14px;
         resize: none;
-        min-height: 50px;
+        min-height: 100px;
     }
     
     .ai-input:focus {
@@ -304,7 +339,7 @@
     .ai-send-btn {
         position: absolute;
         right: 10px;
-        bottom: 10px;
+        top: 10px;
         width: 36px;
         height: 36px;
         background-color: var(--accent-teal);
@@ -346,6 +381,9 @@
                 <i class="bi bi-arrow-left"></i> Back
             </button>
             <div style="margin-left: auto; display: flex; gap: 15px;">
+                <button class="action-icon-btn" onclick="addNewContent()">
+                    <i class="bi bi-plus-circle"></i> Add New
+                </button>
                 <button class="action-icon-btn">
                     <i class="bi bi-clock-history"></i> Version History
                 </button>
@@ -416,18 +454,8 @@
                     </button>
                 </div>
                 
-                <div class="content-area">
-                    <div class="ai-message">
-                        I've analyzed the latest developments in Direct Air Capture technology. Here are the key updates:
-                        <ul>
-                            <li>Climeworks expands Swiss facility to 36,000 tons/year capacity</li>
-                            <li>Carbon Engineering secures $200M Series C funding</li>
-                            <li>New DAC plant in Texas reaches 1 million tons milestone</li>
-                            <li>Research shows 40% cost reduction potential by 2030</li>
-                        </ul>
-                        <p style="margin-top: 15px;">Would you like me to expand on any of these points?</p>
-                        <div class="ai-timestamp">10:21:52 AM</div>
-                    </div>
+                <div id="ai-content-area" class="content-area">
+                    <p id="ai-preview-text" style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>
                 </div>
                 
                 <div class="ai-input-area">
@@ -446,18 +474,185 @@
                         </button>
                     </div>
                     <div class="ai-input-wrapper">
-                        <textarea 
-                            class="ai-input" 
-                            placeholder="Ask AI to refine, expand, or modify the content..."
-                            rows="1"
-                        ></textarea>
-                        <button class="ai-send-btn">
-                            <i class="bi bi-send-fill"></i>
-                        </button>
+                        <form id="prompt-form" onsubmit="return handleFormSubmit(event)">
+                            <textarea 
+                                id="ai-prompt-input"
+                                class="ai-input" 
+                                placeholder="Ask AI to refine, expand, or modify the content..."
+                                rows="1"
+                                oninput="toggleSendButton(); updateAIPreview();"
+                            ></textarea>
+                            <button id="ai-send-btn" class="ai-send-btn" type="submit" disabled>
+                                <i class="bi bi-send-fill"></i>
+                            </button>
+                        </form>
                     </div>
                     <div class="ai-input-hint">Press Enter to send. Shift+Enter for new line</div>
                 </div>
             </div>
             
         </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    const CATEGORY_ID = {{ category_id }};
+    
+    function addNewContent() {
+        // Clear the formatted content area
+        const currentContentArea = document.querySelector('.editor-panel:first-of-type .content-area');
+        if (currentContentArea) {
+            currentContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>';
+        }
+        
+        // Clear the AI message area
+        const aiContentArea = document.querySelector('.editor-panel:last-of-type .content-area');
+        if (aiContentArea) {
+            aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Ready to generate content. Type your request below or use action buttons.</p>';
+        }
+    }
+    
+    function toggleSendButton() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        const sendBtn = document.getElementById('ai-send-btn');
+        const promptText = promptInput.value.trim();
+        
+        // Enable button only if there's non-whitespace text
+        sendBtn.disabled = !promptText;
+    }
+    
+    function updateAIPreview() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        const aiContentArea = document.getElementById('ai-content-area');
+        const inputText = promptInput.value.trim();
+        
+        if (inputText) {
+            // Show the typed text as a paragraph in AI section
+            aiContentArea.innerHTML = '<p class="user-prompt">' + 
+                inputText.replace(/\n/g, '<br>') + '</p>';
+        } else {
+            // Show placeholder when empty
+            aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>';
+        }
+    }
+    
+    async function handleFormSubmit(event) {
+        event.preventDefault();
+        
+        const promptInput = document.getElementById('ai-prompt-input');
+        const sendBtn = document.getElementById('ai-send-btn');
+        const promptText = promptInput.value.trim();
+        
+        // Validate input - don't send if empty or only whitespace
+        if (!promptText) {
+            return false;
+        }
+        
+        const aiContentArea = document.getElementById('ai-content-area');
+        const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
+        
+        // Disable button during submission
+        sendBtn.disabled = true;
+        
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return false;
+            }
+            
+            // Prepare payload
+            const payload = {
+                category_id: CATEGORY_ID,
+                prompt_data: promptText
+            };
+            
+            // Send POST request
+            const response = await fetch('/user/content', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                // Check if token expired using global function
+                if (handleTokenExpiration(response)) {
+                    return false;
+                }
+                
+                // On error: change paragraph color to red
+                if (userPromptParagraph) {
+                    userPromptParagraph.classList.remove('success');
+                    userPromptParagraph.classList.add('error');
+                }
+                
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
+                sendBtn.disabled = false;
+                return false;
+            }
+            
+            const result = await response.json();
+            
+            // On success: change paragraph color to teal and add timestamp below
+            if (userPromptParagraph) {
+                userPromptParagraph.classList.remove('error');
+                userPromptParagraph.classList.add('success');
+                
+                // Create timestamp element
+                const timestamp = document.createElement('div');
+                timestamp.className = 'prompt-timestamp';
+                const now = new Date();
+                const options = { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                };
+                timestamp.textContent = 'Saved on ' + now.toLocaleDateString('en-US', options);
+                
+                // Insert timestamp after the paragraph
+                userPromptParagraph.parentNode.insertBefore(timestamp, userPromptParagraph.nextSibling);
+            }
+            
+            // Clear input after successful send
+            promptInput.value = '';
+            sendBtn.disabled = true; // Keep disabled after clearing
+            
+            console.log('Prompt sent successfully:', result);
+            
+        } catch (error) {
+            console.error('Error sending prompt:', error);
+            
+            // On exception: change paragraph color to red
+            if (userPromptParagraph) {
+                userPromptParagraph.classList.remove('success');
+                userPromptParagraph.classList.add('error');
+            }
+            
+            alert('Failed to send prompt. Please try again.');
+            sendBtn.disabled = false;
+        }
+        
+        return false;
+    }
+    
+    // Allow Enter key to submit (Shift+Enter for new line)
+    document.addEventListener('DOMContentLoaded', function() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        if (promptInput) {
+            promptInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const form = document.getElementById('prompt-form');
+                    if (form) {
+                        form.dispatchEvent(new Event('submit'));
+                    }
+                }
+            });
+        }
+    });
 {% endblock %}

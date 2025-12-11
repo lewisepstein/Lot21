@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum, func
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import enum
 import uuid as uuid_lib
 from models.base import Base
@@ -26,7 +25,7 @@ class TaskRun(Base):
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid_lib.uuid4()), index=True)
     task_run_status = Column(SQLAlchemyEnum(TaskRunStatusEnum), nullable=False, default=TaskRunStatusEnum.IN_PROGRESS)
     task_run_message = Column(Text, nullable=True)
-    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
     scheduled_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
 
@@ -72,7 +71,7 @@ class TaskProcess(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     task_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=False)
     process_id = Column(Integer, nullable=False)
-    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)

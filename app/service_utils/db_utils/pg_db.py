@@ -303,7 +303,7 @@ class PostgresDB:
             logger.error(f"Connection test failed: {e}")
             return False
 
-    def create(self, table_name: str, data: Dict[str, Any]) -> Optional[Any]:
+    def create(self, table_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Insert a new record into the specified table with transaction support and data validation.
 
@@ -312,7 +312,7 @@ class PostgresDB:
             data (dict): Data to insert.
 
         Returns:
-            Optional[Any]: The inserted record.
+            Optional[Dict[str, Any]]: The inserted record as a dictionary.
 
         Raises:
             SQLAlchemyInsertError: If the insert operation fails
@@ -326,7 +326,7 @@ class PostgresDB:
             ...     'is_active': True
             ... }
             >>> created_user = db.create('users', user_data)
-            >>> print(created_user.id)  # Access the created user's ID
+            >>> print(created_user['id'])  # Access the created user's ID
         """
         try:
             table = self._get_table(table_name)
@@ -338,7 +338,12 @@ class PostgresDB:
             
             with self.engine.begin() as conn:
                 result = conn.execute(stmt)
-                return result.fetchone()
+                row = result.fetchone()
+                
+                # Convert Row object to dictionary
+                if row:
+                    return dict(row._mapping) if hasattr(row, '_mapping') else dict(zip(row.keys(), row))
+                return None
         except ValueError as e:
             raise ValueError(f"Data validation failed: {e}")
         except SQLAlchemyError as e:

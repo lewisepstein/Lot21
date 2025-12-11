@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 from models.base import Base
 
 class Scheduler(Base):
@@ -16,7 +15,7 @@ class Scheduler(Base):
     scheduled_at = Column(DateTime(timezone=True), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
 
     # Relationship to User model

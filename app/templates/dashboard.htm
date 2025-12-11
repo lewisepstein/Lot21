@@ -183,8 +183,7 @@
                 });
                 
                 if (!response.ok) {
-                    localStorage.removeItem('access_token');
-                    window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
+                    handleTokenExpiration(response);
                     return;
                 }
             } catch (error) {
@@ -281,10 +280,8 @@
                 });
                 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        localStorage.removeItem('access_token');
-                        window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
-                    }
+                    handleTokenExpiration(response);
+                    return;
                 }
             } catch (error) {
                 console.error('Error loading dashboard:', error);

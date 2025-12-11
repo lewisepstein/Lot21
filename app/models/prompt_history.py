@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum, func
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 from models.base import Base
 import enum
 
@@ -29,7 +28,7 @@ class PromptHistory(Base):
     user_prompt = Column(Text, nullable=True)
     ai_response = Column(Text, nullable=True)
     prompt_type = Column(SQLAlchemyEnum(PromptTypeEnum), nullable=True, default=PromptTypeEnum.TEXT)
-    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships

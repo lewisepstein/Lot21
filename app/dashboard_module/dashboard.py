@@ -26,16 +26,6 @@ async def dashboard_page(request: Request):
         {"request": request}
     )
 
-
-@router.get("/understanding", response_class=HTMLResponse)
-async def understanding_page(request: Request):
-    """Render understanding categories HTML page. Authentication handled by frontend JavaScript."""
-    return templates.TemplateResponse(
-        "understanding.htm",
-        {"request": request}
-    )
-
-
 # API Endpoints
 @router.get("/dashboard-data", response_model=DashboardResponse)
 async def dashboard_data(credentials: HTTPAuthorizationCredentials = Depends(security)):

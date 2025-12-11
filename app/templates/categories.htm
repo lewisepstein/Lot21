@@ -1,0 +1,74 @@
+{% extends "base.htm" %}
+
+{% block title %}Understanding Categories - Lottie{% endblock %}
+
+{% block nav_understanding %}active{% endblock %}
+
+{% block page_title %}Understanding Categories{% endblock %}
+{% block page_subtitle %}AI-powered insights and updates for each climate technology category{% endblock %}
+
+{% block content %}
+        <!-- Top Action Button -->
+        <div class="d-flex justify-content-end mb-4">
+            <button class="action-btn action-btn-primary">
+                <i class="bi bi-stars"></i> Generate All Insights
+            </button>
+        </div>
+        
+        <!-- Categories Grid -->
+        <div class="row g-4">
+            {% if not data %}
+                <p class="alert alert-error">{{ message }}</p>
+            {% else %}
+                {% for row in data %}
+                    <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+                        <div class="category-card">
+                            <div class="category-header">
+                                <h3 class="category-title">{{ row.category_name }}</h3>
+                                <div class="category-updated">
+                                    <i class="bi bi-calendar3"></i>
+                                    <span>Updated On - <strong style="color:#5df307;">{{ row.last_updated_on|safe }}</strong></span>
+                                </div>
+                            </div>
+                            <div class="category-badge">{{ row.ai_suggestions }} AI Suggestions</div>
+                            <a href="/user/content/{{ row.id }}" class="category-btn" style="text-decoration: none;">
+                                <i class="bi bi-stars"></i>
+                                Generate Insights
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}        
+            {% endif %}
+        </div>
+{% endblock %}
+
+{% block extra_scripts %}
+        // Check authentication immediately on page load
+        (async function() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return;
+            }
+            
+            // Verify token with backend
+            try {
+                const response = await fetch('/user/dashboard-data', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    handleTokenExpiration(response);
+                    return;
+                }
+            } catch (error) {
+                localStorage.removeItem('access_token');
+                window.location.replace('/?error=' + encodeURIComponent('Authentication failed. Please login again.'));
+                return;
+            }
+        })();
+{% endblock %}

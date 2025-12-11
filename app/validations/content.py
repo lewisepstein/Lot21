@@ -8,85 +8,24 @@ class ContentAddValidation(BaseModel):
     """
     Pydantic validation model for adding new content.
     """
-    task_run_id: int = Field(
-        ...,
-        gt=0,
-        description="ID of the task run associated with this content"
-    )
     category_id: int = Field(
         ...,
         gt=0,
         description="ID of the category for this content"
     )
-    prompt_data: Optional[str] = Field(
-        default=None,
+    prompt_data: str = Field(
+        ...,
+        min_length=1,
         description="Input prompt data used to generate the content"
-    )
-    generated_content: Optional[str] = Field(
-        default=None,
-        description="AI-generated content output"
-    )
-    action: ContentActionEnum = Field(
-        default=ContentActionEnum.DRAFT,
-        description="Action to perform on the content"
-    )
-    approval_status: ContentApprovalStatusEnum = Field(
-        default=ContentApprovalStatusEnum.PENDING,
-        description="Approval status of the content"
-    )
-    approval_status_date: Optional[datetime] = Field(
-        default=None,
-        description="Date when approval status was last updated"
-    )
-    accuracy: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Accuracy score of the generated content (0-1)"
-    )
-    comments: Optional[str] = Field(
-        default=None,
-        description="Comments or feedback about the content"
-    )
-    quarter: Optional[str] = Field(
-        default=None,
-        max_length=50,
-        description="Quarter identifier (e.g., Q1 2025)"
     )
 
     @field_validator("prompt_data")
     @classmethod
-    def validate_prompt_data(cls, v: Optional[str]) -> Optional[str]:
-        """Trim prompt data if provided."""
-        if v is not None:
-            return v.strip() if v.strip() else None
-        return v
-
-    @field_validator("generated_content")
-    @classmethod
-    def validate_generated_content(cls, v: Optional[str]) -> Optional[str]:
-        """Trim generated content if provided."""
-        if v is not None:
-            return v.strip() if v.strip() else None
-        return v
-
-    @field_validator("comments")
-    @classmethod
-    def validate_comments(cls, v: Optional[str]) -> Optional[str]:
-        """Trim comments if provided."""
-        if v is not None:
-            return v.strip() if v.strip() else None
-        return v
-
-    @field_validator("quarter")
-    @classmethod
-    def validate_quarter(cls, v: Optional[str]) -> Optional[str]:
-        """Trim and validate quarter format if provided."""
-        if v is not None:
-            v = v.strip()
-            if not v:
-                return None
-            return v
+    def validate_prompt_data(cls, v: str) -> str:
+        """Trim and validate prompt data."""
+        v = v.strip()
+        if not v:
+            raise ValueError("Prompt data cannot be empty or whitespace only")
         return v
 
 
