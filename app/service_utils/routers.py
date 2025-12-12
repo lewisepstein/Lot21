@@ -10,6 +10,7 @@ from dashboard_module.dashboard import router as dashboard_router
 from projects_module.projects import router as projects_router
 from resources_module.resources import router as resources_router
 from content_module.content import router as content_router
+from content_module.prompt_history import router as prompt_history_router
 from category_module.category import router as category_router
 
 
@@ -25,4 +26,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(projects_router, tags=["user"])
     app.include_router(resources_router, tags=["user"])
     app.include_router(content_router, tags=["user"])
+    app.include_router(prompt_history_router, tags=["user"])
     app.include_router(category_router, tags=["user"])

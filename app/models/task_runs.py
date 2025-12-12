@@ -28,9 +28,11 @@ class TaskRun(Base):
     created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
     scheduled_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    prompt_history_id = Column(Integer, ForeignKey("prompt_history.id"), nullable=True)
 
-    # Relationship
+    # Relationships
     task = relationship("Task", backref="task_runs")
+    prompt_history = relationship("PromptHistory", backref="task_runs")
 
     def __repr__(self):
         return f"<TaskRun(id={self.id}, uuid='{self.uuid}', status={self.task_run_status.value}, scheduled_task_id={self.scheduled_task_id}, content_id={self.content_id})>"
@@ -45,6 +47,7 @@ class TaskRun(Base):
             "created_on": self.created_on.isoformat() if self.created_on else None,
             "deleted_on": self.deleted_on.isoformat() if self.deleted_on else None,
             "scheduled_task_id": self.scheduled_task_id,
+            "prompt_history_id": self.prompt_history_id
         }
 
 

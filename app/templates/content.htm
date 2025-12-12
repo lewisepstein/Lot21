@@ -263,12 +263,26 @@
         background-color: rgba(0, 217, 181, 0.1);
         border-left: 3px solid var(--accent-teal);
         color: var(--accent-teal);
+        position: relative;
     }
     
     .user-prompt.error {
         background-color: rgba(255, 81, 47, 0.1);
         border-left: 3px solid #ff512f;
         color: #ff512f;
+    }
+    
+    .latest-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 8px;
+        vertical-align: middle;
     }
     
     .prompt-timestamp {
@@ -411,7 +425,7 @@
                 <div class="meta-info">
                     <div class="meta-item">
                         <span class="meta-label">Last Approved</span>
-                        <span class="meta-value">March 15, 2024</span>
+                        <span class="meta-value"></span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Updated By</span>
@@ -419,7 +433,7 @@
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Version</span>
-                        <span class="version-badge">v2.3</span>
+                        <span class="version-badge">v1.0</span>
                     </div>
                 </div>
                 
@@ -436,11 +450,11 @@
                 </div>
                 
                 <div class="content-area">
-                    <p><strong>Direct Air Capture (DAC)</strong> is a technology that removes CO<sub>2</sub> directly from the atmosphere. Unlike carbon capture at emission sources, DAC can be deployed anywhere and removes legacy emissions.</p>
-                    
-                    <p><strong>Key Technologies:</strong> • Solid sorbent systems (like Climeworks) • Liquid solvent systems (like Carbon Engineering) • Electrochemical approaches</p>
-                    
-                    <p><strong>Current Status:</strong> Several commercial-scale facilities are now operational, with capacity growing rapidly. Costs are decreasing as technology matures.</p>
+                    {% if latest_content and latest_content.generated_content %}
+                    {{ latest_content.generated_content | safe }}
+                    {% else %}
+                    <p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>
+                    {% endif %}
                 </div>
             </div>
             
@@ -455,7 +469,14 @@
                 </div>
                 
                 <div id="ai-content-area" class="content-area">
+                    {% if latest_content and latest_content.prompt_data %}
+                    <p class="user-prompt success">
+                        {{ latest_content.prompt_data }}
+                        <span class="latest-badge">Latest</span>
+                    </p>
+                    {% else %}
                     <p id="ai-preview-text" style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>
+                    {% endif %}
                 </div>
                 
                 <div class="ai-input-area">
@@ -497,7 +518,7 @@
 {% block extra_scripts %}
     const CATEGORY_ID = {{ category_id }};
     
-    function addNewContent() {
+    async function addNewContent() {
         // Clear the formatted content area
         const currentContentArea = document.querySelector('.editor-panel:first-of-type .content-area');
         if (currentContentArea) {
@@ -508,6 +529,62 @@
         const aiContentArea = document.querySelector('.editor-panel:last-of-type .content-area');
         if (aiContentArea) {
             aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Ready to generate content. Type your request below or use action buttons.</p>';
+        }
+        
+        // Send POST request to create new content entry
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return;
+            }
+            
+            // Prepare payload with null prompt_data
+            const payload = {
+                category_id: CATEGORY_ID,
+                prompt_data: null,
+                action: "NEW"
+            };
+            
+            // Send POST request
+            const response = await fetch('/user/content', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                // Check if token expired using global function
+                if (handleTokenExpiration(response)) {
+                    return;
+                }
+                
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || 'Failed to create new content'));
+                return;
+            }
+            
+            const result = await response.json();
+            console.log('New content created successfully:', result);
+            
+            // Store prompt_session_id in localStorage if returned
+            if (result.prompt_session_id) {
+                localStorage.setItem('prompt_session_id', result.prompt_session_id);
+                console.log('Stored prompt_session_id:', result.prompt_session_id);
+            }
+
+            // Store content_id in localStorage if returned
+            if (result.content.id) {
+                localStorage.setItem('content_id', result.content.id);
+                console.log('Stored content_id:', result.content.id);
+            }
+            
+        } catch (error) {
+            console.error('Error creating new content:', error);
+            alert('Failed to create new content. Please try again.');
         }
     }
     
@@ -525,13 +602,32 @@
         const aiContentArea = document.getElementById('ai-content-area');
         const inputText = promptInput.value.trim();
         
+        // Check if there's already existing prompt history
+        const existingPrompts = aiContentArea.querySelectorAll('.user-prompt.success');
+        
         if (inputText) {
-            // Show the typed text as a paragraph in AI section
-            aiContentArea.innerHTML = '<p class="user-prompt">' + 
-                inputText.replace(/\n/g, '<br>') + '</p>';
+            // Remove any existing preview (not saved prompts)
+            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+            
+            // Add new preview paragraph at the end
+            const previewParagraph = document.createElement('p');
+            previewParagraph.className = 'user-prompt';
+            previewParagraph.innerHTML = inputText.replace(/\n/g, '<br>');
+            aiContentArea.appendChild(previewParagraph);
         } else {
-            // Show placeholder when empty
-            aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>';
+            // Remove only the preview paragraph (not saved prompts)
+            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+            
+            // Show placeholder only if no saved prompts exist
+            if (existingPrompts.length === 0) {
+                aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>';
+            }
         }
     }
     
@@ -560,14 +656,25 @@
                 return false;
             }
             
-            // Prepare payload
+            // Get stored values from localStorage
+            const prompt_session_id = localStorage.getItem('prompt_session_id');
+            const content_id = localStorage.getItem('content_id');
+            
+            if (!prompt_session_id || !content_id) {
+                alert('Please click "Add New" first to start a new content session');
+                sendBtn.disabled = false;
+                return false;
+            }
+            
+            // Prepare payload for draft endpoint
             const payload = {
-                category_id: CATEGORY_ID,
-                prompt_data: promptText
+                prompt_text: promptText,
+                content_id: parseInt(content_id),
+                prompt_session_id: prompt_session_id
             };
             
-            // Send POST request
-            const response = await fetch('/user/content', {
+            // Send POST request to add_draft_content endpoint
+            const response = await fetch('/user/content/draft', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -596,27 +703,35 @@
             
             const result = await response.json();
             
-            // On success: change paragraph color to teal and add timestamp below
-            if (userPromptParagraph) {
-                userPromptParagraph.classList.remove('error');
-                userPromptParagraph.classList.add('success');
-                
-                // Create timestamp element
-                const timestamp = document.createElement('div');
-                timestamp.className = 'prompt-timestamp';
-                const now = new Date();
-                const options = { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                };
-                timestamp.textContent = 'Saved on ' + now.toLocaleDateString('en-US', options);
-                
-                // Insert timestamp after the paragraph
-                userPromptParagraph.parentNode.insertBefore(timestamp, userPromptParagraph.nextSibling);
+            // Remove the preview paragraph (unsaved one)
+            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (previewParagraph) {
+                previewParagraph.remove();
             }
+            
+            // Remove "Latest" badge from previous prompts
+            const previousLatest = aiContentArea.querySelectorAll('.latest-badge');
+            previousLatest.forEach(badge => badge.remove());
+            
+            // Add the saved prompt to the area
+            const savedPromptDiv = document.createElement('p');
+            savedPromptDiv.className = 'user-prompt success';
+            savedPromptDiv.innerHTML = promptText.replace(/\n/g, '<br>') + '<span class="latest-badge">Latest</span>';
+            aiContentArea.appendChild(savedPromptDiv);
+            
+            // Create timestamp element
+            const timestamp = document.createElement('div');
+            timestamp.className = 'prompt-timestamp';
+            const now = new Date();
+            const options = { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            };
+            timestamp.textContent = 'Saved on ' + now.toLocaleDateString('en-US', options);
+            aiContentArea.appendChild(timestamp);
             
             // Clear input after successful send
             promptInput.value = '';
@@ -627,10 +742,10 @@
         } catch (error) {
             console.error('Error sending prompt:', error);
             
-            // On exception: change paragraph color to red
-            if (userPromptParagraph) {
-                userPromptParagraph.classList.remove('success');
-                userPromptParagraph.classList.add('error');
+            // On exception: change preview paragraph color to red
+            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (previewParagraph) {
+                previewParagraph.classList.add('error');
             }
             
             alert('Failed to send prompt. Please try again.');
@@ -654,5 +769,78 @@
                 }
             });
         }
+        
+        // Load prompt history on page load
+        loadPromptHistory();
     });
+    
+    async function loadPromptHistory() {
+        const prompt_session_id = localStorage.getItem('prompt_session_id');
+        const content_id = localStorage.getItem('content_id');
+        
+        // Only load if we have both values
+        if (!prompt_session_id || !content_id) {
+            console.log('No prompt session found in localStorage');
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                return;
+            }
+            
+            const response = await fetch(`/user/prompt_history/${prompt_session_id}/${content_id}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                if (handleTokenExpiration(response)) {
+                    return;
+                }
+                console.error('Failed to load prompt history');
+                return;
+            }
+            
+            const promptHistories = await response.json();
+            
+            // Display prompt histories in AI content area
+            const aiContentArea = document.getElementById('ai-content-area');
+            if (aiContentArea && promptHistories.length > 0) {
+                aiContentArea.innerHTML = '';
+                
+                promptHistories.forEach((ph, index) => {
+                    if (ph.user_prompt) {
+                        const isLatest = index === promptHistories.length - 1;
+                        const promptDiv = document.createElement('p');
+                        promptDiv.className = 'user-prompt success';
+                        promptDiv.innerHTML = ph.user_prompt + 
+                            (isLatest ? '<span class="latest-badge">Latest</span>' : '');
+                        aiContentArea.appendChild(promptDiv);
+                        
+                        // Add timestamp
+                        const timestamp = document.createElement('div');
+                        timestamp.className = 'prompt-timestamp';
+                        const createdDate = new Date(ph.created_on);
+                        const options = { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        };
+                        timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
+                        aiContentArea.appendChild(timestamp);
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error loading prompt history:', error);
+        }
+    }
 {% endblock %}

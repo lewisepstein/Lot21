@@ -13,19 +13,23 @@ class ContentAddValidation(BaseModel):
         gt=0,
         description="ID of the category for this content"
     )
-    prompt_data: str = Field(
-        ...,
-        min_length=1,
+    prompt_data: Optional[str] = Field(
+        default=None,
         description="Input prompt data used to generate the content"
+    )
+    action: Optional[ContentActionEnum] = Field(
+        default=None,
+        description="Action to perform on the content"
     )
 
     @field_validator("prompt_data")
     @classmethod
-    def validate_prompt_data(cls, v: str) -> str:
-        """Trim and validate prompt data."""
-        v = v.strip()
-        if not v:
-            raise ValueError("Prompt data cannot be empty or whitespace only")
+    def validate_prompt_data(cls, v: Optional[str]) -> Optional[str]:
+        """Trim and validate prompt data if provided."""
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
         return v
 
 

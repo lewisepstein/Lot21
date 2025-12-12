@@ -13,6 +13,21 @@ class PromptTypeEnum(enum.Enum):
     AUDIO = "AUDIO"
     MULTITYPE = "MULTITYPE"
 
+class PromptActionEnum(enum.Enum):
+    """
+    Enum for content action values.
+    """
+    NEW = "NEW"
+    DRAFT = "DRAFT"
+    RE_RUN = "RE_RUN"
+    CANCEL = "CANCEL"
+    RESTORE = "RESTORE"
+
+class PromptLikeStatusEnum(enum.Enum):
+    UNLIKED = "UNLIKED"
+    LIKED = "LIKED"
+    NEUTRAL = "NEUTRAL"
+
 class PromptHistory(Base):
     """
     SQLAlchemy model for prompt_history table.
@@ -24,19 +39,19 @@ class PromptHistory(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     prompt_session_id = Column(String(255), nullable=False, index=True)
     content_id = Column(Integer, ForeignKey("content.id"), nullable=False)
-    task_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=False)
     user_prompt = Column(Text, nullable=True)
     ai_response = Column(Text, nullable=True)
     prompt_type = Column(SQLAlchemyEnum(PromptTypeEnum), nullable=True, default=PromptTypeEnum.TEXT)
+    prompt_like = Column(SQLAlchemyEnum(PromptLikeStatusEnum), nullable=True, default=PromptLikeStatusEnum.NEUTRAL)
+    prompt_action = Column(SQLAlchemyEnum(PromptActionEnum), nullable=True, default=PromptActionEnum.NEW)
     created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     content = relationship("Content", backref="prompt_histories")
-    task_run = relationship("TaskRun", backref="prompt_histories")
 
     def __repr__(self):
-        return f"<PromptHistory(id={self.id}, prompt_session_id='{self.prompt_session_id}', content_id={self.content_id}, task_run_id={self.task_run_id})>"
+        return f"<PromptHistory(id={self.id}, prompt_session_id='{self.prompt_session_id}', content_id={self.content_id})>"
 
     def to_dict(self):
         """Convert the prompt history object to a dictionary for API responses."""
@@ -44,10 +59,13 @@ class PromptHistory(Base):
             "id": self.id,
             "prompt_session_id": self.prompt_session_id,
             "content_id": self.content_id,
-            "task_run_id": self.task_run_id,
             "user_prompt": self.user_prompt,
             "ai_response": self.ai_response,
             "prompt_type": self.prompt_type,
+            "prompt_like": self.prompt_like,
+            "prompt_action": self.prompt_action,
             "created_on": self.created_on.isoformat() if self.created_on else None,
             "deleted_on": self.deleted_on.isoformat() if self.deleted_on else None
         }
+
+

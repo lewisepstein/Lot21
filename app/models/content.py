@@ -9,6 +9,7 @@ class ContentActionEnum(enum.Enum):
     """
     Enum for content action values.
     """
+    NEW = "NEW"
     DRAFT = "DRAFT"
     RE_RUN = "RE_RUN"
     CANCEL = "CANCEL"
