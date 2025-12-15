@@ -3,7 +3,6 @@ Weaviate utility functions.
 Provides text chunking, embedding, and RAG prompt generation utilities.
 """
 import os
-import uuid
 import tiktoken
 import logging
 from typing import List, Dict, Any
@@ -239,3 +238,68 @@ def load_chunks_to_weaviate(
     except Exception as e:
         logger.error(f"Failed to load chunks to Weaviate: {str(e)}")
         raise RuntimeError(f"Failed to load chunks to Weaviate: {str(e)}")
+
+
+def delete_chunks_from_weaviate(
+    collection_name: str,
+    doc_id: str
+) -> Dict[str, Any]:
+    """
+    Delete all chunks with a specific doc_id from Weaviate collection.
+    
+    Args:
+        collection_name: Name of the Weaviate collection
+        doc_id: Unique document identifier to delete
+        
+    Returns:
+        Dictionary with success status and number of chunks deleted
+        
+    Raises:
+        RuntimeError: If Weaviate operations fail
+        
+    Examples:
+        >>> result = delete_chunks_from_weaviate("my_collection", "doc-123")
+        >>> print(f"Deleted {result['chunks_deleted']} chunks")
+    """
+    try:
+        # Initialize Weaviate connection
+        weaviate_db = WeaviateDB()
+        client = weaviate_db.client
+        
+        # Check if collection exists
+        if not client.collections.exists(collection_name):
+            logger.warning(f"Collection '{collection_name}' does not exist")
+            return {
+                "success": True,
+                "chunks_deleted": 0,
+                "message": f"Collection '{collection_name}' does not exist"
+            }
+        
+        # Get collection
+        collection = client.collections.get(collection_name)
+        
+        logger.info(f"Deleting chunks with doc_id '{doc_id}' from collection '{collection_name}'")
+        
+        # Delete all objects with matching doc_id
+        result = collection.data.delete_many(
+            where={
+                "path": ["doc_id"],
+                "operator": "Equal",
+                "valueText": doc_id
+            }
+        )
+        
+        deleted_count = result.successful if hasattr(result, 'successful') else 0
+        
+        logger.info(f"Successfully deleted {deleted_count} chunks from collection '{collection_name}'")
+        
+        return {
+            "success": True,
+            "chunks_deleted": deleted_count,
+            "collection_name": collection_name,
+            "doc_id": doc_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to delete chunks from Weaviate: {str(e)}")
+        raise RuntimeError(f"Failed to delete chunks from Weaviate: {str(e)}")

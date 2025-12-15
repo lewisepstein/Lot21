@@ -54,6 +54,7 @@ class WeaviateData(Base):
     end_time = Column(DateTime(timezone=True), nullable=True)
     processing_duration = Column(Integer, nullable=True)  # Duration in seconds
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_on = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     error_msg = Column(Text, nullable=True)
     
@@ -77,7 +78,8 @@ class WeaviateData(Base):
             "processing_duration": self.processing_duration,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
-            "error_msg": self.error_msg
+            "error_msg": self.error_msg,
+            "updated_on": self.updated_on.isoformat() if self.updated_on else None
         }
     
     def calculate_duration(self):

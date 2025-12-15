@@ -8,7 +8,10 @@ from auth_module.auth_utils import verify_token
 from agent_module.agent_utils import (
     load_training_data_to_weaviate,
     get_training_history,
-    delete_training_record
+    delete_training_record,
+    update_training_record,
+    get_version_history,
+    restore_from_version
 )
 
 # Set up logging
@@ -370,3 +373,126 @@ async def delete_training_record(
     except Exception as e:
         logger.error(f"Unexpected error deleting training record: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete training record: {str(e)}")
+
+
+@router.put("/settings/training-record/{record_id}")
+async def update_training_record_endpoint(
+    record_id: int,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Update an existing training record with new data.
+    """
+    # Verify token and get user info
+    success, status_code, message, payload = verify_token(credentials.credentials)
+    
+    if not success or not payload:
+        raise HTTPException(status_code=status_code, detail=message)
+    
+    user_id = payload.get("user_id")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user authentication")
+    
+    # Get request data
+    data = await request.json()
+    training_data = data.get("training_data", "")
+    description = data.get("description", "")
+    
+    if not training_data.strip():
+        raise HTTPException(status_code=400, detail="Training data cannot be empty")
+    
+    try:
+        result = update_training_record(
+            record_id=record_id,
+            user_id=user_id,
+            training_data=training_data,
+            description=description
+        )
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error updating training record: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update training record: {str(e)}")
+
+
+@router.get("/settings/training-record/{record_id}/versions")
+async def get_training_record_versions(
+    record_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get version history for a training record.
+    """
+    # Verify token and get user info
+    success, status_code, message, payload = verify_token(credentials.credentials)
+    
+    if not success or not payload:
+        raise HTTPException(status_code=status_code, detail=message)
+    
+    user_id = payload.get("user_id")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user authentication")
+    
+    try:
+        versions = get_version_history(
+            weaviate_data_id=record_id,
+            user_id=user_id
+        )
+        return {
+            "success": True,
+            "record_id": record_id,
+            "versions": versions,
+            "total_versions": len(versions)
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error getting version history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get version history: {str(e)}")
+
+
+@router.post("/settings/training-record/{record_id}/restore/{version_number}")
+async def restore_training_record_version(
+    record_id: int,
+    version_number: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Restore a training record to a previous version.
+    """
+    # Verify token and get user info
+    success, status_code, message, payload = verify_token(credentials.credentials)
+    
+    if not success or not payload:
+        raise HTTPException(status_code=status_code, detail=message)
+    
+    user_id = payload.get("user_id")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user authentication")
+    
+    try:
+        result = restore_from_version(
+            weaviate_data_id=record_id,
+            version_number=version_number,
+            user_id=user_id
+        )
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error restoring version: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore version: {str(e)}")
