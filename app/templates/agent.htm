@@ -1,0 +1,1531 @@
+{% extends "base.htm" %}
+
+{% block title %}Agent Settings - Lottie{% endblock %}
+
+{% block nav_settings %}active{% endblock %}
+
+{% block page_title %}Agent Settings{% endblock %}
+{% block page_subtitle %}Configure AI models, scheduling, and content preferences{% endblock %}
+
+{% block extra_styles %}
+.settings-container {
+    width: 100%;
+}
+
+.settings-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0;
+}
+
+.tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-bottom: 2px solid transparent;
+    font-family: 'Inter', sans-serif;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    color: var(--accent-teal);
+    border-bottom-color: var(--accent-teal);
+}
+
+.tab-btn i {
+    font-size: 16px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.settings-section {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.3s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-teal);
+    background-color: rgba(0, 217, 181, 0.05);
+}
+
+.form-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--accent-teal), var(--accent-green));
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'Inter', sans-serif;
+}
+
+.save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 217, 181, 0.3);
+}
+
+.save-btn i {
+    font-size: 16px;
+}
+
+.system-status {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 5px 0;
+    color: var(--text-primary);
+}
+
+.status-info p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    background-color: var(--accent-green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-text {
+    color: var(--accent-green);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.time-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.form-select {
+    padding: 12px 16px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: var(--accent-teal);
+}
+
+.form-select option {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-teal);
+}
+
+.tone-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.tone-option {
+    padding: 12px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 13px;
+}
+
+.tone-option:hover {
+    border-color: var(--accent-teal);
+}
+
+.tone-option.selected {
+    background-color: rgba(0, 217, 181, 0.1);
+    border-color: var(--accent-teal);
+    color: var(--accent-teal);
+}
+
+.model-card {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 15px;
+}
+
+.model-card:hover {
+    border-color: var(--accent-teal);
+}
+
+.model-card.selected {
+    background-color: rgba(0, 217, 181, 0.1);
+    border-color: var(--accent-teal);
+}
+
+.model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.model-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.model-badge {
+    padding: 4px 10px;
+    background-color: rgba(0, 217, 181, 0.2);
+    color: var(--accent-teal);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.model-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.alert-success {
+    background-color: rgba(0, 208, 132, 0.1);
+    border: 1px solid var(--accent-green);
+    color: var(--accent-green);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.alert-error {
+    background-color: rgba(255, 81, 47, 0.1);
+    border: 1px solid #ff512f;
+    color: #ff512f;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.form-textarea {
+    width: 100%;
+    min-height: 400px;
+    padding: 16px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+    transition: all 0.3s;
+    line-height: 1.6;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-teal);
+    background-color: rgba(0, 217, 181, 0.05);
+}
+
+.form-textarea::placeholder {
+    color: var(--text-secondary);
+}
+
+.upload-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background-color: rgba(0, 217, 181, 0.1);
+    border: 1px solid var(--accent-teal);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.upload-info i {
+    color: var(--accent-teal);
+    font-size: 18px;
+}
+
+/* Offcanvas styling */
+.offcanvas-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.offcanvas-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.offcanvas {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 75%;
+    height: 100%;
+    background: var(--bg-card);
+    z-index: 10000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.offcanvas.show {
+    transform: translateX(0);
+}
+
+.offcanvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+}
+
+.offcanvas-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-teal) var(--bg-primary);
+}
+
+.offcanvas-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.offcanvas-body::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 4px;
+}
+
+.offcanvas-body::-webkit-scrollbar-thumb {
+    background: var(--accent-teal);
+    border-radius: 4px;
+}
+
+.offcanvas-body::-webkit-scrollbar-thumb:hover {
+    background: #00c9a7;
+}
+
+@media (max-width: 768px) {
+    .offcanvas {
+        width: 90%;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <!-- Alert Messages -->
+    <div id="successAlert" class="alert-success"></div>
+    <div id="errorAlert" class="alert-error"></div>
+
+    <!-- Settings Tabs -->
+    <div class="settings-tabs">
+        <button class="tab-btn active" onclick="switchTab('api')">
+            <i class="bi bi-plug"></i>
+            API Configuration
+        </button>
+        <button class="tab-btn" onclick="switchTab('scheduling')">
+            <i class="bi bi-clock"></i>
+            Scheduling
+        </button>
+        <button class="tab-btn" onclick="switchTab('content')">
+            <i class="bi bi-palette"></i>
+            Content Style
+        </button>
+        <button class="tab-btn" onclick="switchTab('model')">
+            <i class="bi bi-cpu"></i>
+            AI Model
+        </button>
+        <button class="tab-btn" onclick="switchTab('train')">
+            <i class="bi bi-database"></i>
+            Train Model
+        </button>
+    </div>
+
+    <!-- API Configuration Tab -->
+    <div id="apiTab" class="tab-content active">
+        <div class="settings-section">
+            <h2 class="section-title">API Credentials</h2>
+            
+            <div class="form-group">
+                <label class="form-label">Web Search API Key</label>
+                <input type="text" class="form-input" id="webSearchApiKey" placeholder="Enter API key...">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Image Generation API Key</label>
+                <input type="text" class="form-input" id="imageGenApiKey" placeholder="Enter API key...">
+            </div>
+
+            <button class="save-btn" onclick="saveApiCredentials()">
+                <i class="bi bi-save"></i>
+                Save Credentials
+            </button>
+        </div>
+
+        <!-- System Status -->
+        <div class="system-status">
+            <div class="status-info">
+                <h3>System Status</h3>
+                <p>All systems operational</p>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="status-text">Online</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduling Tab -->
+    <div id="schedulingTab" class="tab-content">
+        <div class="settings-section">
+            <h2 class="section-title">Content Generation Schedule</h2>
+            
+            <div class="schedule-grid">
+                <div class="form-group">
+                    <label class="form-label">Understanding Updates</label>
+                    <select class="form-select" id="understandingSchedule">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Newsletter Generation</label>
+                    <select class="form-select" id="newsletterSchedule">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Social Media Posts</label>
+                    <select class="form-select" id="socialSchedule">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Preferred Time</label>
+                    <div class="time-input-group">
+                        <input type="time" class="form-input" id="preferredTime" value="09:00">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" class="form-checkbox" id="autoPublish">
+                    <label class="form-label" style="margin: 0;">Auto-publish generated content</label>
+                </div>
+            </div>
+
+            <button class="save-btn" onclick="saveScheduleSettings()">
+                <i class="bi bi-save"></i>
+                Save Schedule
+            </button>
+        </div>
+    </div>
+
+    <!-- Content Style Tab -->
+    <div id="contentTab" class="tab-content">
+        <div class="settings-section">
+            <h2 class="section-title">Content Preferences</h2>
+            
+            <div class="form-group">
+                <label class="form-label">Writing Tone</label>
+                <div class="tone-options">
+                    <div class="tone-option" onclick="selectTone(this, 'professional')">Professional</div>
+                    <div class="tone-option" onclick="selectTone(this, 'casual')">Casual</div>
+                    <div class="tone-option" onclick="selectTone(this, 'technical')">Technical</div>
+                    <div class="tone-option" onclick="selectTone(this, 'friendly')">Friendly</div>
+                    <div class="tone-option" onclick="selectTone(this, 'formal')">Formal</div>
+                    <div class="tone-option" onclick="selectTone(this, 'conversational')">Conversational</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Target Audience</label>
+                <select class="form-select" id="targetAudience">
+                    <option value="general">General Public</option>
+                    <option value="technical">Technical Experts</option>
+                    <option value="business">Business Professionals</option>
+                    <option value="students">Students & Educators</option>
+                    <option value="policymakers">Policy Makers</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Content Length</label>
+                <select class="form-select" id="contentLength">
+                    <option value="short">Short (100-300 words)</option>
+                    <option value="medium">Medium (300-600 words)</option>
+                    <option value="long">Long (600-1000 words)</option>
+                    <option value="detailed">Detailed (1000+ words)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" class="form-checkbox" id="includeImages" checked>
+                    <label class="form-label" style="margin: 0;">Include AI-generated images</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" class="form-checkbox" id="includeSources" checked>
+                    <label class="form-label" style="margin: 0;">Include source citations</label>
+                </div>
+            </div>
+
+            <button class="save-btn" onclick="saveContentSettings()">
+                <i class="bi bi-save"></i>
+                Save Preferences
+            </button>
+        </div>
+    </div>
+
+    <!-- AI Model Tab -->
+    <div id="modelTab" class="tab-content">
+        <div class="settings-section">
+            <h2 class="section-title">Language Model Selection</h2>
+            
+            <div class="model-card selected" onclick="selectModel(this, 'gpt-4')">
+                <div class="model-header">
+                    <span class="model-name">GPT-4 Turbo</span>
+                    <span class="model-badge">Recommended</span>
+                </div>
+                <p class="model-description">Most capable model for complex content generation with excellent accuracy and coherence.</p>
+            </div>
+
+            <div class="model-card" onclick="selectModel(this, 'gpt-3.5')">
+                <div class="model-header">
+                    <span class="model-name">GPT-3.5 Turbo</span>
+                    <span class="model-badge">Faster</span>
+                </div>
+                <p class="model-description">Balanced performance and speed, ideal for quick content generation tasks.</p>
+            </div>
+
+            <div class="model-card" onclick="selectModel(this, 'claude')">
+                <div class="model-header">
+                    <span class="model-name">Claude 3 Sonnet</span>
+                    <span class="model-badge">Alternative</span>
+                </div>
+                <p class="model-description">Excellent for nuanced content with strong reasoning capabilities.</p>
+            </div>
+
+            <button class="save-btn" onclick="saveModelSettings()">
+                <i class="bi bi-save"></i>
+                Save Model Selection
+            </button>
+        </div>
+
+        <div class="settings-section">
+            <h2 class="section-title">Image Generation Model</h2>
+            
+            <div class="model-card selected" onclick="selectImageModel(this, 'dall-e-3')">
+                <div class="model-header">
+                    <span class="model-name">DALL-E 3</span>
+                    <span class="model-badge">Recommended</span>
+                </div>
+                <p class="model-description">Latest image generation model with enhanced quality and adherence to prompts.</p>
+            </div>
+
+            <div class="model-card" onclick="selectImageModel(this, 'stable-diffusion')">
+                <div class="model-header">
+                    <span class="model-name">Stable Diffusion XL</span>
+                    <span class="model-badge">Cost-Effective</span>
+                </div>
+                <p class="model-description">Open-source alternative with good quality and customization options.</p>
+            </div>
+
+            <button class="save-btn" onclick="saveImageModelSettings()">
+                <i class="bi bi-save"></i>
+                Save Image Model
+            </button>
+        </div>
+    </div>
+
+    <!-- Train Model Tab -->
+    <div id="trainTab" class="tab-content">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Load Training Data Section -->
+            <div>
+                <div class="settings-section">
+                    <h2 class="section-title">Load Training Data</h2>
+                    
+                    <div class="upload-info">
+                        <i class="bi bi-info-circle"></i>
+                        <span>Paste your training data below. This data will be processed and stored in Weaviate for AI model training and retrieval.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Training Data</label>
+                        <textarea 
+                            class="form-textarea" 
+                            id="trainingData" 
+                            placeholder="Paste your training data here...\n\nYou can add:\n- Text content\n- Documentation\n- Knowledge base articles\n- Any data you want the AI to learn from"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Collection Name</label>
+                        <input type="text" class="form-input" id="collectionName" value="training_data" readonly style="background-color: var(--bg-secondary); cursor: not-allowed; opacity: 0.7;">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Data Description (Optional)</label>
+                        <input type="text" class="form-input" id="dataDescription" placeholder="Describe what this data is about...">
+                    </div>
+
+                    <button class="save-btn" onclick="loadDataToWeaviate()">
+                        <i class="bi bi-upload"></i>
+                        Load Data to Weaviate
+                    </button>
+                </div>
+
+                <div class="settings-section">
+                    <h2 class="section-title">Data Statistics</h2>
+                    
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title">Total Characters</span>
+                                <div class="stat-icon">
+                                    <i class="bi bi-file-text"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value" id="charCount">0</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title">Total Words</span>
+                                <div class="stat-icon">
+                                    <i class="bi bi-type"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value" id="wordCount">0</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title">Total Lines</span>
+                                <div class="stat-icon">
+                                    <i class="bi bi-list-ol"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value" id="lineCount">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training History Section -->
+            <div>
+                <div class="settings-section" style="max-height: 800px; overflow-y: auto;">
+                    <h2 class="section-title">Training History</h2>
+                    
+                    <div id="trainingHistory">
+                        <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <i class="bi bi-clock-history" style="font-size: 48px; opacity: 0.3;"></i>
+                            <p style="margin-top: 15px;">Loading training history...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Details Offcanvas -->
+<div class="offcanvas-overlay" id="offcanvasOverlay" onclick="closeRecordOffcanvas()"></div>
+<div class="offcanvas" id="recordOffcanvas">
+    <!-- Offcanvas Header -->
+    <div class="offcanvas-header">
+        <div>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">
+                <i class="bi bi-file-earmark-text"></i> Training Record Details
+            </h2>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: var(--text-secondary);">Complete information about this training data load</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button onclick="editTrainingRecord()" style="background: var(--accent-teal); border: none; color: white; font-size: 14px; cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all 0.3s; display: flex; align-items: center; gap: 6px; font-weight: 500;" onmouseover="this.style.background='#00c9a7';" onmouseout="this.style.background='var(--accent-teal)';">
+                <i class="bi bi-pencil"></i>
+                Edit
+            </button>
+            <button onclick="deleteTrainingRecord()" style="background: #ef4444; border: none; color: white; font-size: 14px; cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all 0.3s; display: flex; align-items: center; gap: 6px; font-weight: 500;" onmouseover="this.style.background='#dc2626';" onmouseout="this.style.background='#ef4444';">
+                <i class="bi bi-trash"></i>
+                Delete
+            </button>
+            <button onclick="closeRecordOffcanvas()" style="background: transparent; border: none; color: var(--text-secondary); font-size: 28px; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='var(--bg-primary)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Offcanvas Body -->
+    <div class="offcanvas-body" id="offcanvasRecordDetails">
+        <!-- Content will be populated by JavaScript -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+// Tab switching
+function switchTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + 'Tab').classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.closest('.tab-btn').classList.add('active');
+    
+    // Save active tab to localStorage
+    localStorage.setItem('activeSettingsTab', tabName);
+}
+
+// Tone selection
+let selectedTone = 'professional';
+function selectTone(element, tone) {
+    document.querySelectorAll('.tone-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    selectedTone = tone;
+}
+
+// Model selection
+let selectedModel = 'gpt-4';
+function selectModel(element, model) {
+    const parent = element.closest('.settings-section');
+    parent.querySelectorAll('.model-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    selectedModel = model;
+}
+
+// Image model selection
+let selectedImageModel = 'dall-e-3';
+function selectImageModel(element, model) {
+    const parent = element.closest('.settings-section');
+    parent.querySelectorAll('.model-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    selectedImageModel = model;
+}
+
+// Show alerts
+function showAlert(type, message) {
+    const alertId = type === 'success' ? 'successAlert' : 'errorAlert';
+    const alert = document.getElementById(alertId);
+    alert.textContent = message;
+    alert.style.display = 'block';
+    
+    setTimeout(() => {
+        alert.style.display = 'none';
+    }, 5000);
+}
+
+// Save API Credentials
+async function saveApiCredentials() {
+    const webSearchApiKey = document.getElementById('webSearchApiKey').value;
+    const imageGenApiKey = document.getElementById('imageGenApiKey').value;
+    
+    if (!webSearchApiKey || !imageGenApiKey) {
+        showAlert('error', 'Please fill in all API keys');
+        return;
+    }
+    
+    const token = localStorage.getItem('access_token');
+    
+    try {
+        const response = await fetch('/user/settings/api', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                web_search_api_key: webSearchApiKey,
+                image_gen_api_key: imageGenApiKey
+            })
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'API credentials saved successfully!');
+        } else {
+            showAlert('error', 'Failed to save API credentials');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving API credentials: ' + error.message);
+    }
+}
+
+// Save Schedule Settings
+async function saveScheduleSettings() {
+    const token = localStorage.getItem('access_token');
+    
+    const scheduleData = {
+        understanding_schedule: document.getElementById('understandingSchedule').value,
+        newsletter_schedule: document.getElementById('newsletterSchedule').value,
+        social_schedule: document.getElementById('socialSchedule').value,
+        preferred_time: document.getElementById('preferredTime').value,
+        auto_publish: document.getElementById('autoPublish').checked
+    };
+    
+    try {
+        const response = await fetch('/user/settings/schedule', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(scheduleData)
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Schedule settings saved successfully!');
+        } else {
+            showAlert('error', 'Failed to save schedule settings');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving schedule settings: ' + error.message);
+    }
+}
+
+// Save Content Settings
+async function saveContentSettings() {
+    const token = localStorage.getItem('access_token');
+    
+    const contentData = {
+        writing_tone: selectedTone,
+        target_audience: document.getElementById('targetAudience').value,
+        content_length: document.getElementById('contentLength').value,
+        include_images: document.getElementById('includeImages').checked,
+        include_sources: document.getElementById('includeSources').checked
+    };
+    
+    try {
+        const response = await fetch('/user/settings/content', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(contentData)
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Content preferences saved successfully!');
+        } else {
+            showAlert('error', 'Failed to save content preferences');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving content preferences: ' + error.message);
+    }
+}
+
+// Save Model Settings
+async function saveModelSettings() {
+    const token = localStorage.getItem('access_token');
+    
+    try {
+        const response = await fetch('/user/settings/model', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                language_model: selectedModel
+            })
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Language model saved successfully!');
+        } else {
+            showAlert('error', 'Failed to save language model');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving language model: ' + error.message);
+    }
+}
+
+// Save Image Model Settings
+async function saveImageModelSettings() {
+    const token = localStorage.getItem('access_token');
+    
+    try {
+        const response = await fetch('/user/settings/image-model', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image_model: selectedImageModel
+            })
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Image generation model saved successfully!');
+        } else {
+            showAlert('error', 'Failed to save image model');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving image model: ' + error.message);
+    }
+}
+
+// Load saved settings on page load
+async function loadSettings() {
+    const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+        return;
+    }
+    
+    try {
+        // Load API credentials (without showing actual values for security)
+        const apiResponse = await fetch('/user/settings/api', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Load other settings
+        const scheduleResponse = await fetch('/user/settings/schedule', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (scheduleResponse.ok) {
+            const scheduleData = await scheduleResponse.json();
+            if (scheduleData.understanding_schedule) {
+                document.getElementById('understandingSchedule').value = scheduleData.understanding_schedule;
+            }
+            if (scheduleData.newsletter_schedule) {
+                document.getElementById('newsletterSchedule').value = scheduleData.newsletter_schedule;
+            }
+            if (scheduleData.social_schedule) {
+                document.getElementById('socialSchedule').value = scheduleData.social_schedule;
+            }
+            if (scheduleData.preferred_time) {
+                document.getElementById('preferredTime').value = scheduleData.preferred_time;
+            }
+            if (scheduleData.auto_publish !== undefined) {
+                document.getElementById('autoPublish').checked = scheduleData.auto_publish;
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+// Initialize on page load
+(async function() {
+    // Restore active tab from localStorage
+    const savedTab = localStorage.getItem('activeSettingsTab') || 'api';
+    const tabButton = document.querySelector(`[onclick="switchTab('${savedTab}')"]`);
+    if (tabButton) {
+        // Hide all tabs first
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show saved tab
+        document.getElementById(savedTab + 'Tab').classList.add('active');
+        tabButton.classList.add('active');
+    }
+    
+    await loadSettings();
+    
+    // Add event listener for training data textarea to update stats
+    const trainingDataTextarea = document.getElementById('trainingData');
+    if (trainingDataTextarea) {
+        trainingDataTextarea.addEventListener('input', updateDataStats);
+    }
+    
+    // Load training history
+    await loadTrainingHistory();
+})();
+
+// Load Training History
+async function loadTrainingHistory() {
+    const token = localStorage.getItem('access_token');
+    
+    try {
+        const response = await fetch('/user/settings/training-history', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            displayTrainingHistory(data.history || []);
+        } else {
+            document.getElementById('trainingHistory').innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <i class="bi bi-exclamation-circle" style="font-size: 48px; opacity: 0.3;"></i>
+                    <p style="margin-top: 15px;">Failed to load training history</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading training history:', error);
+        document.getElementById('trainingHistory').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <i class="bi bi-exclamation-circle" style="font-size: 48px; opacity: 0.3;"></i>
+                <p style="margin-top: 15px;">Error loading training history</p>
+            </div>
+        `;
+    }
+}
+
+// Display Training History
+function displayTrainingHistory(history) {
+    const container = document.getElementById('trainingHistory');
+    
+    if (!history || history.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <i class="bi bi-inbox" style="font-size: 48px; opacity: 0.3;"></i>
+                <p style="margin-top: 15px;">No training history found</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const historyHTML = history.map((record, index) => {
+        const statusColor = {
+            'COMPLETED': '#10b981',
+            'IN_PROGRESS': '#f59e0b',
+            'EXIT_WITH_ERROR': '#ef4444',
+            'CANCELLED': '#6b7280'
+        }[record.status] || '#6b7280';
+        
+        const statusIcon = {
+            'COMPLETED': 'check-circle-fill',
+            'IN_PROGRESS': 'arrow-repeat',
+            'EXIT_WITH_ERROR': 'x-circle-fill',
+            'CANCELLED': 'dash-circle-fill'
+        }[record.status] || 'circle';
+        
+        const duration = record.processing_duration 
+            ? `${record.processing_duration}s` 
+            : '-';
+        
+        const isLatest = index === 0;
+        
+        return `
+            <div class="training-history-card" data-record-id="${record.id}" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 12px; position: relative; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.borderColor='var(--accent-teal)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0, 217, 181, 0.15)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                ${isLatest ? `
+                    <div style="position: absolute; top: 10px; right: 10px; background: var(--accent-teal); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px;">
+                        NEW
+                    </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px; ${isLatest ? 'padding-right: 50px;' : ''}">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                            ${record.collection_name}
+                        </div>
+                        ${record.description ? `
+                            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                                ${record.description}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; background: ${statusColor}15; border-radius: 6px;">
+                        <i class="bi bi-${statusIcon}" style="color: ${statusColor}; font-size: 14px;"></i>
+                        <span style="color: ${statusColor}; font-size: 12px; font-weight: 500;">${record.status}</span>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px; color: var(--text-secondary);">
+                    <div>
+                        <i class="bi bi-file-text"></i> ${(record.no_of_characters || 0).toLocaleString()} chars
+                    </div>
+                    <div>
+                        <i class="bi bi-list-ol"></i> ${(record.no_of_lines || 0).toLocaleString()} lines
+                    </div>
+                    <div>
+                        <i class="bi bi-clock"></i> ${duration}
+                    </div>
+                </div>
+                
+                ${record.error_msg ? `
+                    <div style="margin-top: 10px; padding: 8px; background: #ef444415; border-left: 3px solid #ef4444; border-radius: 4px;">
+                        <div style="font-size: 12px; color: #ef4444;">
+                            <i class="bi bi-exclamation-triangle"></i> ${record.error_msg}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 10px; font-size: 11px; color: var(--text-secondary);">
+                    <i class="bi bi-calendar"></i> ${new Date(record.created_at).toLocaleString()}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = historyHTML;
+    
+    // Add click handlers after inserting HTML
+    document.querySelectorAll('.training-history-card').forEach(card => {
+        const recordId = card.getAttribute('data-record-id');
+        const record = history.find(r => r.id == recordId);
+        if (record) {
+            card.addEventListener('click', () => showRecordDetails(record));
+        }
+    });
+}
+
+// Store current record globally for edit/delete operations
+let currentRecord = null;
+
+// Show record details in offcanvas
+function showRecordDetails(record) {
+    currentRecord = record;
+    const offcanvas = document.getElementById('recordOffcanvas');
+    const offcanvasOverlay = document.getElementById('offcanvasOverlay');
+    const offcanvasBody = document.getElementById('offcanvasRecordDetails');
+    
+    const statusColor = record.status === 'COMPLETED' ? '#10b981' : 
+                       record.status === 'EXIT_WITH_ERROR' ? '#ef4444' : 
+                       record.status === 'IN_PROGRESS' ? '#3b82f6' : '#6b7280';
+    
+    const duration = record.duration_formatted || 'N/A';
+    
+    // Format JSON data
+    let dataDetailsHTML = '<div style="color: var(--text-secondary); font-style: italic;">No additional data</div>';
+    if (record.data_details) {
+        try {
+            const jsonFormatted = JSON.stringify(record.data_details, null, 2);
+            dataDetailsHTML = `<pre style="background: var(--bg-primary); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0; font-size: 12px; color: var(--text-primary);">${jsonFormatted}</pre>`;
+        } catch (e) {
+            dataDetailsHTML = `<div style="color: #ef4444;">Error parsing JSON data</div>`;
+        }
+    }
+    
+    offcanvasBody.innerHTML = `
+        <div style="display: grid; gap: 20px;">
+            <!-- Collection Info -->
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Collection Name</div>
+                <div style="font-size: 16px; font-weight: 600; color: var(--text-primary);">${record.collection_name || 'N/A'}</div>
+            </div>
+            
+            <!-- Status -->
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Status</div>
+                <div style="display: inline-block; padding: 6px 12px; background: ${statusColor}15; color: ${statusColor}; border-radius: 6px; font-size: 13px; font-weight: 600;">
+                    ${record.status || 'UNKNOWN'}
+                </div>
+            </div>
+            
+            <!-- Description -->
+            ${record.description ? `
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Description</div>
+                <div style="padding: 10px; background: var(--bg-primary); border-radius: 6px; color: var(--text-primary); font-size: 14px;">${record.description}</div>
+            </div>
+            ` : ''}
+            
+            <!-- Training Content -->
+            ${record.content ? `
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Training Content</div>
+                <div style="padding: 12px; background: var(--bg-primary); border-radius: 6px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--accent-teal) var(--bg-primary);">
+                    <pre style="margin: 0; font-size: 13px; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; line-height: 1.5;">${record.content}</pre>
+                </div>
+            </div>
+            ` : ''}
+            
+            <!-- Statistics Grid -->
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">Statistics</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                    <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Characters</div>
+                        <div style="font-size: 20px; font-weight: 600; color: var(--accent-teal);">
+                            ${(record.no_of_characters || 0).toLocaleString()}
+                        </div>
+                    </div>
+                    <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Lines</div>
+                        <div style="font-size: 20px; font-weight: 600; color: var(--accent-purple);">
+                            ${(record.no_of_lines || 0).toLocaleString()}
+                        </div>
+                    </div>
+                    <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Chunks Created</div>
+                        <div style="font-size: 20px; font-weight: 600; color: var(--accent-green);">
+                            ${(record.no_of_chunks || 0).toLocaleString()}
+                        </div>
+                    </div>
+                    <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Duration</div>
+                        <div style="font-size: 20px; font-weight: 600; color: var(--accent-orange);">
+                            ${duration}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Error Message -->
+            ${record.error_msg ? `
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Error Message</div>
+                <div style="padding: 12px; background: #ef444415; border-left: 4px solid #ef4444; border-radius: 6px; color: #ef4444; font-size: 13px;">
+                    <i class="bi bi-exclamation-triangle"></i> ${record.error_msg}
+                </div>
+            </div>
+            ` : ''}
+            
+            <!-- Timestamps -->
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">Timestamps</div>
+                <div style="display: grid; gap: 8px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--bg-primary); border-radius: 6px;">
+                        <span style="color: var(--text-secondary);">Created:</span>
+                        <span style="color: var(--text-primary); font-weight: 500;">${new Date(record.created_at).toLocaleString()}</span>
+                    </div>
+                    ${record.start_time ? `
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--bg-primary); border-radius: 6px;">
+                        <span style="color: var(--text-secondary);">Started:</span>
+                        <span style="color: var(--text-primary); font-weight: 500;">${new Date(record.start_time).toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                    ${record.end_time ? `
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: var(--bg-primary); border-radius: 6px;">
+                        <span style="color: var(--text-secondary);">Completed:</span>
+                        <span style="color: var(--text-primary); font-weight: 500;">${new Date(record.end_time).toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            
+            <!-- Additional Data -->
+            <div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Additional Data (JSON)</div>
+                ${dataDetailsHTML}
+            </div>
+        </div>
+    `;
+    
+    // Show offcanvas with animation
+    setTimeout(() => {
+        offcanvas.classList.add('show');
+        offcanvasOverlay.classList.add('show');
+    }, 10);
+}
+
+// Close offcanvas
+function closeRecordOffcanvas() {
+    const offcanvas = document.getElementById('recordOffcanvas');
+    const offcanvasOverlay = document.getElementById('offcanvasOverlay');
+    
+    offcanvas.classList.remove('show');
+    offcanvasOverlay.classList.remove('show');
+    currentRecord = null;
+}
+
+// Edit training record
+function editTrainingRecord() {
+    if (!currentRecord) {
+        showAlert('error', 'No record selected');
+        return;
+    }
+    
+    // Close offcanvas
+    closeRecordOffcanvas();
+    
+    // Switch to train tab
+    switchTab('train');
+    
+    // Populate the form with current record data
+    setTimeout(() => {
+        document.getElementById('trainingData').value = currentRecord.content || '';
+        document.getElementById('dataDescription').value = currentRecord.description || '';
+        updateDataStats();
+        
+        // Scroll to the form
+        document.getElementById('trainingData').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        showAlert('success', 'Record loaded for editing. Modify the content and click "Load Data to Weaviate" to save.');
+    }, 300);
+}
+
+// Delete training record
+async function deleteTrainingRecord() {
+    if (!currentRecord) {
+        showAlert('error', 'No record selected');
+        return;
+    }
+    
+    const confirmDelete = confirm(`Are you sure you want to delete this training record?\n\nCollection: ${currentRecord.collection_name}\n${currentRecord.description ? 'Description: ' + currentRecord.description : ''}\n\nThis action cannot be undone.`);
+    
+    if (!confirmDelete) {
+        return;
+    }
+    
+    const token = localStorage.getItem('access_token');
+    
+    try {
+        const response = await fetch(`/user/settings/training-record/${currentRecord.id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            showAlert('success', 'Training record deleted successfully!');
+            closeRecordOffcanvas();
+            await loadTrainingHistory();
+        } else {
+            const error = await response.json();
+            showAlert('error', error.detail || 'Failed to delete record');
+        }
+    } catch (error) {
+        showAlert('error', 'Error deleting record: ' + error.message);
+    }
+}
+
+// Update data statistics
+function updateDataStats() {
+    const text = document.getElementById('trainingData').value;
+    
+    // Character count
+    document.getElementById('charCount').textContent = text.length.toLocaleString();
+    
+    // Word count
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    document.getElementById('wordCount').textContent = words.length.toLocaleString();
+    
+    // Line count
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    document.getElementById('lineCount').textContent = lines.length.toLocaleString();
+}
+
+// Load Data to Weaviate
+async function loadDataToWeaviate() {
+    const token = localStorage.getItem('access_token');
+    const trainingData = document.getElementById('trainingData').value;
+    const collectionName = document.getElementById('collectionName').value;
+    const dataDescription = document.getElementById('dataDescription').value;
+    
+    if (!trainingData.trim()) {
+        showAlert('error', 'Please enter training data');
+        return;
+    }
+    
+    if (!collectionName.trim()) {
+        showAlert('error', 'Please enter a collection name');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/user/settings/train-model', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                training_data: trainingData,
+                collection_name: collectionName,
+                description: dataDescription
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showAlert('success', `Data loaded successfully! ${result.chunks_created || 0} chunks created in Weaviate.`);
+            
+            // Clear the form
+            document.getElementById('trainingData').value = '';
+            document.getElementById('dataDescription').value = '';
+            updateDataStats();
+            
+            // Reload training history
+            await loadTrainingHistory();
+        } else {
+            const error = await response.json();
+            showAlert('error', error.detail || 'Failed to load data to Weaviate');
+            
+            // Reload history anyway to show the error record
+            await loadTrainingHistory();
+        }
+    } catch (error) {
+        showAlert('error', 'Error loading data to Weaviate: ' + error.message);
+    }
+}
+{% endblock %}
