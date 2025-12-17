@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List
+import logging
 
 from content_module.content_responses import PromptHistoryResponse
 from auth_module.auth_utils import verify_token
 from service_utils.db_utils.pg_db import PostgresDB
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])
@@ -30,15 +34,16 @@ async def get_prompt_history(
     Returns:
         List of prompt history records ordered by created_on
     """
-    token = credentials.credentials
-    
-    # Verify token
-    success, status_code, message, payload = verify_token(token)
-    
-    if not success:
-        raise HTTPException(status_code=status_code, detail=message)
-    
     try:
+        token = credentials.credentials
+        
+        # Verify token
+        success, status_code, message, payload = verify_token(token)
+        
+        if not success:
+            logger.warning("Invalid token attempt in get_prompt_history")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
         db = PostgresDB()
         
         # Get all prompt history records for this session
@@ -69,7 +74,11 @@ async def get_prompt_history(
                 deleted_on=ph.get("deleted_on")
             ))
         
+        logger.info(f"Retrieved {len(response_list)} prompt history records")
         return response_list
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        logger.error(f"Error retrieving prompt history: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to retrieve prompt history at this time")

@@ -10,7 +10,6 @@ from typing import Dict, Any, List
 from sqlalchemy import text
 
 from service_utils.db_utils.pg_db import PostgresDB
-from service_utils.db_utils.weaviate_db import WeaviateDB
 from weaviate_module.weaviate_utils import chunk_text, load_chunks_to_weaviate, delete_chunks_from_weaviate
 from models.weaviate_data import WeaviateDataStatusEnum
 from models.weaviate_data_versions import WeaviateDataVersion

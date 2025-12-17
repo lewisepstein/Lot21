@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
 
 from content_module.content_responses import (
     ContentCreateRequest, 
@@ -26,6 +27,9 @@ from validations.content import ContentAddValidation
 from auth_module.auth_utils import verify_token
 from models.content import ContentActionEnum
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -34,6 +38,33 @@ security = HTTPBearer()
 
 # Templates
 templates = Jinja2Templates(directory="templates")
+
+
+@router.get("/content", response_class=HTMLResponse)
+async def content_generation_page(request: Request):
+    """
+    Render content generation page with empty textarea.
+    Authentication handled by frontend JavaScript.
+    """
+    try:
+        return templates.TemplateResponse(
+            "content.htm",
+            {
+                "request": request, 
+                "category_id": None,
+                "latest_content": None
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            "content.htm",
+            {
+                "request": request,
+                "category_id": None,
+                "latest_content": None
+            }
+        )
 
 
 @router.get("/content/{category_id}", response_class=HTMLResponse)
@@ -46,19 +77,28 @@ async def content_page(request: Request, category_id: int):
     Args:
         category_id: ID of the category to generate content for
     """
-    # Get the latest content for this category
-    latest_content = get_latest_content(category_id)
+    try:
+        # Get the latest content for this category
+        latest_content = get_latest_content(category_id)
 
-    print(latest_content)
-    
-    return templates.TemplateResponse(
-        "content.htm",
-        {
-            "request": request, 
-            "category_id": category_id,
-            "latest_content": latest_content
-        }
-    )
+        return templates.TemplateResponse(
+            "content.htm",
+            {
+                "request": request, 
+                "category_id": category_id,
+                "latest_content": latest_content
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading content page for category {category_id}: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            "content.htm",
+            {
+                "request": request,
+                "category_id": category_id,
+                "latest_content": None
+            }
+        )
 
 
 @router.post("/content", response_model=ContentCreateResponse)
@@ -76,31 +116,34 @@ async def create_content(
     Returns:
         JSON response with created content information
     """
-    token = credentials.credentials
-    
-    # Verify token
-    success, status_code, message, payload = verify_token(token)
-    
-    if not success:
-        raise HTTPException(status_code=status_code, detail=message)
-    
-    # Validate using ContentAddValidation
     try:
-        validated_data = ContentAddValidation(
-            category_id=content_data.category_id,
-            prompt_data=content_data.prompt_data,
-            action=content_data.action
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+        token = credentials.credentials
+        
+        # Verify token
+        success, status_code, message, payload = verify_token(token)
+        
+        if not success:
+            logger.warning("Invalid token attempt in create_content")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
+        # Validate using ContentAddValidation
+        try:
+            validated_data = ContentAddValidation(
+                category_id=content_data.category_id,
+                prompt_data=content_data.prompt_data,
+                action=content_data.action
+            )
+        except ValueError as e:
+            logger.warning(f"Validation error in create_content: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid content data provided")
     
-    try:
         # Create new content entry using utility function
         new_content = create_content_record(
             category_id=validated_data.category_id,
             prompt_data=validated_data.prompt_data,
             action=validated_data.action,
-            user_id=payload.get("user_id")
+            user_id=payload.get("user_id"),
+            content_type=content_data.content_type
         )
         
         # Initialize prompt_session_id as None
@@ -112,6 +155,8 @@ async def create_content(
                 content_id=new_content["id"],
                 prompt_data=validated_data.prompt_data
             )
+        
+        logger.info(f"Content created successfully: ID {new_content['id']}")
         
         return ContentCreateResponse(
             message="Content created successfully",
@@ -127,12 +172,17 @@ async def create_content(
                 approval_status_date=new_content.get("approval_status_date"),
                 accuracy=new_content.get("accuracy"),
                 comments=new_content.get("comments"),
-                quarter=new_content.get("quarter")
+                quarter=new_content.get("quarter"),
+                content_type=new_content.get("content_type")
             ),
             prompt_session_id=prompt_session_id
         )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        logger.error(f"Error creating content: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to create content at this time")
 
 
 @router.post("/content/draft", response_model=AddDraftContentResponse)
@@ -150,21 +200,24 @@ async def add_draft_content(
     Returns:
         JSON response with created prompt_history information
     """
-    token = credentials.credentials
-    
-    # Verify token
-    success, status_code, message, payload = verify_token(token)
-    
-    if not success:
-        raise HTTPException(status_code=status_code, detail=message)
-    
     try:
+        token = credentials.credentials
+        
+        # Verify token
+        success, status_code, message, payload = verify_token(token)
+        
+        if not success:
+            logger.warning("Invalid token attempt in add_draft_content")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
         # Add draft to existing prompt history session
         prompt_history = add_draft_to_prompt_history(
             prompt_session_id=draft_data.prompt_session_id,
             content_id=draft_data.content_id,
             prompt_text=draft_data.prompt_text
         )
+        
+        logger.info(f"Draft content added successfully: session {draft_data.prompt_session_id}")
         
         return AddDraftContentResponse(
             message="Draft content added successfully",
@@ -179,7 +232,11 @@ async def add_draft_content(
                 deleted_on=prompt_history.get("deleted_on")
             )
         )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        logger.error(f"Error adding draft content: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to add draft content at this time")
 
 

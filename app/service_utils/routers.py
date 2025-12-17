@@ -12,6 +12,7 @@ from resources_module.resources import router as resources_router
 from content_module.content import router as content_router
 from content_module.prompt_history import router as prompt_history_router
 from category_module.category import router as category_router
+from page_modules.page import router as page_router
 from weaviate_module.weaviate import router as weaviate_router
 from agent_module.agent import router as agent_router
 
@@ -30,5 +31,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(content_router, tags=["user"])
     app.include_router(prompt_history_router, tags=["user"])
     app.include_router(category_router, tags=["user"])
+    app.include_router(page_router, tags=["user"])
     app.include_router(agent_router, tags=["user"])
     app.include_router(weaviate_router, tags=["weaviate"])

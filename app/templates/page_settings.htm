@@ -1,0 +1,689 @@
+{% extends "base.htm" %}
+
+{% block title %}Page Settings - Lottie{% endblock %}
+
+{% block nav_page_settings %}active{% endblock %}
+
+{% block page_title %}Page Settings{% endblock %}
+{% block page_subtitle %}Manage and monitor your pages{% endblock %}
+
+{% block header_actions %}
+<button style="padding: 10px 20px; background-color: transparent; color: var(--accent-teal); border: 1px solid var(--accent-teal); border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.3s; font-family: 'Inter', sans-serif;" 
+        onmouseover="this.style.backgroundColor='var(--accent-teal)'; this.style.color='white';" 
+        onmouseout="this.style.backgroundColor='transparent'; this.style.color='var(--accent-teal)';"
+        onclick="addNewPage()">
+    <i class="bi bi-plus-circle"></i> Add New Page
+</button>
+<button style="padding: 10px 20px; background-color: rgba(255, 81, 47, 0.2); color: #ff512f; border: 1px solid #ff512f; border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.3s; display: none; font-family: 'Inter', sans-serif;" 
+        id="deleteBtn"
+        onmouseover="this.style.backgroundColor='#ff512f'; this.style.color='white';" 
+        onmouseout="this.style.backgroundColor='rgba(255, 81, 47, 0.2)'; this.style.color='#ff512f';"
+        onclick="deleteSelected()">
+    <i class="bi bi-trash"></i> Delete Selected
+</button>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .main-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    
+    @media (max-width: 1200px) {
+        .main-layout {
+            grid-template-columns: 1fr;
+        }
+        
+        .counters-section {
+            order: -1;
+        }
+    }
+    
+    .table-section {
+        min-width: 0;
+    }
+    
+    .page-settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .counter-card {
+        background: linear-gradient(135deg, var(--bg-card) 0%, rgba(26, 35, 50, 0.8) 100%);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .counter-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 217, 181, 0.15);
+        border-color: var(--accent-teal);
+    }
+    
+    .counter-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--accent-teal), var(--accent-green));
+    }
+    
+    .counter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+    
+    .counter-icon {
+        width: 45px;
+        height: 45px;
+        background: rgba(0, 217, 181, 0.1);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent-teal);
+        font-size: 22px;
+    }
+    
+    .counter-value {
+        font-size: 36px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 5px;
+        line-height: 1;
+    }
+    
+    .counter-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filter-sidebar {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 25px;
+    }
+    
+    .filter-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: var(--text-primary);
+    }
+    
+    .filter-group {
+        margin-bottom: 20px;
+    }
+    
+    .filter-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 10px;
+    }
+    
+    .filter-option {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        background-color: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .filter-option:hover {
+        background-color: rgba(0, 217, 181, 0.1);
+        border-color: var(--accent-teal);
+    }
+    
+    .filter-option.active {
+        background-color: rgba(0, 217, 181, 0.2);
+        border-color: var(--accent-teal);
+        color: var(--accent-teal);
+    }
+    
+    .filter-option input[type="checkbox"],
+    .filter-option input[type="radio"] {
+        margin-right: 10px;
+        cursor: pointer;
+    }
+    
+    .filter-btn {
+        width: 100%;
+        padding: 12px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 10px;
+    }
+    
+    .filter-btn:hover {
+        background-color: #00f5cc;
+    }
+    
+    .clear-filter-btn {
+        background-color: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+    
+    .clear-filter-btn:hover {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    
+    .pages-table-container {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 25px;
+        overflow-x: auto;
+    }
+    
+    .pages-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 600px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .pages-table thead {
+        background: linear-gradient(135deg, rgba(0, 217, 181, 0.15) 0%, rgba(0, 208, 132, 0.1) 100%);
+    }
+    
+    .pages-table th {
+        padding: 15px 10px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .pages-table td {
+        padding: 15px 10px;
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+    }
+    
+    .pages-table tbody tr:hover {
+        background-color: rgba(0, 217, 181, 0.05);
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .badge-active {
+        background-color: rgba(0, 208, 132, 0.2);
+        color: var(--accent-green);
+        border: 1px solid var(--accent-green);
+    }
+    
+    .badge-inactive {
+        background-color: rgba(255, 81, 47, 0.2);
+        color: #ff512f;
+        border: 1px solid #ff512f;
+    }
+    
+    .badge-assigned {
+        background-color: rgba(0, 217, 181, 0.2);
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+    }
+    
+    .badge-unassigned {
+        background-color: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+        border: 1px solid #ffc107;
+    }
+    
+    .badge-with-content {
+        background-color: rgba(138, 43, 226, 0.2);
+        color: #8a2be2;
+        border: 1px solid #8a2be2;
+    }
+    
+    .badge-no-content {
+        background-color: rgba(128, 128, 128, 0.2);
+        color: #888;
+        border: 1px solid #888;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Statistics Row at Top -->
+<div style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; margin-bottom: 20px;">
+    <div class="card-header" style="margin-bottom: 20px;">
+        <h3 class="card-title">Statistics</h3>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px;">
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ assigned_pages }}</div>
+            <div class="counter-label">Assigned Pages</div>
+        </div>
+        
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ unassigned_pages }}</div>
+            <div class="counter-label">Unassigned Pages</div>
+        </div>
+        
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-toggle-on"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ active_pages }}</div>
+            <div class="counter-label">Active Pages</div>
+        </div>
+        
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-toggle-off"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ inactive_pages }}</div>
+            <div class="counter-label">Inactive Pages</div>
+        </div>
+        
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-file-text-fill"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ pages_with_content }}</div>
+            <div class="counter-label">Pages with Content</div>
+        </div>
+        
+        <div class="counter-card">
+            <div class="counter-header">
+                <div class="counter-icon">
+                    <i class="bi bi-file-earmark-x"></i>
+                </div>
+            </div>
+            <div class="counter-value">{{ pages_without_content }}</div>
+            <div class="counter-label">Pages without Content</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Area with Sidebar and Table -->
+<div style="display: grid; grid-template-columns: 250px 1fr; gap: 20px;">
+    <!-- Filter Sidebar -->
+    <div class="filter-sidebar">
+        <h3 class="filter-title">Filters</h3>
+        
+        <!-- Category Filter -->
+        <div class="filter-group">
+            <label class="filter-label">Category</label>
+            <div class="filter-option" onclick="filterByCategory('all')">
+                <input type="radio" name="category" value="all" checked>
+                <span>All Categories</span>
+            </div>
+            <div class="filter-option" onclick="filterByCategory('assigned')">
+                <input type="radio" name="category" value="assigned">
+                <span>Assigned Only</span>
+            </div>
+            <div class="filter-option" onclick="filterByCategory('unassigned')">
+                <input type="radio" name="category" value="unassigned">
+                <span>Unassigned Only</span>
+            </div>
+        </div>
+        
+        <!-- Status Filter -->
+        <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <div class="filter-option" onclick="toggleStatusFilter('active')">
+                <input type="checkbox" id="filter-active" value="active" checked>
+                <span>Active</span>
+            </div>
+            <div class="filter-option" onclick="toggleStatusFilter('inactive')">
+                <input type="checkbox" id="filter-inactive" value="inactive">
+                <span>Inactive</span>
+            </div>
+        </div>
+        
+        <!-- Content Filter -->
+        <div class="filter-group">
+            <label class="filter-label">Content</label>
+            <div class="filter-option" onclick="toggleContentFilter('with-content')">
+                <input type="checkbox" id="filter-with-content" value="with-content" checked>
+                <span>With Content</span>
+            </div>
+            <div class="filter-option" onclick="toggleContentFilter('without-content')">
+                <input type="checkbox" id="filter-without-content" value="without-content" checked>
+                <span>Without Content</span>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <button class="filter-btn" onclick="applyFilters()">
+            <i class="bi bi-funnel"></i> Apply Filters
+        </button>
+        <button class="filter-btn clear-filter-btn" onclick="clearFilters()">
+            <i class="bi bi-x-circle"></i> Clear Filters
+        </button>
+    </div>
+    
+    <!-- Pages Table -->
+    <div class="pages-table-container">
+        <div class="card-header">
+            <h3 class="card-title">All Pages</h3>
+        </div>
+        
+        <table class="pages-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
+                    </th>
+                    <th>Page Name</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Assignment</th>
+                    <th>Content</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+            <tbody id="pagesTableBody">
+                {% if pages %}
+                    {% for page in pages %}
+                    <tr class="page-row" 
+                        data-category="{{ 'assigned' if page.category_id else 'unassigned' }}"
+                        data-status="{{ 'active' if page.is_active else 'inactive' }}"
+                        data-content="{{ 'with-content' if page.has_content else 'without-content' }}"
+                        data-page-id="{{ page.id }}">
+                        <td>
+                            <input type="checkbox" class="page-checkbox" value="{{ page.id }}" onchange="updateDeleteButton()">
+                        </td>
+                        <td>{{ page.page_name }}</td>
+                        <td>
+                            {% if page.category_name %}
+                                {{ page.category_name }}
+                            {% else %}
+                                <span style="color: var(--text-secondary);">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if page.is_active %}
+                                <span class="status-badge badge-active">Active</span>
+                            {% else %}
+                                <span class="status-badge badge-inactive">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if page.category_id %}
+                                <span class="status-badge badge-assigned">Assigned</span>
+                            {% else %}
+                                <span class="status-badge badge-unassigned">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if page.has_content %}
+                                <span class="status-badge badge-with-content">Has Content</span>
+                            {% else %}
+                                <span class="status-badge badge-no-content">No Content</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ page.created_on }}</td>
+                        <td>{{ page.updated_on }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            No pages found
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Check token on page load
+    if (!checkTokenExpiration()) {
+        window.location.replace('/?error=' + encodeURIComponent('Please login to continue'));
+    }
+    
+    // Filter state
+    let filters = {
+        category: 'all',
+        status: ['active'],
+        content: ['with-content', 'without-content']
+    };
+    
+    // Filter by category
+    function filterByCategory(category) {
+        filters.category = category;
+        document.querySelectorAll('input[name="category"]').forEach(radio => {
+            radio.checked = radio.value === category;
+        });
+    }
+    
+    // Toggle status filter
+    function toggleStatusFilter(status) {
+        const checkbox = document.getElementById('filter-' + status);
+        checkbox.checked = !checkbox.checked;
+        
+        if (checkbox.checked) {
+            if (!filters.status.includes(status)) {
+                filters.status.push(status);
+            }
+        } else {
+            filters.status = filters.status.filter(s => s !== status);
+        }
+    }
+    
+    // Toggle content filter
+    function toggleContentFilter(content) {
+        const checkbox = document.getElementById('filter-' + content);
+        checkbox.checked = !checkbox.checked;
+        
+        if (checkbox.checked) {
+            if (!filters.content.includes(content)) {
+                filters.content.push(content);
+            }
+        } else {
+            filters.content = filters.content.filter(c => c !== content);
+        }
+    }
+    
+    // Apply filters
+    function applyFilters() {
+        const rows = document.querySelectorAll('.page-row');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const rowCategory = row.dataset.category;
+            const rowStatus = row.dataset.status;
+            const rowContent = row.dataset.content;
+            
+            // Check category filter
+            let categoryMatch = filters.category === 'all' || rowCategory === filters.category;
+            
+            // Check status filter
+            let statusMatch = filters.status.includes(rowStatus);
+            
+            // Check content filter
+            let contentMatch = filters.content.includes(rowContent);
+            
+            // Show or hide row
+            if (categoryMatch && statusMatch && contentMatch) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Show message if no results
+        const tbody = document.getElementById('pagesTableBody');
+        const existingNoResults = tbody.querySelector('.no-results-row');
+        
+        if (visibleCount === 0 && !existingNoResults) {
+            const noResultsRow = document.createElement('tr');
+            noResultsRow.className = 'no-results-row';
+            noResultsRow.innerHTML = '<td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">No pages match the selected filters</td>';
+            tbody.appendChild(noResultsRow);
+        } else if (visibleCount > 0 && existingNoResults) {
+            existingNoResults.remove();
+        }
+    }
+    
+    // Clear all filters
+    function clearFilters() {
+        filters = {
+            category: 'all',
+            status: ['active', 'inactive'],
+            content: ['with-content', 'without-content']
+        };
+        
+        // Reset checkboxes and radios
+        document.querySelectorAll('input[name="category"]').forEach(radio => {
+            radio.checked = radio.value === 'all';
+        });
+        
+        document.getElementById('filter-active').checked = true;
+        document.getElementById('filter-inactive').checked = true;
+        document.getElementById('filter-with-content').checked = true;
+        document.getElementById('filter-without-content').checked = true;
+        
+        // Show all rows
+        document.querySelectorAll('.page-row').forEach(row => {
+            row.style.display = '';
+        });
+        
+        // Remove no results message
+        const noResultsRow = document.querySelector('.no-results-row');
+        if (noResultsRow) {
+            noResultsRow.remove();
+        }
+    }
+    
+    // Initialize filters on page load
+    applyFilters();
+    
+    // Toggle select all checkboxes
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.page-checkbox');
+        checkboxes.forEach(cb => {
+            if (cb.closest('tr').style.display !== 'none') {
+                cb.checked = selectAll.checked;
+            }
+        });
+        updateDeleteButton();
+    }
+    
+    // Update delete button visibility
+    function updateDeleteButton() {
+        const checkedBoxes = document.querySelectorAll('.page-checkbox:checked');
+        const deleteBtn = document.getElementById('deleteBtn');
+        
+        if (checkedBoxes.length > 0) {
+            deleteBtn.style.display = 'block';
+        } else {
+            deleteBtn.style.display = 'none';
+        }
+    }
+    
+    // Add new page
+    function addNewPage() {
+        // Redirect to pages creation or open modal
+        window.location.href = '/user/pages/2'; // Or implement modal
+    }
+    
+    // Delete selected pages
+    async function deleteSelected() {
+        const checkedBoxes = document.querySelectorAll('.page-checkbox:checked');
+        const pageIds = Array.from(checkedBoxes).map(cb => cb.value);
+        
+        if (pageIds.length === 0) {
+            alert('Please select pages to delete');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to delete ${pageIds.length} page(s)?`)) {
+            return;
+        }
+        
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            // You'll need to implement a delete endpoint in the backend
+            const response = await fetch('/user/delete_pages', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ page_ids: pageIds })
+            });
+            
+            if (handleTokenExpiration(response)) return;
+            
+            if (response.ok) {
+                alert('Pages deleted successfully');
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('Error: ' + (data.detail || 'Failed to delete pages'));
+            }
+        } catch (error) {
+            console.error('Error deleting pages:', error);
+            alert('An error occurred while deleting pages');
+        }
+    }
+</script>
+{% endblock %}

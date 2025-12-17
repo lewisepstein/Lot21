@@ -34,7 +34,8 @@ def create_content_record(
     category_id: int,
     prompt_data: Optional[str],
     action: Optional[ContentActionEnum],
-    user_id: int
+    user_id: int,
+    content_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Create a new content record in the database.
@@ -44,6 +45,7 @@ def create_content_record(
         prompt_data: User's prompt text (can be None)
         action: Content action enum (NEW, DRAFT, etc.)
         user_id: ID of the user creating the content
+        content_type: Type of content (UNDERSTANDING, PROJECTS, etc.)
     
     Returns:
         Dictionary containing the created content record
@@ -64,6 +66,10 @@ def create_content_record(
         "approval_status": ContentApprovalStatusEnum.PENDING.value,
         "created_by": user_id
     }
+    
+    # Add content_type if provided
+    if content_type:
+        content_dict["content_type"] = content_type
     
     # Create new content entry
     new_content = db.create("content", content_dict)

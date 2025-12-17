@@ -2,6 +2,7 @@
 from models.base import Base
 from models.users import User
 from models.categories import Category
+from models.pages import Page
 from models.schedulers import Scheduler
 from models.tasks import Task
 from models.task_runs import TaskRun, TaskProcess
@@ -13,6 +14,7 @@ __all__ = [
     "Base",
     "User",
     "Category",
+    "Page",
     "Scheduler",
     "Task",
     "TaskRun",

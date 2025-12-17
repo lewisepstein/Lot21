@@ -480,19 +480,33 @@
                 </div>
                 
                 <div class="ai-input-area">
-                    <div class="ai-actions">
-                        <button class="ai-action-btn">
-                            <i class="bi bi-arrow-clockwise"></i> Refine
-                        </button>
-                        <button class="ai-action-btn">
-                            <i class="bi bi-arrows-angle-expand"></i> Expand
-                        </button>
-                        <button class="ai-action-btn">
-                            <i class="bi bi-arrows-collapse"></i> Shorten
-                        </button>
-                        <button class="ai-action-btn">
-                            <i class="bi bi-list-ul"></i> Add References
-                        </button>
+                    <div class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 8px;">
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrow-clockwise"></i> Refine
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrows-angle-expand"></i> Expand
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrows-collapse"></i> Shorten
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-list-ul"></i> Add References
+                            </button>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
+                            <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                                <option value="UNDERSTANDING">Understanding</option>
+                                <option value="PROJECTS">Projects</option>
+                                <option value="RESOURCES">Resources</option>
+                                <option value="POLICY">Policy</option>
+                                <option value="LOTS">Lots</option>
+                                <option value="NEWSLETTER">Newsletter</option>
+                                <option value="SOCIAL">Social</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="ai-input-wrapper">
                         <form id="prompt-form" onsubmit="return handleFormSubmit(event)">

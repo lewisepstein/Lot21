@@ -577,37 +577,45 @@
             
             <div class="menu-section">
                 <div class="menu-section-title">Website Content</div>
-                <a href="/user/understanding" class="menu-item {% block nav_understanding %}{% endblock %}">
+                <a href="/user/pages/2" class="menu-item {% block nav_understanding %}{% endblock %}">
                     <i class="bi bi-book"></i>
                     <span>Understanding</span>
                 </a>
-                <a href="/user/projects" class="menu-item {% block nav_projects %}{% endblock %}">
+                <a href="/user/pages/3" class="menu-item {% block nav_projects %}{% endblock %}">
                     <i class="bi bi-folder"></i>
                     <span>Projects</span>
                 </a>
-                <a href="/user/resources" class="menu-item {% block nav_resources %}{% endblock %}">
+                <a href="/user/pages/4" class="menu-item {% block nav_resources %}{% endblock %}">
                     <i class="bi bi-file-text"></i>
                     <span>Resources</span>
                 </a>
-                <a href="/user/policy" class="menu-item {% block nav_policy %}{% endblock %}">
+                <a href="/user/pages/5" class="menu-item {% block nav_policy %}{% endblock %}">
                     <i class="bi bi-shield-check"></i>
                     <span>Policy</span>
+                </a>
+                <a href="/user/pages/6" class="menu-item {% block nav_lots %}{% endblock %}">
+                    <i class="bi bi-list-ul"></i>
+                    <span>Lots</span>
+                </a>
+                <a href="/user/pages/7" class="menu-item {% block nav_newsletter %}{% endblock %}">
+                    <i class="bi bi-envelope"></i>
+                    <span>Newsletter</span>
+                </a>
+                <a href="/user/pages/8" class="menu-item {% block nav_social %}{% endblock %}">
+                    <i class="bi bi-share"></i>
+                    <span>Social Media</span>
                 </a>
             </div>
             
             <div class="menu-section">
                 <div class="menu-section-title">Content Generation</div>
-                <a href="/user/lots" class="menu-item {% block nav_lots %}{% endblock %}">
-                    <i class="bi bi-list-ul"></i>
-                    <span>Lots</span>
+                <a href="/user/content" class="menu-item {% block nav_content_generation %}{% endblock %}">
+                    <i class="bi bi-magic"></i>
+                    <span>Generate Now</span>
                 </a>
-                <a href="/user/newsletter" class="menu-item {% block nav_newsletter %}{% endblock %}">
-                    <i class="bi bi-envelope"></i>
-                    <span>Newsletter</span>
-                </a>
-                <a href="/user/social" class="menu-item {% block nav_social %}{% endblock %}">
-                    <i class="bi bi-share"></i>
-                    <span>Social Media</span>
+                <a href="/user/page-settings" class="menu-item {% block nav_page_settings %}{% endblock %}">
+                    <i class="bi bi-sliders"></i>
+                    <span>Page Settings</span>
                 </a>
             </div>
             
@@ -628,9 +636,12 @@
                 <h1>{% block page_title %}Lottie Agent{% endblock %}</h1>
                 <p>{% block page_subtitle %}AI Content Assistant{% endblock %}</p>
             </div>
-            <button class="logout-btn" onclick="logout()">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </button>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                {% block header_actions %}{% endblock %}
+                <button class="logout-btn" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </div>
         </div>
         
         <!-- Scrollable Content Area -->

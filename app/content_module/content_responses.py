@@ -10,6 +10,7 @@ class ContentCreateRequest(BaseModel):
     category_id: int = Field(..., gt=0, description="ID of the category")
     prompt_data: Optional[str] = Field(default=None, description="Input prompt data")
     action: Optional[str] = Field(default=None, description="Action to perform on the content")
+    content_type: Optional[str] = Field(default=None, description="Type of content being created")
 
 
 class ContentResponse(BaseModel):
@@ -28,6 +29,7 @@ class ContentResponse(BaseModel):
     accuracy: Optional[float]
     comments: Optional[str]
     quarter: Optional[str]
+    content_type: Optional[str]
 
     class Config:
         from_attributes = True
