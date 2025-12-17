@@ -4,6 +4,7 @@ Helper utility functions for common operations.
 from typing import Optional
 from datetime import datetime
 import logging
+import re
 
 from service_utils.date_exceptions import DateConversionError, InvalidDateFormatError
 
@@ -64,3 +65,31 @@ def convert_datetime_to_formatted_string(
         raise DateConversionError(
             f"Failed to convert datetime to {format_type} format: {str(e)}"
         ) from e
+
+
+def validate_url(url: Optional[str]) -> bool:
+    """
+    Validate if a URL has a valid HTTP or HTTPS format.
+    
+    Args:
+        url: URL string to validate
+    
+    Returns:
+        True if URL is valid, False otherwise
+    
+    Raises:
+        ValueError: If URL is None or empty string
+    """
+    if not url:
+        raise ValueError("URL cannot be empty")
+    
+    # Validate URL format using regex
+    url_pattern = re.compile(
+        r'^https?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    
+    return bool(url_pattern.match(url))

@@ -3,17 +3,26 @@ Weaviate utility functions.
 Provides text chunking, embedding, and RAG prompt generation utilities.
 """
 import os
+import json
 import tiktoken
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+from datetime import datetime
+
+from sqlalchemy import text
 
 from service_utils.db_utils.weaviate_db import WeaviateDB
+from service_utils.db_utils.pg_db import PostgresDB
+from models.weaviate_data import WeaviateDataStatusEnum
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # OpenAI configuration
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
+# Token encoding for chunking
+ENCODING = "cl100k_base"
 
 # Initialize OpenAI if available
 if OPENAI_API_KEY:
@@ -26,9 +35,199 @@ if OPENAI_API_KEY:
 else:
     openai = None
 
-# Token encoding for chunking
-ENCODING = "cl100k_base"  # tiktoken encoding for OpenAI models
 
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def calculate_text_statistics(text: str) -> Tuple[int, int, int]:
+    """
+    Calculate statistics for text content.
+    
+    Args:
+        text: Text content to analyze
+        
+    Returns:
+        Tuple of (no_of_characters, no_of_lines, no_of_tokens)
+        
+    Examples:
+        >>> chars, lines, tokens = calculate_text_statistics("Sample text\\nLine 2")
+        >>> print(f"Chars: {chars}, Lines: {lines}, Tokens: {tokens}")
+    """
+    no_of_characters = len(text)
+    no_of_lines = len(text.split('\n'))
+    
+    # Calculate tokens
+    try:
+        enc = tiktoken.get_encoding(ENCODING)
+        no_of_tokens = len(enc.encode(text))
+    except Exception as e:
+        logger.warning(f"Failed to calculate tokens: {e}")
+        no_of_tokens = None
+    
+    return no_of_characters, no_of_lines, no_of_tokens
+
+
+def create_weaviate_data_record(
+    db: PostgresDB,
+    collection_name: str,
+    content: str,
+    user_id: int,
+    description: str = "",
+    no_of_characters: int = 0,
+    no_of_lines: int = 0,
+    no_of_tokens: int = None
+) -> Dict[str, Any]:
+    """
+    Create a weaviate_data database record with IN_PROGRESS status.
+    
+    Args:
+        db: PostgresDB instance
+        collection_name: Name of the Weaviate collection
+        content: Text content being stored
+        user_id: ID of the user creating the record
+        description: Optional description
+        no_of_characters: Number of characters in content
+        no_of_lines: Number of lines in content
+        no_of_tokens: Number of tokens in content (optional)
+        
+    Returns:
+        Dictionary containing the created database record with start_time set
+        
+    Raises:
+        Exception: If database insert fails
+    """
+    start_time = datetime.now(datetime.now().astimezone().tzinfo)
+    
+    weaviate_data_dict = {
+        "collection_name": collection_name,
+        "description": description,
+        "content": content,
+        "status": WeaviateDataStatusEnum.IN_PROGRESS.value,
+        "no_of_lines": no_of_lines,
+        "no_of_tokens": no_of_tokens,
+        "no_of_characters": no_of_characters,
+        "created_by": user_id
+    }
+    
+    # Create new weaviate_data entry
+    db_record = db.create("weaviate_data", weaviate_data_dict)
+    
+    if not db_record:
+        raise Exception("Failed to create weaviate_data record")
+    
+    record_id = db_record["id"]
+    
+    # Update with start_time using raw SQL
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("UPDATE weaviate_data SET start_time = :start_time WHERE id = :id"),
+            {"start_time": start_time, "id": record_id}
+        )
+    db_record["start_time"] = start_time
+    
+    logger.info(f"Created weaviate_data record with ID: {record_id}")
+    return db_record
+
+
+def update_weaviate_data_success(
+    db: PostgresDB,
+    record_id: int,
+    start_time: datetime,
+    doc_id: str,
+    chunks_created: int,
+    description: str = "",
+    extra_details: Dict[str, Any] = None
+) -> None:
+    """
+    Update weaviate_data record with COMPLETED status.
+    
+    Args:
+        db: PostgresDB instance
+        record_id: ID of the weaviate_data record
+        start_time: Time when processing started
+        doc_id: Document ID used in Weaviate
+        chunks_created: Number of chunks created
+        description: Description of the collection
+        extra_details: Optional additional details to store in data_details JSON
+    """
+    end_time = datetime.now(datetime.now().astimezone().tzinfo)
+    processing_duration = int((end_time - start_time).total_seconds())
+    
+    data_details = {
+        "doc_id": doc_id,
+        "chunks_created": chunks_created,
+        "collection_description": description
+    }
+    
+    if extra_details:
+        data_details.update(extra_details)
+    
+    data_details_json = json.dumps(data_details)
+    
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE weaviate_data 
+                SET status = :status, 
+                    end_time = :end_time, 
+                    processing_duration = :processing_duration,
+                    data_details = CAST(:data_details AS jsonb)
+                WHERE id = :id
+            """),
+            {
+                "status": WeaviateDataStatusEnum.COMPLETED.value,
+                "end_time": end_time,
+                "processing_duration": processing_duration,
+                "data_details": data_details_json,
+                "id": record_id
+            }
+        )
+    logger.info(f"Updated weaviate_data record {record_id} with COMPLETED status")
+
+
+def update_weaviate_data_error(
+    db: PostgresDB,
+    record_id: int,
+    start_time: datetime,
+    error_msg: str
+) -> None:
+    """
+    Update weaviate_data record with ERROR status.
+    
+    Args:
+        db: PostgresDB instance
+        record_id: ID of the weaviate_data record
+        start_time: Time when processing started
+        error_msg: Error message to store
+    """
+    end_time = datetime.now(datetime.now().astimezone().tzinfo)
+    processing_duration = int((end_time - start_time).total_seconds())
+    
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE weaviate_data 
+                SET status = :status,
+                    end_time = :end_time,
+                    processing_duration = :processing_duration,
+                    error_msg = :error_msg
+                WHERE id = :id
+            """),
+            {
+                "status": WeaviateDataStatusEnum.EXIT_WITH_ERROR.value,
+                "end_time": end_time,
+                "processing_duration": processing_duration,
+                "error_msg": error_msg,
+                "id": record_id
+            }
+        )
+    logger.info(f"Updated weaviate_data record {record_id} with ERROR status")
+
+
+# ============================================================================
+# CHUNKING AND WEAVIATE OPERATIONS
+# ============================================================================
 
 def chunk_text(text: str, max_tokens: int = 400, overlap: int = 50) -> List[str]:
     """
@@ -303,3 +502,210 @@ def delete_chunks_from_weaviate(
     except Exception as e:
         logger.error(f"Failed to delete chunks from Weaviate: {str(e)}")
         raise RuntimeError(f"Failed to delete chunks from Weaviate: {str(e)}")
+
+
+def load_scraped_data_with_tracking(
+    scraped_content: str,
+    collection_name: str,
+    source_url: str,
+    user_id: int,
+    description: str = "",
+    page_id: int = None
+) -> Dict[str, Any]:
+    """
+    Load scraped web content into Weaviate with full database tracking.
+    Similar to load_training_data_to_weaviate but for scraped web content.
+    
+    Creates a weaviate_data record, chunks the content, loads to Weaviate,
+    and tracks status, statistics, and errors.
+    
+    Args:
+        scraped_content: The scraped HTML/text content
+        collection_name: Name of the Weaviate collection
+        source_url: Source URL of the scraped content
+        user_id: ID of the user loading the data
+        description: Optional description
+        page_id: Optional page ID to associate with the data
+        
+    Returns:
+        Dictionary with success status, collection name, chunks created, doc_id, and db record ID
+        
+    Raises:
+        ValueError: If scraped_content or collection_name is empty
+        RuntimeError: If Weaviate operations fail
+        
+    Examples:
+        >>> result = load_scraped_data_with_tracking(
+        ...     scraped_content="<h1>Title</h1><p>Content...</p>",
+        ...     collection_name="training_data",
+        ...     source_url="https://example.com/page",
+        ...     user_id=1,
+        ...     description="Scraped from example.com"
+        ... )
+        >>> print(f"Loaded {result['chunks_created']} chunks, record ID: {result['record_id']}")
+    """
+    if not scraped_content.strip():
+        raise ValueError("Scraped content cannot be empty")
+    
+    if not collection_name.strip():
+        raise ValueError("Collection name cannot be empty")
+    
+    # Initialize PostgresDB
+    db = PostgresDB()
+    
+    # Calculate statistics using helper function
+    no_of_characters, no_of_lines, no_of_tokens = calculate_text_statistics(scraped_content)
+    
+    # Create database record with IN_PROGRESS status using helper function
+    db_record = create_weaviate_data_record(
+        db=db,
+        collection_name=collection_name,
+        description=description or f"Scraped content from {source_url}",
+        content=scraped_content,
+        no_of_characters=no_of_characters,
+        no_of_lines=no_of_lines,
+        no_of_tokens=no_of_tokens,
+        user_id=user_id
+    )
+    
+    record_id = db_record["id"]
+    
+    try:
+        logger.info(f"Loading scraped data from {source_url} into collection: {collection_name}")
+        
+        # Use source_url as document ID
+        doc_id = source_url
+        
+        # Chunk the scraped content
+        logger.info("Chunking scraped content...")
+        chunks = chunk_text(scraped_content, max_tokens=400, overlap=50)
+        chunks_count = len(chunks)
+        
+        logger.info(f"Created {chunks_count} chunks")
+        
+        # Load chunks to Weaviate
+        weaviate_result = load_chunks_to_weaviate(
+            chunks=chunks,
+            collection_name=collection_name,
+            doc_id=doc_id,
+            description=description or f"Scraped content from {source_url}"
+        )
+        
+        chunks_count = weaviate_result["chunks_created"]
+        logger.info(f"Successfully loaded {chunks_count} chunks into collection '{collection_name}'")
+        
+        # Prepare data_details
+        data_details = {
+            "doc_id": doc_id,
+            "chunks_created": chunks_count,
+            "collection_description": description or f"Scraped content from {source_url}",
+            "source_url": source_url
+        }
+        
+        if page_id:
+            data_details["page_id"] = page_id
+        
+        # Update database record with success using helper function
+        update_weaviate_data_success(
+            db=db,
+            record_id=record_id,
+            data_details=data_details,
+            start_time=db_record["start_time"]
+        )
+        
+        return {
+            "success": True,
+            "message": "Scraped data loaded successfully",
+            "collection_name": collection_name,
+            "chunks_created": chunks_count,
+            "doc_id": doc_id,
+            "source_url": source_url,
+            "description": description,
+            "record_id": record_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to load scraped data to Weaviate: {str(e)}")
+        
+        # Update database record with error using helper function
+        update_weaviate_data_error(
+            db=db,
+            record_id=record_id,
+            error_msg=str(e),
+            start_time=db_record["start_time"]
+        )
+        
+        raise RuntimeError(f"Failed to load scraped data to Weaviate: {str(e)}")
+
+
+
+def load_scraped_data_to_weaviate(
+    scraped_content: str,
+    collection_name: str,
+    source_url: str,
+    description: str = ""
+) -> Dict[str, Any]:
+    """
+    Load scraped web content into Weaviate as a single document.
+    This is a simple wrapper around load_chunks_to_weaviate for scraped content.
+    Does NOT create database tracking records.
+    
+    For full tracking with weaviate_data records, use load_scraped_data_with_tracking().
+    
+    Args:
+        scraped_content: The scraped HTML/text content
+        collection_name: Name of the Weaviate collection
+        source_url: Source URL of the scraped content (used as doc_id)
+        description: Optional description
+        
+    Returns:
+        Dictionary with success status, collection name, chunks created, and doc_id
+        
+    Raises:
+        ValueError: If scraped_content or collection_name is empty
+        RuntimeError: If Weaviate operations fail
+        
+    Examples:
+        >>> result = load_scraped_data_to_weaviate(
+        ...     scraped_content="<h1>Title</h1><p>Content...</p>",
+        ...     collection_name="training_data",
+        ...     source_url="https://example.com/page"
+        ... )
+        >>> print(f"Loaded {result['chunks_created']} chunks")
+    """
+    if not scraped_content.strip():
+        raise ValueError("Scraped content cannot be empty")
+    
+    if not collection_name.strip():
+        raise ValueError("Collection name cannot be empty")
+    
+    try:
+        # Chunk the scraped content
+        logger.info(f"Chunking scraped content from {source_url}...")
+        chunks = chunk_text(scraped_content, max_tokens=400, overlap=50)
+        chunks_count = len(chunks)
+        
+        logger.info(f"Created {chunks_count} chunks from scraped content")
+        
+        # Load chunks to Weaviate using source_url as doc_id
+        result = load_chunks_to_weaviate(
+            chunks=chunks,
+            collection_name=collection_name,
+            doc_id=source_url,
+            description=description or f"Scraped content from {source_url}"
+        )
+        
+        logger.info(f"Successfully loaded {result['chunks_created']} chunks from {source_url}")
+        
+        return {
+            "success": True,
+            "collection_name": collection_name,
+            "chunks_created": result["chunks_created"],
+            "doc_id": source_url,
+            "source_url": source_url
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to load scraped data to Weaviate: {str(e)}")
+        raise RuntimeError(f"Failed to load scraped data to Weaviate: {str(e)}")
+

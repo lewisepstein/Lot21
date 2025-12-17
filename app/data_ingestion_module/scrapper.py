@@ -9,7 +9,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from service_utils.db_utils.weaviate_db import WeaviateDB
-from weaviate_module.weaviate_utils import load_chunks_to_weaviate
+from weaviate_module.weaviate_utils import (
+    load_scraped_data_to_weaviate, 
+    load_scraped_data_with_tracking
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -199,8 +202,7 @@ def insert_scraped_data_to_weaviate(
     """
     Insert scraped web page data into Weaviate collection.
     
-    Creates a chunk for each heading and calls load_chunks_to_weaviate() 
-    for each heading section separately.
+    Converts scraped data to HTML and loads it as a single document.
     
     Args:
         scraped_data: Dictionary returned from scrape_page() function with:
@@ -214,9 +216,9 @@ def insert_scraped_data_to_weaviate(
         Dictionary with:
             - success: Boolean indicating success
             - collection_name: Name of the collection
-            - total_chunks_created: Total number of chunks inserted
+            - chunks_created: Number of chunks inserted
             - doc_id: Document identifier used
-            - headings_processed: Number of headings processed
+            - source_url: Source URL
             
     Raises:
         RuntimeError: If Weaviate operations fail
@@ -225,62 +227,27 @@ def insert_scraped_data_to_weaviate(
         >>> url = "https://example.com/page"
         >>> data = scrape_page(url)
         >>> result = insert_scraped_data_to_weaviate(data, url)
-        >>> print(f"Inserted {result['total_chunks_created']} chunks from {result['headings_processed']} headings")
+        >>> print(f"Inserted {result['chunks_created']} chunks")
     """
     try:
-        # Use URL as default doc_id if not provided
+        # Convert scraped data to WYSIWYG HTML
+        html_content = convert_to_wysiwyg_html(scraped_data)
+        
+        # Use URL as doc_id if not provided
         if not doc_id:
             doc_id = url
         
-        headings_with_content = scraped_data.get("headings_with_content", [])
-        total_chunks_created = 0
-        headings_processed = 0
+        # Load to Weaviate using the helper function
+        result = load_scraped_data_to_weaviate(
+            scraped_content=html_content,
+            collection_name=collection_name,
+            source_url=doc_id,
+            description=f"Scraped content from {url}"
+        )
         
-        # Process each heading section separately
-        for idx, section in enumerate(headings_with_content):
-            heading = section.get("heading", "")
-            paragraphs = section.get("paragraphs", [])
-            lists = section.get("lists", [])
-            
-            # Build chunk text with heading and content
-            chunk_parts = []
-            if heading:
-                chunk_parts.append(heading)
-            
-            # Add paragraphs
-            chunk_parts.extend(paragraphs)
-            
-            # Add list items
-            for list_items in lists:
-                chunk_parts.extend(list_items)
-            
-            # Create chunk for this heading
-            if chunk_parts:
-                chunk_text = "\n".join(chunk_parts)
-                
-                # Call load_chunks_to_weaviate for this single chunk
-                # Use unique doc_id for each heading section
-                section_doc_id = f"{doc_id}_section_{idx}"
-                
-                result = load_chunks_to_weaviate(
-                    chunks=[chunk_text],  # Single chunk per heading
-                    collection_name=collection_name,
-                    doc_id=section_doc_id,
-                    description=f"Scraped content from {url} - {heading}"
-                )
-                
-                total_chunks_created += result.get("chunks_created", 0)
-                headings_processed += 1
-                
-                logger.info(f"Inserted chunk for heading '{heading}' (section {idx + 1}/{len(headings_with_content)})")
+        logger.info(f"Successfully loaded scraped data from {url} - {result['chunks_created']} chunks created")
         
-        return {
-            "success": True,
-            "collection_name": collection_name,
-            "total_chunks_created": total_chunks_created,
-            "doc_id": doc_id,
-            "headings_processed": headings_processed
-        }
+        return result
         
     except Exception as e:
         logger.error(f"Failed to insert scraped data to Weaviate: {str(e)}")

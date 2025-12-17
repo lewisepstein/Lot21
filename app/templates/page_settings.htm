@@ -24,9 +24,6 @@
 {% endblock %}
 
 {% block extra_styles %}
-<!-- Summernote CSS -->
-<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs5.min.css" rel="stylesheet">
-
 <style>
     .main-layout {
         display: grid;
@@ -359,7 +356,7 @@
     
     /* Form styling - reused from agent.htm */
     .form-group {
-        margin-bottom: 25px;
+        margin-bottom: 5px;
     }
     
     .form-label {
@@ -420,6 +417,16 @@
     
     .save-btn i {
         font-size: 16px;
+    }
+    
+    /* Summernote editor styling */
+    #pageContent + .note-editor {
+        background-color: white;
+    }
+    
+    #pageContent + .note-editor .note-editable {
+        background-color: white;
+        color: #000;
     }
 
     @media (max-width: 768px) {
@@ -664,6 +671,24 @@
                 <input type="text" class="form-input" id="pageName" placeholder="Enter page name" required>
             </div>
             
+            <!-- Source URL -->
+            <div class="form-group">
+                <label class="form-label">Source URL</label>
+                <input type="url" class="form-input" id="sourceUrl" placeholder="Enter source URL (optional)">
+            </div>
+            
+            <!-- Scrape Data and Is Active in one row -->
+            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="scrapeData" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span class="form-label" style="margin: 0;">Scrape Data from URL</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="isActive" checked style="width: 18px; height: 18px; cursor: pointer;">
+                    <span class="form-label" style="margin: 0;">Is Active</span>
+                </label>
+            </div>
+            
             <!-- Category -->
             <div class="form-group">
                 <label class="form-label">Category</label>
@@ -691,14 +716,6 @@
                 <label class="form-label">Content</label>
                 <textarea class="form-input" rows="10" id="pageContent" placeholder="Enter page content (optional)"></textarea>
             </div>
-
-            <!-- Is Active -->
-            <div class="form-group">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="isActive" checked style="width: 18px; height: 18px; cursor: pointer;">
-                    <span class="form-label" style="margin: 0;">Is Active</span>
-                </label>
-            </div>
             
             <!-- Submit Button -->
             <div style="display: flex; justify-content: flex-end;">
@@ -713,11 +730,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- Summernote JS (jQuery already loaded in base.htm) -->
-<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs5.min.js"></script>
-
 <script>
-    // Initialize Summernote WYSIWYG editor
+    // Initialize Summernote WYSIWYG editor (Summernote loaded in base.htm)
     $(document).ready(function() {
         $('#pageContent').summernote({
             height: 300,
@@ -732,6 +746,18 @@
                 ['insert', ['link', 'picture', 'video']],
                 ['view', ['fullscreen', 'codeview', 'help']]
             ]
+        });
+        
+        // Handle scrapeData checkbox change
+        $('#scrapeData').on('change', function() {
+            if ($(this).is(':checked')) {
+                // Clear and disable Summernote editor
+                $('#pageContent').summernote('code', '');
+                $('#pageContent').summernote('disable');
+            } else {
+                // Enable Summernote editor
+                $('#pageContent').summernote('enable');
+            }
         });
     });
 </script>
@@ -906,7 +932,11 @@
         const token = localStorage.getItem('access_token');
         const pageName = document.getElementById('pageName').value.trim();
         const categoryId = document.getElementById('categoryId').value;
+        const description = document.getElementById('pageDescription').value.trim();
         const isActive = document.getElementById('isActive').checked;
+        const pageContent = $('#pageContent').summernote('code'); // Get HTML content from Summernote
+        const sourceUrl = document.getElementById('sourceUrl').value.trim();
+        const scrapeData = document.getElementById('scrapeData').checked;
         
         if (!pageName) {
             showAlert('addPageErrorAlert', 'Page name is required');
@@ -916,7 +946,11 @@
         const requestData = {
             page_name: pageName,
             category_id: categoryId && categoryId !== '0' ? parseInt(categoryId) : null,
-            is_active: isActive
+            description: description || null,
+            is_active: isActive,
+            content: pageContent || null,
+            source_url: sourceUrl || null,
+            scrape_data: scrapeData
         };
         
         try {

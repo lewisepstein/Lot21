@@ -10,9 +10,9 @@ class Page(Base):
         id (int): Primary key, unique identifier for each page.
         page_name (str): Name of the page.
         category_id (int): Foreign key referencing the category (nullable).
-        is_parent (bool): Flag indicating if this page is a parent page.
-        parent_id (int): Foreign key referencing the parent page (nullable).
-        is_root (bool): Flag indicating if this page is a root page.
+        description (str): Description of the page (nullable).
+        source_url (str): Optional source URL for the page (nullable).
+        scrape_data (bool): Flag indicating if data should be scraped from the source URL.
         is_active (bool): Flag indicating if the page is active.
         created_by (int): Foreign key referencing the user who created the page (nullable).
         created_on (datetime): Timestamp when the page was created.
@@ -23,11 +23,14 @@ class Page(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     page_name = Column(String(255), nullable=False, index=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    source_url = Column(String(200), nullable=True)
+    scrape_data = Column(Boolean, default=False, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
-    updated_on = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
+    updated_on = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     
     # Self-referential relationship for parent-child hierarchy
     parent = relationship("Page", remote_side=[id], backref="children")
@@ -41,7 +44,10 @@ class Page(Base):
             "id": self.id,
             "page_name": self.page_name,
             "category_id": self.category_id,
+            "description": self.description,
             "is_active": self.is_active,
+            "source_url": self.source_url,
+            "scrape_data": self.scrape_data,
             "created_by": self.created_by,
             "created_on": self.created_on.isoformat() if self.created_on else None,
             "deleted_on": self.deleted_on.isoformat() if self.deleted_on else None,

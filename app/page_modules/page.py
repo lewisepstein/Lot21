@@ -91,13 +91,25 @@ async def create_page(
         # Extract user_id from token payload
         user_id = payload.get('user_id')
         
-        # Create page record
-        page_data_dict = create_page_record(
-            page_name=page_data.page_name,
-            category_id=page_data.category_id,
-            created_by=user_id,
-            is_active=page_data.is_active
-        )
+        # Log incoming request data for debugging
+        logger.info(f"Creating page with data: name={page_data.page_name}, category_id={page_data.category_id}, "
+                   f"scrape_data={page_data.scrape_data}, description={page_data.description}")
+        
+        try:
+            # Create page record
+            page_data_dict = create_page_record(
+                page_name=page_data.page_name,
+                category_id=page_data.category_id,
+                created_by=user_id,
+                is_active=page_data.is_active,
+                content=page_data.content,
+                source_url=page_data.source_url,
+                scrape_data=page_data.scrape_data,
+                description=page_data.description
+            )
+        except ValueError as ve:
+            logger.warning(f"Page creation validation failed: {ve}")
+            raise HTTPException(status_code=400, detail=str(ve))
         
         # Convert to response model
         page_response = PageResponse(**page_data_dict)

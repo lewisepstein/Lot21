@@ -10,8 +10,15 @@ from typing import Dict, Any, List
 from sqlalchemy import text
 
 from service_utils.db_utils.pg_db import PostgresDB
-from weaviate_module.weaviate_utils import chunk_text, load_chunks_to_weaviate, delete_chunks_from_weaviate
-from models.weaviate_data import WeaviateDataStatusEnum
+from weaviate_module.weaviate_utils import (
+    chunk_text, 
+    load_chunks_to_weaviate, 
+    delete_chunks_from_weaviate,
+    calculate_text_statistics,
+    create_weaviate_data_record,
+    update_weaviate_data_success,
+    update_weaviate_data_error
+)
 from models.weaviate_data_versions import WeaviateDataVersion
 
 # Set up logging
@@ -51,9 +58,6 @@ def load_training_data_to_weaviate(
         >>> print(f"Loaded {result['chunks_created']} chunks")
     """
     import uuid
-    import tiktoken
-    
-    ENCODING = "cl100k_base"
     
     if not training_data.strip():
         raise ValueError("Training data cannot be empty")
@@ -61,54 +65,27 @@ def load_training_data_to_weaviate(
     if not collection_name.strip():
         raise ValueError("Collection name cannot be empty")
     
-    # Calculate statistics
-    no_of_characters = len(training_data)
-    no_of_lines = len(training_data.split('\n'))
-    
-    # Calculate tokens
-    try:
-        enc = tiktoken.get_encoding(ENCODING)
-        no_of_tokens = len(enc.encode(training_data))
-    except Exception as e:
-        logger.warning(f"Failed to calculate tokens: {e}")
-        no_of_tokens = None
-    
     # Initialize PostgresDB
     db = PostgresDB()
     
-    # Get current time for tracking
-    start_time = datetime.now(datetime.now().astimezone().tzinfo)
+    # Calculate statistics using helper function
+    no_of_characters, no_of_lines, no_of_tokens = calculate_text_statistics(training_data)
     
-    # Create database record with IN_PROGRESS status
-    weaviate_data_dict = {
-        "collection_name": collection_name,
-        "description": description,
-        "content": training_data,
-        "status": WeaviateDataStatusEnum.IN_PROGRESS.value,
-        "no_of_lines": no_of_lines,
-        "no_of_tokens": no_of_tokens,
-        "no_of_characters": no_of_characters,
-        "created_by": user_id
-    }
+    # Create database record with IN_PROGRESS status using helper function
+    db_record = create_weaviate_data_record(
+        db=db,
+        collection_name=collection_name,
+        description=description,
+        content=training_data,
+        no_of_characters=no_of_characters,
+        no_of_lines=no_of_lines,
+        no_of_tokens=no_of_tokens,
+        user_id=user_id
+    )
+    
+    record_id = db_record["id"]
     
     try:
-        # Create new weaviate_data entry
-        db_record = db.create("weaviate_data", weaviate_data_dict)
-        
-        if not db_record:
-            raise Exception("Failed to create weaviate_data record")
-        
-        record_id = db_record["id"]
-        
-        # Update with start_time using raw SQL to avoid validation issues
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("UPDATE weaviate_data SET start_time = :start_time WHERE id = :id"),
-                {"start_time": start_time, "id": record_id}
-            )
-        db_record["start_time"] = start_time
-        
-        logger.info(f"Created weaviate_data record with ID: {record_id}")
         logger.info(f"Loading training data into collection: {collection_name}")
         
         # Generate unique document ID
@@ -132,37 +109,20 @@ def load_training_data_to_weaviate(
         chunks_count = weaviate_result["chunks_created"]
         logger.info(f"Successfully loaded {chunks_count} chunks into collection '{collection_name}'")
         
-        # Calculate processing duration
-        end_time = datetime.now(datetime.now().astimezone().tzinfo)
-        start_time = db_record["start_time"]
-        processing_duration = int((end_time - start_time).total_seconds())
-        
-        # Update database record with success using raw SQL to avoid validation issues
-        data_details_json = json.dumps({
+        # Prepare data_details
+        data_details = {
             "doc_id": doc_id,
             "chunks_created": chunks_count,
             "collection_description": description
-        })
+        }
         
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("""
-                    UPDATE weaviate_data 
-                    SET status = :status, 
-                        end_time = :end_time, 
-                        processing_duration = :processing_duration,
-                        data_details = CAST(:data_details AS jsonb)
-                    WHERE id = :id
-                """),
-                {
-                    "status": WeaviateDataStatusEnum.COMPLETED.value,
-                    "end_time": end_time,
-                    "processing_duration": processing_duration,
-                    "data_details": data_details_json,
-                    "id": record_id
-                }
-            )
-        logger.info(f"Updated weaviate_data record {record_id} with COMPLETED status")
+        # Update database record with success using helper function
+        update_weaviate_data_success(
+            db=db,
+            record_id=record_id,
+            data_details=data_details,
+            start_time=db_record["start_time"]
+        )
         
         return {
             "success": True,
@@ -177,37 +137,16 @@ def load_training_data_to_weaviate(
     except Exception as e:
         logger.error(f"Failed to load data to Weaviate: {str(e)}")
         
-        # Update database record with error
-        try:
-            end_time = datetime.now(datetime.now().astimezone().tzinfo)
-            # Check if db_record was created
-            if 'db_record' in locals() and db_record:
-                start_time = db_record.get("start_time", end_time)
-                processing_duration = int((end_time - start_time).total_seconds())
-                
-                with db.engine.begin() as conn:
-                    conn.execute(
-                        text("""
-                            UPDATE weaviate_data 
-                            SET status = :status,
-                                end_time = :end_time,
-                                processing_duration = :processing_duration,
-                                error_msg = :error_msg
-                            WHERE id = :id
-                        """),
-                        {
-                            "status": WeaviateDataStatusEnum.EXIT_WITH_ERROR.value,
-                            "end_time": end_time,
-                            "processing_duration": processing_duration,
-                            "error_msg": str(e),
-                            "id": db_record["id"]
-                        }
-                    )
-                logger.info(f"Updated weaviate_data record {db_record['id']} with ERROR status")
-        except Exception as db_error:
-            logger.error(f"Failed to update database record: {str(db_error)}")
+        # Update database record with error using helper function
+        update_weaviate_data_error(
+            db=db,
+            record_id=record_id,
+            error_msg=str(e),
+            start_time=db_record["start_time"]
+        )
         
         raise RuntimeError(f"Failed to load data to Weaviate: {str(e)}")
+
 
 
 def get_training_history(user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
@@ -513,7 +452,7 @@ def update_training_record(
         # Load new chunks to Weaviate
         start_time = datetime.now(datetime.now().astimezone().tzinfo)
         
-        weaviate_result = load_chunks_to_weaviate(
+        load_chunks_to_weaviate(
             chunks=chunks,
             collection_name=collection_name,
             doc_id=new_doc_id,

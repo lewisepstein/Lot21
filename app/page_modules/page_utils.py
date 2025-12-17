@@ -6,8 +6,15 @@ import pandas as pd
 from service_utils.db_utils.pg_db import PostgresDB
 from service_utils.helpers import (
     convert_datetime_to_formatted_string,
+    validate_url,
 )
-from models.pages import Page
+from data_ingestion_module.scrapper import (
+    scrape_page,
+    convert_to_wysiwyg_html,
+)
+from weaviate_module.weaviate_utils import load_scraped_data_with_tracking
+from content_module.content_utils import create_content_record
+from models.content import ContentActionEnum
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -139,51 +146,140 @@ def create_page_record(
     page_name: str,
     category_id: Optional[int] = None,
     created_by: Optional[int] = None,
-    is_active: bool = True
+    is_active: bool = True,
+    content: Optional[str] = None,
+    source_url: Optional[str] = None,
+    scrape_data: bool = False,
+    description: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Create a new page record in the database.
+    Create a new page record in the database and a corresponding content entry.
     
     Args:
         page_name: Name of the page
         category_id: ID of the category (nullable)
         created_by: ID of the user who created the page (nullable)
         is_active: Flag indicating if the page is active
+        content: Optional content text for the page
+        source_url: Optional source URL for the page
+        scrape_data: Flag indicating if data should be scraped from URL
+        description: Optional description for the page
         
     Returns:
         Dictionary containing the created page record
         
     Raises:
+        ValueError: If scrape_data is True but source_url is invalid or missing
         Exception: If database insert fails
     """
     try:
-        db = PostgresDB()
+        # Validate URL if scrape_data is True
+        if scrape_data:
+            if not source_url:
+                raise ValueError("Source URL is required when scrape data is enabled")
+            
+            # Validate URL format
+            if not validate_url(source_url):
+                raise ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
+            
+            # Scrape content from URL
+            try:
+                logger.info(f"Scraping content from URL: {source_url}")
+                scraped_data = scrape_page(source_url)
+                scraped_html = convert_to_wysiwyg_html(scraped_data)
+
+                logger.info(f"Scraped HTML Content length: {len(scraped_html)} characters")
+                
+                # Override content with scraped content
+                content = scraped_html
+                logger.info(f"Successfully scraped content from {source_url}")
+            except Exception as scrape_error:
+                logger.error(f"Failed to scrape content from {source_url}: {scrape_error}")
+                raise ValueError(f"Failed to scrape content from URL: {str(scrape_error)}")
         
+        db = PostgresDB()
+
         # Prepare page data
         page_dict = {
             'page_name': page_name,
-            'category_id': category_id,
             'created_by': created_by,
-            'is_active': is_active
+            'is_active': is_active,
+            'source_url': source_url,
+            'scrape_data': scrape_data,
+            'description': description
         }
+
+        if category_id is not None:
+            page_dict['category_id'] = category_id
+
+        # Log the data being inserted
+        logger.info(f"Inserting page data: {page_dict}")
+
         
         # Create page in database
-        result = db.create('pages', page_dict)
+        page_record = db.create('pages', page_dict)
         
-        if not result:
+        if not page_record:
             raise Exception("Failed to create page")
+        
+        page_id = page_record['id']
+        
+        # Load scraped content to Weaviate if scraping was performed
+        if scrape_data and content and source_url:
+            try:
+                logger.info(f"Loading scraped content to Weaviate for page {page_id}")
+                weaviate_result = load_scraped_data_with_tracking(
+                    scraped_content=content,
+                    collection_name="training_data",
+                    source_url=source_url,
+                    user_id=created_by,
+                    description=description or f"Scraped content for page: {page_name}",
+                    page_id=page_id
+                )
+                logger.info(f"Loaded {weaviate_result['chunks_created']} chunks to Weaviate (record ID: {weaviate_result['record_id']})")
+            except Exception as weaviate_error:
+                logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
+                # Don't fail page creation if Weaviate loading fails
+        
+        # Create corresponding content entry (only if content is provided and category exists)
+        if content and category_id is not None:
+            try:
+                # Create content record using content_utils function
+                content_record = create_content_record(
+                    category_id=category_id,
+                    prompt_data=None,  # No prompt for scraped/manual content
+                    action=ContentActionEnum.DRAFT,
+                    user_id=created_by,
+                    content_type=None
+                )
+                
+                # Update the content record with page_id and generated_content
+                db.update(
+                    'content',
+                    conditions={'id': content_record['id']},
+                    data={
+                        'page_id': page_id,
+                        'generated_content': content
+                    }
+                )
+                
+                logger.info(f"Successfully created content entry (ID: {content_record['id']}) for page {page_id}")
+            except Exception as e:
+                logger.warning(f"Failed to create content entry for page {page_id}: {e}")
+        elif category_id is None:
+            logger.info(f"Page {page_id} created without category, skipping content entry creation")
         
         # Fetch the created page to return full object
         page = db.read(
             'pages',
-            conditions={'id': result},
+            conditions={'id': page_id},
             limit=1
         )
         
         if not page:
             raise Exception("Failed to retrieve created page")
         
-        logger.info(f"Successfully created page: {page_name} (ID: {result})")
+        logger.info(f"Successfully created page: {page_name} (ID: {page_id})")
         return page[0]
         
     except Exception as e:
@@ -250,7 +346,7 @@ def get_page_statistics() -> Dict[str, Any]:
         assigned_pages = len(df[df['category_id'].notna()])
         unassigned_pages = len(df[df['category_id'].isna()])
         active_pages = len(df[df['is_active']])
-        inactive_pages = len(df[not df['is_active']])
+        inactive_pages = len(df[~df['is_active']])
         pages_with_content = len([pid for pid in df['id'] if pid in pages_with_content_ids])
         
         # Prepare detailed page list
