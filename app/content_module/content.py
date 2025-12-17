@@ -48,9 +48,9 @@ async def content_generation_page(request: Request):
     """
     try:
         return templates.TemplateResponse(
-            "content.htm",
-            {
-                "request": request, 
+            request=request,
+            name="content.htm",
+            context={
                 "category_id": None,
                 "latest_content": None
             }
@@ -58,9 +58,9 @@ async def content_generation_page(request: Request):
     except Exception as e:
         logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "content.htm",
-            {
-                "request": request,
+            request=request,
+            name="content.htm",
+            context={
                 "category_id": None,
                 "latest_content": None
             }
@@ -82,9 +82,9 @@ async def content_page(request: Request, category_id: int):
         latest_content = get_latest_content(category_id)
 
         return templates.TemplateResponse(
-            "content.htm",
-            {
-                "request": request, 
+            request=request,
+            name="content.htm",
+            context={
                 "category_id": category_id,
                 "latest_content": latest_content
             }
@@ -92,9 +92,9 @@ async def content_page(request: Request, category_id: int):
     except Exception as e:
         logger.error(f"Error loading content page for category {category_id}: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "content.htm",
-            {
-                "request": request,
+            request=request,
+            name="content.htm",
+            context={
                 "category_id": category_id,
                 "latest_content": None
             }

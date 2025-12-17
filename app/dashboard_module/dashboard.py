@@ -27,14 +27,14 @@ async def dashboard_page(request: Request):
     """Render dashboard HTML page. Authentication handled by frontend JavaScript."""
     try:
         return templates.TemplateResponse(
-            "dashboard.htm",
-            {"request": request}
+            request=request,
+            name="dashboard.htm"
         )
     except Exception as e:
         logger.error(f"Error loading dashboard page: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "dashboard.htm",
-            {"request": request}
+            request=request,
+            name="dashboard.htm"
         )
 
 # API Endpoints

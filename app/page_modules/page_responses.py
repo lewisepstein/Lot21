@@ -9,7 +9,6 @@ class PageCreateRequest(BaseModel):
     """
     page_name: str = Field(..., min_length=1, max_length=255, description="Name of the page")
     category_id: Optional[int] = Field(default=None, description="ID of the category (nullable)")
-    created_by: Optional[int] = Field(default=None, description="ID of the user who created the page (nullable)")
     is_active: bool = Field(default=True, description="Flag indicating if the page is active")
 
 

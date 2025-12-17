@@ -21,6 +21,7 @@ def get_last_updated(row):
         else row['created_on']
     )
 
+
 def get_categories_list() -> Optional[List[Dict[str, Any]]]:
     """
     Retrieve list of active categories.
@@ -66,7 +67,7 @@ def get_categories_list() -> Optional[List[Dict[str, Any]]]:
         return None, "Unable to retrieve categories"
 
 
-def get_parent_categories() -> Optional[List[Dict[str, Any]]]:
+def get_parent_categories(is_parent = True, is_root=True, is_active=None) -> Optional[List[Dict[str, Any]]]:
     """
     Retrieve list of parent categories.
     
@@ -75,15 +76,26 @@ def get_parent_categories() -> Optional[List[Dict[str, Any]]]:
     """
     try:
         db = PostgresDB()
+        
+        # Print the query conditions for debugging
+        conditions = {
+            'is_parent': is_parent,
+            'is_root': is_root,
+            'deleted_on': None
+        }
+
+        if is_active is not None:
+            conditions['is_active'] = is_active
+
+        print(f"Query conditions: {conditions}")
+        
         categories = db.read(
             'categories',
-            conditions={
-                'is_parent': True,
-                'is_active': True,
-                'deleted_on': None
-            },
+            conditions=conditions,
             columns=['id', 'category_name']
         )
+
+        print(f"Query result: {categories}")
 
         if not categories:
             logger.info("No parent categories found")

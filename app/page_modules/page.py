@@ -14,6 +14,7 @@ from page_modules.page_utils import (
     get_page_statistics
 )
 from page_modules.page_responses import PageCreateRequest, PageCreateResponse, PageResponse
+from category_module.category_utils import get_parent_categories
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -38,9 +39,9 @@ async def pages_page(request: Request, category_id: int):
         has_root_page = check_root_exists()
 
         return templates.TemplateResponse(
-            "page.htm",
-            {
-                "request": request,
+            request=request,
+            name="page.htm",
+            context={
                 "data": results if results else [],
                 "parent_pages": parent_pages,
                 "has_root_page": has_root_page,
@@ -51,9 +52,9 @@ async def pages_page(request: Request, category_id: int):
     except Exception as e:
         logger.error(f"Error loading pages page: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "page.htm",
-            {
-                "request": request,
+            request=request,
+            name="page.htm",
+            context={
                 "data": [],
                 "parent_pages": [],
                 "has_root_page": False,
@@ -82,45 +83,26 @@ async def create_page(
     """
     try:
         # Verify token
-        token_data = verify_token(credentials.credentials)
-        if not token_data:
-            logger.warning("Invalid or expired token attempt")
-            raise HTTPException(status_code=401, detail="Authentication failed")
+        success, status_code, message, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning(f"Token verification failed: {message}")
+            raise HTTPException(status_code=status_code, detail=message)
+        
+        # Extract user_id from token payload
+        user_id = payload.get('user_id')
         
         # Create page record
-        page = create_page_record(
+        page_data_dict = create_page_record(
             page_name=page_data.page_name,
             category_id=page_data.category_id,
-            created_by=page_data.created_by,
-            is_parent=page_data.is_parent,
-            parent_id=page_data.parent_id,
-            is_root=page_data.is_root,
+            created_by=user_id,
             is_active=page_data.is_active
         )
         
-        if not page:
-            logger.error(f"Failed to create page: {page_data.page_name}")
-            raise HTTPException(
-                status_code=500,
-                detail="Unable to create page at this time"
-            )
-        
         # Convert to response model
-        page_response = PageResponse(
-            id=page.id,
-            page_name=page.page_name,
-            category_id=page.category_id,
-            created_by=page.created_by,
-            is_parent=page.is_parent,
-            parent_id=page.parent_id,
-            is_root=page.is_root,
-            is_active=page.is_active,
-            created_on=page.created_on,
-            deleted_on=page.deleted_on,
-            updated_on=page.updated_on
-        )
+        page_response = PageResponse(**page_data_dict)
         
-        logger.info(f"Successfully created page: {page.page_name} (ID: {page.id})")
+        logger.info(f"Successfully created page: {page_data.page_name} (ID: {page_data_dict['id']})")
         
         return PageCreateResponse(
             message="Page created successfully",
@@ -143,32 +125,35 @@ async def page_settings(request: Request):
     
     try:
         stats = get_page_statistics()
+        categories = get_parent_categories(is_parent=False, is_root=False, is_active=True)
         
         return templates.TemplateResponse(
-            "page_settings.htm",
-            {
-                "request": request,
+            request=request,
+            name="page_settings.htm",
+            context={
                 "assigned_pages": stats['assigned_pages'],
                 "unassigned_pages": stats['unassigned_pages'],
                 "active_pages": stats['active_pages'],
                 "inactive_pages": stats['inactive_pages'],
                 "pages_with_content": stats['pages_with_content'],
                 "pages_without_content": stats['pages_without_content'],
-                "pages": stats['pages']
+                "pages": stats['pages'],
+                "categories": categories if categories else []
             }
         )
     except Exception as e:
         logger.error(f"Error loading page settings: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "page_settings.htm",
-            {
-                "request": request,
+            request=request,
+            name="page_settings.htm",
+            context={
                 "assigned_pages": 0,
                 "unassigned_pages": 0,
                 "active_pages": 0,
                 "inactive_pages": 0,
                 "pages_with_content": 0,
                 "pages_without_content": 0,
-                "pages": []
+                "pages": [],
+                "categories": []
             }
         )

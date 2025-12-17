@@ -27,8 +27,9 @@ register_routers(app)
 async def login_page(request: Request, error: str = None):
     """Render login page."""
     return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "error": error}
+        request=request,
+        name="login.html",
+        context={"error": error}
     )
 
 

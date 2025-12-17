@@ -37,9 +37,9 @@ async def understanding_page(request: Request):
         has_root_category = check_root_exists()
 
         return templates.TemplateResponse(
-            "categories.htm",
-            {
-                "request": request,
+            request=request,
+            name="categories.htm",
+            context={
                 "data": results if results else [],
                 "parent_categories": parent_categories,
                 "has_root_category": has_root_category,
@@ -49,9 +49,9 @@ async def understanding_page(request: Request):
     except Exception as e:
         logger.error(f"Error loading understanding page: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "categories.htm",
-            {
-                "request": request,
+            request=request,
+            name="categories.htm",
+            context={
                 "data": [],
                 "parent_categories": [],
                 "has_root_category": False,

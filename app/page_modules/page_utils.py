@@ -139,11 +139,8 @@ def create_page_record(
     page_name: str,
     category_id: Optional[int] = None,
     created_by: Optional[int] = None,
-    is_parent: bool = False,
-    parent_id: Optional[int] = None,
-    is_root: bool = False,
     is_active: bool = True
-) -> Optional[Page]:
+) -> Dict[str, Any]:
     """
     Create a new page record in the database.
     
@@ -151,13 +148,13 @@ def create_page_record(
         page_name: Name of the page
         category_id: ID of the category (nullable)
         created_by: ID of the user who created the page (nullable)
-        is_parent: Flag indicating if this is a parent page
-        parent_id: ID of the parent page (nullable)
-        is_root: Flag indicating if this is a root page
         is_active: Flag indicating if the page is active
         
     Returns:
-        Page object if successful, None otherwise
+        Dictionary containing the created page record
+        
+    Raises:
+        Exception: If database insert fails
     """
     try:
         db = PostgresDB()
@@ -167,35 +164,31 @@ def create_page_record(
             'page_name': page_name,
             'category_id': category_id,
             'created_by': created_by,
-            'is_parent': is_parent,
-            'parent_id': parent_id,
-            'is_root': is_root,
             'is_active': is_active
         }
         
         # Create page in database
         result = db.create('pages', page_dict)
         
-        if result:
-            logger.info(f"Successfully created page: {page_name}")
-            # Fetch the created page to return full object
-            page = db.read(
-                'pages',
-                conditions={'id': result},
-                limit=1
-            )
-            
-            if page:
-                # Convert to Page object
-                page_data = page[0]
-                return Page(**page_data)
+        if not result:
+            raise Exception("Failed to create page")
         
-        logger.error(f"Failed to create page: {page_name}")
-        return None
+        # Fetch the created page to return full object
+        page = db.read(
+            'pages',
+            conditions={'id': result},
+            limit=1
+        )
+        
+        if not page:
+            raise Exception("Failed to retrieve created page")
+        
+        logger.info(f"Successfully created page: {page_name} (ID: {result})")
+        return page[0]
         
     except Exception as e:
         logger.error(f"Error creating page: {e}")
-        return None
+        raise
 
 
 def get_page_statistics() -> Dict[str, Any]:
@@ -222,6 +215,7 @@ def get_page_statistics() -> Dict[str, Any]:
                 'active_pages': 0,
                 'inactive_pages': 0,
                 'pages_with_content': 0,
+                'pages_without_content': 0,
                 'pages': []
             }
         
@@ -255,8 +249,8 @@ def get_page_statistics() -> Dict[str, Any]:
         # Calculate statistics
         assigned_pages = len(df[df['category_id'].notna()])
         unassigned_pages = len(df[df['category_id'].isna()])
-        active_pages = len(df[df['is_active'] == True])
-        inactive_pages = len(df[df['is_active'] == False])
+        active_pages = len(df[df['is_active']])
+        inactive_pages = len(df[not df['is_active']])
         pages_with_content = len([pid for pid in df['id'] if pid in pages_with_content_ids])
         
         # Prepare detailed page list

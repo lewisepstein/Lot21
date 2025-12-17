@@ -13,6 +13,6 @@ templates = Jinja2Templates(directory="templates")
 async def projects_page(request: Request):
     """Render projects HTML page. Authentication handled by frontend JavaScript."""
     return templates.TemplateResponse(
-        "projects.htm",
-        {"request": request}
+        request=request,
+        name="projects.htm"
     )

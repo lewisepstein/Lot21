@@ -18,12 +18,12 @@ async def resources_page(request: Request):
     """Render resources HTML page. Authentication handled by frontend JavaScript."""
     try:
         return templates.TemplateResponse(
-            "resources.htm",
-            {"request": request}
+            request=request,
+            name="resources.htm"
         )
     except Exception as e:
         logger.error(f"Error loading resources page: {str(e)}", exc_info=True)
         return templates.TemplateResponse(
-            "resources.htm",
-            {"request": request}
+            request=request,
+            name="resources.htm"
         )
