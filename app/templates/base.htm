@@ -662,6 +662,8 @@
         function handleTokenExpiration(response) {
             if (response.status === 401) {
                 localStorage.removeItem('access_token');
+                // Clear session token cookie
+                document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                 if (confirm('Your session has expired. Please login again.')) {
                     window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
                 } else {
@@ -691,6 +693,8 @@
             }
             
             localStorage.removeItem('access_token');
+            // Clear session token cookie
+            document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
             window.location.replace('/');
         }
         
@@ -722,6 +726,8 @@
                 if (currentTime >= exp) {
                     // Token expired, clear storage and redirect to login
                     localStorage.removeItem('access_token');
+                    // Clear session token cookie
+                    document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                     window.location.replace('/?error=' + encodeURIComponent('Session expired. Please login again.'));
                     return false;
                 }

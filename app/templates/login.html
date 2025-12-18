@@ -176,16 +176,25 @@ button{
                 const data = await response.json();
                 
                 if (response.ok) {
-                    // Store token in localStorage
+                    // Store JWT token in localStorage
                     localStorage.setItem('access_token', data.access_token);
+                    
+                    // Store session token in cookie if provided
+                    if (data.session_token) {
+                        // Set cookie with 1 hour expiry
+                        const expires = new Date();
+                        expires.setHours(expires.getHours() + 1);
+                        document.cookie = `session_token=${data.session_token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+                    }
+                    
                     // Redirect to dashboard HTML page
                     window.location.href = '/user/dashboard';
                 } else {
                     // Redirect to login with error message
-                    window.location.href = '/?error=' + encodeURIComponent(data.detail || 'Login failed');
+                    window.location.href = '/';
                 }
             } catch (error) {
-                window.location.href = '/?error=' + encodeURIComponent('Network error. Please try again.');
+                window.location.href = '/';
             }
         });
     </script>

@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from typing import Optional
+
 
 class LoginRequest(BaseModel):
     """
@@ -20,11 +22,13 @@ class LoginResponse(BaseModel):
         access_token (str): JWT access token for authenticated requests.
         token_type (str): The type of token, typically 'bearer'.
         expires_in (int): Token expiration time in seconds.
+        session_token (Optional[str]): Session token for session-based authentication.
         user (dict): Dictionary containing user information (username, email, full_name).
     """
     access_token: str
     token_type: str
     expires_in: int
+    session_token: Optional[str] = None
     user: dict
 
 

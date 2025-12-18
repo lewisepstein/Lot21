@@ -234,16 +234,20 @@ class PostgresDB:
                 raise ValueError(f"Invalid column name: {column_name}")
             
             column = table.columns[column_name]
-            try:
-                # Attempt to convert value to column's Python type
-                if value is not None:  # Skip validation for NULL values
-                    column.type.python_type(value)
-            except (ValueError, TypeError) as e:
-                raise ValueError(
-                    f"Invalid type for column {column_name}: "
-                    f"expected {column.type.python_type.__name__}, "
-                    f"got {type(value).__name__}"
-                ) from e
+            if value is not None:  # Skip validation for NULL values
+                expected_type = column.type.python_type
+                
+                # Check if value is already the correct type
+                if not isinstance(value, expected_type):
+                    try:
+                        # Attempt to convert value to column's Python type
+                        expected_type(value)
+                    except (ValueError, TypeError) as e:
+                        raise ValueError(
+                            f"Invalid type for column {column_name}: "
+                            f"expected {expected_type.__name__}, "
+                            f"got {type(value).__name__}"
+                        ) from e
 
     def get_connection_info(self) -> Dict[str, Any]:
         """

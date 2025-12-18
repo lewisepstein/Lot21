@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import logging
+from typing import Optional, Dict
 
-from auth_module.auth_utils import verify_token
+from auth_module.auth_utils import verify_token, require_session_auth
 
 from page_modules.page_utils import (
     get_pages_list, 
     create_page_record,
     get_parent_pages,
     check_root_exists,
-    get_page_statistics
+    get_page_statistics,
+    get_page_by_id,
+    update_page
 )
 from page_modules.page_responses import PageCreateRequest, PageCreateResponse, PageResponse
 from category_module.category_utils import get_parent_categories
@@ -31,8 +33,14 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/pages/{category_id}", response_class=HTMLResponse)
-async def pages_page(request: Request, category_id: int):
-    """Render pages HTML page filtered by category_id. Authentication handled by frontend JavaScript."""
+@require_session_auth(redirect_url="/")
+async def pages_page(
+    request: Request,
+    category_id: int,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """Render pages HTML page filtered by category_id."""
     
     try:
         results, msg = get_pages_list(category_id=category_id)
@@ -133,8 +141,13 @@ async def create_page(
 
 
 @router.get("/page-settings", response_class=HTMLResponse)
-async def page_settings(request: Request):
-    """Render page settings page with statistics. Authentication handled by frontend JavaScript."""
+@require_session_auth(redirect_url="/")
+async def page_settings(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """Render page settings page with statistics."""
     
     try:
         stats = get_page_statistics()
@@ -170,3 +183,114 @@ async def page_settings(request: Request):
                 "categories": []
             }
         )
+
+
+@router.get("/get_page/{page_id}")
+async def get_page(
+    page_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get a single page by ID.
+    
+    Args:
+        page_id: The ID of the page to retrieve
+        credentials: HTTP Bearer token for authentication
+        
+    Returns:
+        Page details
+        
+    Raises:
+        HTTPException: If authentication fails or page not found
+    """
+    try:
+        # Verify token
+        success, status_code, message, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning(f"Token verification failed: {message}")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
+        # Get page
+        page = get_page_by_id(page_id)
+        
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+        
+        logger.info(f"Retrieved page {page_id}")
+        return page
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_page: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while retrieving the page"
+        )
+
+
+@router.put("/update_page/{page_id}")
+async def update_page_endpoint(
+    page_id: int,
+    page_data: PageCreateRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Update an existing page.
+    
+    Args:
+        page_id: The ID of the page to update
+        page_data: Page update request data
+        credentials: HTTP Bearer token for authentication
+        
+    Returns:
+        Updated page details
+        
+    Raises:
+        HTTPException: If authentication fails or update fails
+    """
+    try:
+        # Verify token
+        success, status_code, message, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning(f"Token verification failed: {message}")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
+        # Extract user_id from token payload
+        user_id = payload.get('user_id')
+        
+        logger.info(f"Updating page {page_id} with data: name={page_data.page_name}, "
+                   f"category_id={page_data.category_id}, is_active={page_data.is_active}")
+        
+        try:
+            # Update page record
+            updated_page = update_page(
+                page_id=page_id,
+                page_name=page_data.page_name,
+                category_id=page_data.category_id,
+                is_active=page_data.is_active,
+                content=page_data.content,
+                source_url=page_data.source_url,
+                description=page_data.description,
+                updated_by=user_id
+            )
+        except ValueError as ve:
+            logger.warning(f"Page update validation failed: {ve}")
+            raise HTTPException(status_code=400, detail=str(ve))
+        
+        logger.info(f"Successfully updated page: {updated_page['page_name']} (ID: {page_id})")
+        
+        return {
+            "message": "Page updated successfully",
+            "page": updated_page
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in update_page: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while updating the page"
+        )
+

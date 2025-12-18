@@ -3,7 +3,6 @@ Agent utility functions.
 Business logic for agent-related operations including training data management.
 """
 import json
-import logging
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -18,9 +17,10 @@ from weaviate_module.weaviate_utils import (
     calculate_text_statistics,
     create_weaviate_data_record,
     update_weaviate_data_success,
-    update_weaviate_data_error
+    update_weaviate_data_error,
+    create_weaviate_version_snapshot
 )
-from models.weaviate_data_versions import WeaviateDataVersion
+
 
 # Set up logging
 logger = get_logger(__name__)
@@ -319,7 +319,7 @@ def delete_training_record(record_id: int, user_id: int) -> Dict[str, Any]:
         new_values = {**old_values, "deleted_at": now.isoformat()}
         
         try:
-            version_result = create_version_snapshot(
+            version_result = create_weaviate_version_snapshot(
                 weaviate_data_id=record_id,
                 user_id=user_id,
                 old_data=old_values,
@@ -511,7 +511,7 @@ def update_training_record(
         }
         
         try:
-            version_result = create_version_snapshot(
+            version_result = create_weaviate_version_snapshot(
                 weaviate_data_id=record_id,
                 user_id=user_id,
                 old_data=old_values,
@@ -537,107 +537,6 @@ def update_training_record(
     except Exception as e:
         logger.error(f"Error updating training record: {str(e)}")
         raise RuntimeError(f"Failed to update training record: {str(e)}")
-
-
-def create_version_snapshot(
-    weaviate_data_id: int,
-    user_id: int,
-    old_data: Dict[str, Any],
-    new_data: Dict[str, Any],
-    operation: str = "UPDATE",
-    change_description: str = None
-) -> Dict[str, Any]:
-    """
-    Create a version snapshot for a weaviate_data record using JSON diff.
-    
-    Args:
-        weaviate_data_id: ID of the weaviate_data record
-        user_id: ID of the user making the change
-        old_data: Dictionary containing old values of the record
-        new_data: Dictionary containing new values of the record
-        operation: Type of operation (UPDATE, DELETE, RESTORE)
-        change_description: Optional description of the change
-        
-    Returns:
-        Dictionary with version creation status and version number
-        
-    Examples:
-        >>> result = create_version_snapshot(
-        ...     weaviate_data_id=1,
-        ...     user_id=1,
-        ...     old_data={"content": "old text", "description": "old desc"},
-        ...     new_data={"content": "new text", "description": "new desc"},
-        ...     operation="UPDATE"
-        ... )
-    """
-    try:
-        db = PostgresDB()
-        
-        # Create diff using the model's static method
-        diff = WeaviateDataVersion.create_diff(old_data, new_data)
-        
-        # Only create version if there are actual changes
-        if not WeaviateDataVersion.has_changes(diff):
-            logger.info(f"No changes detected for record {weaviate_data_id}, skipping version creation")
-            return {
-                "success": True,
-                "message": "No changes detected",
-                "version_created": False
-            }
-        
-        # Get the next version number
-        version_query = text("""
-            SELECT COALESCE(MAX(version_number), 0) + 1 as next_version
-            FROM weaviate_data_versions
-            WHERE weaviate_data_id = :weaviate_data_id
-        """)
-        
-        with db.engine.connect() as conn:
-            result = conn.execute(version_query, {"weaviate_data_id": weaviate_data_id})
-            next_version = result.scalar()
-        
-        # Create version record
-        insert_query = text("""
-            INSERT INTO weaviate_data_versions (
-                weaviate_data_id, version_number, changed_by, 
-                change_description, old_values, new_values, diff, operation
-            ) VALUES (
-                :weaviate_data_id, :version_number, :changed_by,
-                :change_description, CAST(:old_values AS jsonb), 
-                CAST(:new_values AS jsonb), CAST(:diff AS jsonb), :operation
-            ) RETURNING id
-        """)
-        
-        with db.engine.begin() as conn:
-            result = conn.execute(
-                insert_query,
-                {
-                    "weaviate_data_id": weaviate_data_id,
-                    "version_number": next_version,
-                    "changed_by": user_id,
-                    "change_description": change_description,
-                    "old_values": json.dumps(old_data),
-                    "new_values": json.dumps(new_data),
-                    "diff": json.dumps(diff),
-                    "operation": operation
-                }
-            )
-            version_id = result.scalar()
-        
-        logger.info(f"Created version {next_version} for record {weaviate_data_id}")
-        
-        return {
-            "success": True,
-            "message": "Version snapshot created",
-            "version_created": True,
-            "version_id": version_id,
-            "version_number": next_version,
-            "changed_fields": WeaviateDataVersion.get_changed_fields(diff)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error creating version snapshot: {str(e)}")
-        raise RuntimeError(f"Failed to create version snapshot: {str(e)}")
 
 
 def get_version_history(
@@ -792,7 +691,7 @@ def restore_from_version(
             "no_of_characters": restore_data.get("no_of_characters")
         }
         
-        create_version_snapshot(
+        create_weaviate_version_snapshot(
             weaviate_data_id=weaviate_data_id,
             user_id=user_id,
             old_data=old_data,

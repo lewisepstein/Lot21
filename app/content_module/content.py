@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional, Dict
 import logging
 
 from content_module.content_responses import (
@@ -28,7 +29,7 @@ from content_module.prompt_history_utils import (
 )
 
 from validations.content import ContentAddValidation
-from auth_module.auth_utils import verify_token
+from auth_module.auth_utils import verify_token, require_session_auth
 from models.content import ContentActionEnum
 
 # Create router
@@ -42,10 +43,14 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/content", response_class=HTMLResponse)
-async def content_generation_page(request: Request):
+@require_session_auth(redirect_url="/")
+async def content_generation_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
     """
     Render content generation page with empty textarea.
-    Authentication handled by frontend JavaScript.
     """
     try:
         return templates.TemplateResponse(
@@ -69,11 +74,16 @@ async def content_generation_page(request: Request):
 
 
 @router.get("/content/{category_id}", response_class=HTMLResponse)
-async def content_page(request: Request, category_id: int):
+@require_session_auth(redirect_url="/")
+async def content_page(
+    request: Request,
+    category_id: int,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
     """
     Render content editor HTML page with category context.
     Fetches the latest content for the category if available.
-    Authentication handled by frontend JavaScript.
     
     Args:
         category_id: ID of the category to generate content for

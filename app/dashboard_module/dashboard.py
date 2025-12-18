@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timezone
-import logging
+from typing import Optional, Dict
 
 from dashboard_module.dashboard_responses import DashboardResponse
-from auth_module.auth_utils import verify_token, get_user_data
+from auth_module.auth_utils import (
+    verify_token, get_user_data, 
+    require_session_auth
+)
 from service_utils.log_management import get_logger
 
 # Set up logging
@@ -22,21 +25,35 @@ security = HTTPBearer()
 templates = Jinja2Templates(directory="templates")
 
 
-# HTML Page Endpoints (Frontend handles auth via JavaScript)
+# HTML Page Endpoints
 @router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request):
-    """Render dashboard HTML page. Authentication handled by frontend JavaScript."""
+@require_session_auth(redirect_url="/")
+async def dashboard_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """
+    Render dashboard HTML page with server-side session verification.
+    
+    Args:
+        request: FastAPI Request object
+        session_token: Session token from cookie
+        authenticated_user: User data injected by require_session_auth decorator
+    
+    Returns:
+        Dashboard HTML page or redirect to login
+    """
     try:
         return templates.TemplateResponse(
             request=request,
             name="dashboard.htm"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading dashboard page: {str(e)}", exc_info=True)
-        return templates.TemplateResponse(
-            request=request,
-            name="dashboard.htm"
-        )
+        raise HTTPException(status_code=500, detail="Unable to load dashboard")
 
 # API Endpoints
 @router.get("/dashboard-data", response_model=DashboardResponse)

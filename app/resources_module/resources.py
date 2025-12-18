@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import Optional, Dict
 import logging
 from service_utils.log_management import get_logger
+from auth_module.auth_utils import require_session_auth
 
 # Set up logging
 logger = get_logger(__name__)
@@ -15,8 +17,13 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/resources", response_class=HTMLResponse)
-async def resources_page(request: Request):
-    """Render resources HTML page. Authentication handled by frontend JavaScript."""
+@require_session_auth(redirect_url="/")
+async def resources_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """Render resources HTML page."""
     try:
         return templates.TemplateResponse(
             request=request,

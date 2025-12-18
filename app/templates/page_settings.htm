@@ -480,6 +480,15 @@
         background-color: white;
         color: #000;
     }
+    
+    #editPageContent + .note-editor {
+        background-color: white;
+    }
+    
+    #editPageContent + .note-editor .note-editable {
+        background-color: white;
+        color: #000;
+    }
 
     @media (max-width: 768px) {
         .offcanvas {
@@ -805,6 +814,95 @@
         </form>
     </div>
 </div>
+
+<!-- Edit Page Offcanvas -->
+<div class="offcanvas-overlay" id="editPageOverlay" onclick="closeEditPageOffcanvas()"></div>
+<div class="offcanvas" id="editPageOffcanvas">
+    <!-- Offcanvas Header -->
+    <div class="offcanvas-header">
+        <div>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">
+                <i class="bi bi-pencil"></i> Edit Page
+            </h2>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: var(--text-secondary);">Update page information</p>
+        </div>
+        <button onclick="closeEditPageOffcanvas()" style="background: transparent; border: none; color: var(--text-secondary); font-size: 28px; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='var(--bg-primary)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+            <i class="bi bi-x"></i>
+        </button>
+    </div>
+    
+    <!-- Offcanvas Body -->
+    <div class="offcanvas-body">
+        <!-- Alert Messages -->
+        <div id="editPageSuccessAlert" class="alert-success" style="margin-bottom: 15px; display: none;"></div>
+        <div id="editPageErrorAlert" class="alert-error" style="margin-bottom: 15px; display: none;"></div>
+        
+        <form id="editPageForm" style="display: grid; gap: 20px;">
+            <!-- Hidden Page ID -->
+            <input type="hidden" id="editPageId">
+            
+            <!-- Page Name -->
+            <div class="form-group">
+                <label class="form-label">Title <span style="color: #ff512f;">*</span></label>
+                <input type="text" class="form-input" id="editPageName" placeholder="Enter page name" required>
+            </div>
+            
+            <!-- Source URL -->
+            <div class="form-group">
+                <label class="form-label">Source URL</label>
+                <input type="url" class="form-input" id="editSourceUrl" placeholder="Enter source URL (optional)" disabled>
+            </div>
+            
+            <!-- Scraped Data Badge (shown conditionally) -->
+            <div class="form-group" id="editScrapedDataBadge" style="display: none;">
+                <div style="display: inline-block; background-color: #e3f2fd; color: #1976d2; padding: 8px 16px; border-radius: 4px; font-weight: 500; font-size: 14px;">
+                    <i class="bi bi-info-circle"></i> SCRAPED DATA
+                </div>
+            </div>
+            
+            <!-- Is Active -->
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="editIsActive" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span class="form-label" style="margin: 0;">Is Active</span>
+                </label>
+            </div>
+            
+            <!-- Category -->
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select class="form-input" id="editCategoryId">
+                    <option value="0">None</option>
+                    {% if categories %}
+                        {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.category_name }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            
+            <!-- Description -->
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-input" id="editPageDescription" rows="3" placeholder="Enter page description (optional)" style="resize: vertical; min-height: 100px;"></textarea>
+            </div>
+            
+            <!-- Content -->
+            <div class="form-group">
+                <label class="form-label">Content</label>
+                <textarea class="form-input" rows="10" id="editPageContent" placeholder="Enter page content (optional)"></textarea>
+            </div>
+            
+            <!-- Submit Button -->
+            <div style="display: flex; justify-content: flex-end;">
+                <button type="submit" class="save-btn">
+                    <i class="bi bi-save"></i>
+                    Update Page
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -812,6 +910,22 @@
     // Initialize Summernote WYSIWYG editor (Summernote loaded in base.htm)
     $(document).ready(function() {
         $('#pageContent').summernote({
+            height: 300,
+            placeholder: 'Enter page content (optional)',
+            toolbar: [
+                ['style', ['style']],
+                ['font', ['bold', 'italic', 'underline', 'clear']],
+                ['fontname', ['fontname']],
+                ['color', ['color']],
+                ['para', ['ul', 'ol', 'paragraph']],
+                ['table', ['table']],
+                ['insert', ['link', 'picture', 'video']],
+                ['view', ['fullscreen', 'codeview', 'help']]
+            ]
+        });
+        
+        // Initialize edit page content editor
+        $('#editPageContent').summernote({
             height: 300,
             placeholder: 'Enter page content (optional)',
             toolbar: [
@@ -835,6 +949,18 @@
             } else {
                 // Enable Summernote editor
                 $('#pageContent').summernote('enable');
+            }
+        });
+        
+        // Handle edit scrapeData checkbox change
+        $('#editScrapeData').on('change', function() {
+            if ($(this).is(':checked')) {
+                // Clear and disable Summernote editor
+                $('#editPageContent').summernote('code', '');
+                $('#editPageContent').summernote('disable');
+            } else {
+                // Enable Summernote editor
+                $('#editPageContent').summernote('enable');
             }
         });
     });
@@ -1114,11 +1240,132 @@
     }
     
     // Edit page function
-    window.editPage = function(pageId) {
-        // TODO: Implement edit page functionality
-        // This will open an offcanvas similar to add page, but pre-filled with existing data
-        alert(`Edit page functionality coming soon for page ID: ${pageId}`);
+    window.editPage = async function(pageId) {
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            // Fetch page data
+            const response = await fetch(`/user/get_page/${pageId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (handleTokenExpiration(response)) return;
+            
+            if (!response.ok) {
+                const data = await response.json();
+                alert('Error: ' + (data.detail || 'Failed to fetch page data'));
+                return;
+            }
+            
+            const page = await response.json();
+            
+            // Populate form fields
+            document.getElementById('editPageId').value = page.id;
+            document.getElementById('editPageName').value = page.page_name || '';
+            document.getElementById('editSourceUrl').value = page.source_url || '';
+            document.getElementById('editIsActive').checked = page.is_active || false;
+            document.getElementById('editCategoryId').value = page.category_id || '0';
+            document.getElementById('editPageDescription').value = page.description || '';
+            
+            // Show scraped data badge if page was scraped
+            const scrapedBadge = document.getElementById('editScrapedDataBadge');
+            if (page.scrape_data === true) {
+                scrapedBadge.style.display = 'block';
+            } else {
+                scrapedBadge.style.display = 'none';
+            }
+            
+            // Set Summernote content
+            if (page.content) {
+                $('#editPageContent').summernote('code', page.content);
+                $('#editPageContent').summernote('enable');
+            } else {
+                $('#editPageContent').summernote('code', '');
+                $('#editPageContent').summernote('enable');
+            }
+            
+            // Open offcanvas
+            document.getElementById('editPageOverlay').classList.add('show');
+            document.getElementById('editPageOffcanvas').classList.add('show');
+            
+        } catch (error) {
+            console.error('Error fetching page data:', error);
+            alert('An error occurred while fetching page data');
+        }
     }
+    
+    // Close edit page offcanvas
+    window.closeEditPageOffcanvas = function() {
+        document.getElementById('editPageOverlay').classList.remove('show');
+        document.getElementById('editPageOffcanvas').classList.remove('show');
+        
+        // Reset form
+        document.getElementById('editPageForm').reset();
+        $('#editPageContent').summernote('code', '');
+        document.getElementById('editPageSuccessAlert').style.display = 'none';
+        document.getElementById('editPageErrorAlert').style.display = 'none';
+    }
+    
+    // Handle edit form submission
+    document.getElementById('editPageForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const token = localStorage.getItem('access_token');
+        const pageId = document.getElementById('editPageId').value;
+        const pageName = document.getElementById('editPageName').value.trim();
+        const categoryId = document.getElementById('editCategoryId').value;
+        const description = document.getElementById('editPageDescription').value.trim();
+        const isActive = document.getElementById('editIsActive').checked;
+        const pageContent = $('#editPageContent').summernote('code');
+        const sourceUrl = document.getElementById('editSourceUrl').value.trim();
+        
+        if (!pageName) {
+            showAlert('editPageErrorAlert', 'Page name is required');
+            return;
+        }
+        
+        const requestData = {
+            page_name: pageName,
+            category_id: categoryId && categoryId !== '0' ? parseInt(categoryId) : null,
+            description: description || null,
+            is_active: isActive,
+            content: pageContent || null,
+            source_url: sourceUrl || null
+        };
+        
+        try {
+            const response = await fetch(`/user/update_page/${pageId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (handleTokenExpiration(response)) return;
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showAlert('editPageSuccessAlert', 'Page updated successfully!');
+                
+                // Reload page after 1 second
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showAlert('editPageErrorAlert', data.detail || 'Failed to update page');
+            }
+        } catch (error) {
+            console.error('Error updating page:', error);
+            showAlert('editPageErrorAlert', 'An error occurred while updating the page');
+        }
+    });
     
     // Retry Weaviate load for pages with errors
     window.retryWeaviate = async function(pageId) {

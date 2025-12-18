@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import timedelta
+from typing import Optional
 
 from auth_module.auth_responses import (
     LoginRequest,
@@ -18,7 +19,8 @@ from auth_module.auth_utils import (
     blacklist_token,
     verify_token,
     get_user_data,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    invalidate_all_user_sessions
 )
 
 from validations.auth import (
@@ -35,15 +37,16 @@ security = HTTPBearer()
 
 # API Endpoints
 @router.post("/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, request: Request):
     """
-    Login endpoint - authenticates user and returns JWT token.
+    Login endpoint - authenticates user, creates session, and returns JWT token.
     
     Args:
         login_data: LoginRequest containing username and password
+        request: FastAPI Request object for extracting client info
     
     Returns:
-        JSON response with access token and user information
+        JSON response with access token, session token, and user information
     """
     # Authenticate user
     success, status_code, message, user = authenticate_user(
@@ -54,7 +57,26 @@ async def login(login_data: LoginRequest):
     if not success:
         raise HTTPException(status_code=status_code, detail=message)
     
-    # Create access token
+    # Extract client information
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", None)
+    
+    # Step 1: Create session record BEFORE JWT token (as per flowchart)
+    from auth_module.auth_utils import create_session_without_jwt, update_session_with_jwt, delete_session
+    session_success, session_status, session_message, session = create_session_without_jwt(
+        user_id=user["id"],
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+    
+    if not session_success:
+        # Session creation failed - redirect to login (NO path in flowchart)
+        raise HTTPException(status_code=session_status, detail=session_message)
+    
+    session_id = session.get("id")
+    session_token = session.get("session_token")
+    
+    # Step 2: Create JWT token only if session creation succeeded
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token_success, token_status_code, token_message, access_token = create_access_token(
         data={"email": user["email"], "user_id": user["id"]},
@@ -62,12 +84,26 @@ async def login(login_data: LoginRequest):
     )
     
     if not token_success:
+        # JWT creation failed - delete session record and redirect to login
+        delete_session(session_id)
         raise HTTPException(status_code=token_status_code, detail=token_message)
+    
+    # Step 3: Update session table with JWT token hash
+    update_success, update_status, update_message = update_session_with_jwt(
+        session_id=session_id,
+        jwt_token=access_token
+    )
+    
+    if not update_success:
+        # Failed to update session with JWT - delete session and redirect to login
+        delete_session(session_id)
+        raise HTTPException(status_code=update_status, detail=update_message)
     
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # in seconds
+        "session_token": session_token,
         "user": {
             "id": user["id"],
             "email": user["email"],
@@ -77,23 +113,35 @@ async def login(login_data: LoginRequest):
 
 
 @router.post("/logout", response_model=LogoutResponse)
-async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    session_token: Optional[str] = None
+):
     """
-    Logout endpoint - invalidates the current JWT token.
+    Logout endpoint - invalidates the current JWT token and session.
     
     Args:
         credentials: Bearer token from Authorization header
+        session_token: Optional session token to invalidate
     
     Returns:
         JSON response confirming logout
     """
     token = credentials.credentials
     
-    # Blacklist token
-    success, status_code, message = blacklist_token(token)
+    # Blacklist JWT token
+    jwt_success, jwt_status_code, jwt_message = blacklist_token(token)
     
-    if not success:
-        raise HTTPException(status_code=status_code, detail=message)
+    if not jwt_success:
+        raise HTTPException(status_code=jwt_status_code, detail=jwt_message)
+    
+    # Delete session record from sessions table if session_token provided
+    if session_token:
+        from auth_module.auth_utils import delete_session_by_token
+        session_success, session_status, session_message = delete_session_by_token(session_token)
+        if not session_success:
+            # Log warning but don't fail logout if session deletion fails
+            pass
     
     return {
         "message": "Successfully logged out",

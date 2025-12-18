@@ -13,7 +13,7 @@ class PageCreateRequest(BaseModel):
     is_active: bool = Field(default=True, description="Flag indicating if the page is active")
     content: Optional[str] = Field(default=None, description="Optional content for the page")
     source_url: Optional[str] = Field(default=None, max_length=200, description="Source URL for the page")
-    scrape_data: bool = Field(default=False, description="Flag indicating if data should be scraped from URL")
+    scrape_data: Optional[bool] = Field(default=False, description="Flag indicating if data should be scraped from URL (only used during creation)")
 
 
 class PageResponse(BaseModel):

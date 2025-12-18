@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import logging
+from typing import Optional, Dict
 
-from auth_module.auth_utils import verify_token
+from auth_module.auth_utils import verify_token, require_session_auth
 
 from category_module.category_utils import (
     get_categories_list, 
@@ -29,8 +29,13 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/understanding", response_class=HTMLResponse)
-async def understanding_page(request: Request):
-    """Render understanding categories HTML page. Authentication handled by frontend JavaScript."""
+@require_session_auth(redirect_url="/")
+async def understanding_page(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """Render understanding categories HTML page."""
     
     try:
         results, msg = get_categories_list()

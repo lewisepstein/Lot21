@@ -9,6 +9,7 @@ from models.task_runs import TaskRun, TaskProcess
 from models.prompt_history import PromptHistory
 from models.content import Content
 from models.weaviate_data import WeaviateData
+from models.sessions import Session
 
 __all__ = [
     "Base",
@@ -22,4 +23,5 @@ __all__ = [
     "PromptHistory",
     "TaskProcess",
     "WeaviateData",
+    "Session",
 ]
