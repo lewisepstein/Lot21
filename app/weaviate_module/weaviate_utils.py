@@ -14,9 +14,10 @@ from sqlalchemy import text
 from service_utils.db_utils.weaviate_db import WeaviateDB
 from service_utils.db_utils.pg_db import PostgresDB
 from models.weaviate_data import WeaviateDataStatusEnum
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # OpenAI configuration
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -76,7 +77,9 @@ def create_weaviate_data_record(
     description: str = "",
     no_of_characters: int = 0,
     no_of_lines: int = 0,
-    no_of_tokens: int = None
+    no_of_tokens: int = None,
+    page_id: int = None,
+    content_id: int = None
 ) -> Dict[str, Any]:
     """
     Create a weaviate_data database record with IN_PROGRESS status.
@@ -90,6 +93,8 @@ def create_weaviate_data_record(
         no_of_characters: Number of characters in content
         no_of_lines: Number of lines in content
         no_of_tokens: Number of tokens in content (optional)
+        page_id: Optional page ID reference
+        content_id: Optional content ID reference
         
     Returns:
         Dictionary containing the created database record with start_time set
@@ -109,6 +114,12 @@ def create_weaviate_data_record(
         "no_of_characters": no_of_characters,
         "created_by": user_id
     }
+    
+    # Add optional foreign key references
+    if page_id is not None:
+        weaviate_data_dict["page_id"] = page_id
+    if content_id is not None:
+        weaviate_data_dict["content_id"] = content_id
     
     # Create new weaviate_data entry
     db_record = db.create("weaviate_data", weaviate_data_dict)
@@ -565,7 +576,8 @@ def load_scraped_data_with_tracking(
         no_of_characters=no_of_characters,
         no_of_lines=no_of_lines,
         no_of_tokens=no_of_tokens,
-        user_id=user_id
+        user_id=user_id,
+        page_id=page_id
     )
     
     record_id = db_record["id"]
@@ -594,23 +606,20 @@ def load_scraped_data_with_tracking(
         chunks_count = weaviate_result["chunks_created"]
         logger.info(f"Successfully loaded {chunks_count} chunks into collection '{collection_name}'")
         
-        # Prepare data_details
-        data_details = {
-            "doc_id": doc_id,
-            "chunks_created": chunks_count,
-            "collection_description": description or f"Scraped content from {source_url}",
+        # Prepare extra details for data_details JSON (page_id is now a proper column)
+        extra_details = {
             "source_url": source_url
         }
-        
-        if page_id:
-            data_details["page_id"] = page_id
         
         # Update database record with success using helper function
         update_weaviate_data_success(
             db=db,
             record_id=record_id,
-            data_details=data_details,
-            start_time=db_record["start_time"]
+            start_time=db_record["start_time"],
+            doc_id=doc_id,
+            chunks_created=chunks_count,
+            description=description or f"Scraped content from {source_url}",
+            extra_details=extra_details
         )
         
         return {

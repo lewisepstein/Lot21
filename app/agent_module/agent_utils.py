@@ -10,6 +10,7 @@ from typing import Dict, Any, List
 from sqlalchemy import text
 
 from service_utils.db_utils.pg_db import PostgresDB
+from service_utils.log_management import get_logger
 from weaviate_module.weaviate_utils import (
     chunk_text, 
     load_chunks_to_weaviate, 
@@ -22,7 +23,7 @@ from weaviate_module.weaviate_utils import (
 from models.weaviate_data_versions import WeaviateDataVersion
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def load_training_data_to_weaviate(
@@ -109,19 +110,14 @@ def load_training_data_to_weaviate(
         chunks_count = weaviate_result["chunks_created"]
         logger.info(f"Successfully loaded {chunks_count} chunks into collection '{collection_name}'")
         
-        # Prepare data_details
-        data_details = {
-            "doc_id": doc_id,
-            "chunks_created": chunks_count,
-            "collection_description": description
-        }
-        
         # Update database record with success using helper function
         update_weaviate_data_success(
             db=db,
             record_id=record_id,
-            data_details=data_details,
-            start_time=db_record["start_time"]
+            start_time=db_record["start_time"],
+            doc_id=doc_id,
+            chunks_created=chunks_count,
+            description=description
         )
         
         return {

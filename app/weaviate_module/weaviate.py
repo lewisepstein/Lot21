@@ -15,9 +15,10 @@ from weaviate_module.weaviate_utils import (
     generate_answer_openai
 )
 from service_utils.db_utils.weaviate_db import WeaviateDB
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/weaviate", tags=["weaviate"])

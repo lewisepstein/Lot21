@@ -7,10 +7,15 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
 
 from service_utils.routers import register_routers
+from service_utils.log_management import setup_logger
 
 
 # Load environment variables
 load_dotenv()
+
+# Initialize logging
+logger = setup_logger(__name__)
+logger.info("Starting Lottie application...")
 
 # Initialize FastAPI app
 app = FastAPI(title="Lottie", version="1.0.0")

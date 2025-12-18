@@ -17,6 +17,10 @@ from content_module.content_utils import (
     get_latest_content, 
     create_content_record
 )
+from service_utils.log_management import get_logger
+
+# Set up logging
+logger = get_logger(__name__)
 
 from content_module.prompt_history_utils import (
     create_prompt_history_record,
@@ -26,9 +30,6 @@ from content_module.prompt_history_utils import (
 from validations.content import ContentAddValidation
 from auth_module.auth_utils import verify_token
 from models.content import ContentActionEnum
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

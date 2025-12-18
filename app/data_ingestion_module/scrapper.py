@@ -1,21 +1,19 @@
 import requests
 from bs4 import BeautifulSoup
-import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 import sys
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from service_utils.db_utils.weaviate_db import WeaviateDB
 from weaviate_module.weaviate_utils import (
-    load_scraped_data_to_weaviate, 
-    load_scraped_data_with_tracking
+    load_scraped_data_to_weaviate
 )
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',

@@ -24,11 +24,12 @@ from service_utils.custom_exceptions.sqlalchemy_custom_exceptions import (
 )
 
 from service_utils.db_utils.conf.postgres_db_conf import POSTGRES_URL
+from service_utils.log_management import get_logger
 
 T = TypeVar('T')
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PostgresDB:

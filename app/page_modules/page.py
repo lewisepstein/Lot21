@@ -15,9 +15,10 @@ from page_modules.page_utils import (
 )
 from page_modules.page_responses import PageCreateRequest, PageCreateResponse, PageResponse
 from category_module.category_utils import get_parent_categories
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

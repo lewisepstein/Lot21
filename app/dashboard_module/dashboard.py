@@ -7,9 +7,10 @@ import logging
 
 from dashboard_module.dashboard_responses import DashboardResponse
 from auth_module.auth_utils import verify_token, get_user_data
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

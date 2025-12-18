@@ -281,6 +281,58 @@
         border: 1px solid #888;
     }
     
+    .badge-completed {
+        background-color: rgba(0, 208, 132, 0.2);
+        color: var(--accent-green);
+        border: 1px solid var(--accent-green);
+    }
+    
+    .badge-in-progress {
+        background-color: rgba(0, 217, 181, 0.2);
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+    }
+    
+    .badge-error {
+        background-color: rgba(255, 81, 47, 0.2);
+        color: #ff512f;
+        border: 1px solid #ff512f;
+    }
+    
+    .badge-pending {
+        background-color: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+        border: 1px solid #ffc107;
+    }
+    
+    .action-btn {
+        padding: 6px 12px;
+        background-color: transparent;
+        border: 1px solid var(--accent-teal);
+        color: var(--accent-teal);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.3s;
+        margin: 0 2px;
+    }
+    
+    .action-btn:hover {
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+    }
+    
+    .action-btn.btn-error {
+        border-color: #ff512f;
+        color: #ff512f;
+    }
+    
+    .action-btn.btn-error:hover {
+        background-color: #ff512f;
+        color: white;
+    }
+    
     /* Offcanvas styling */
     .offcanvas-overlay {
         position: fixed;
@@ -516,16 +568,16 @@
         <!-- Category Filter -->
         <div class="filter-group">
             <label class="filter-label">Category</label>
-            <div class="filter-option" onclick="filterByCategory('all')">
-                <input type="radio" name="category" value="all" checked>
+            <div class="filter-option">
+                <input type="radio" name="category" value="all" checked onchange="filterByCategory('all')">
                 <span>All Categories</span>
             </div>
-            <div class="filter-option" onclick="filterByCategory('assigned')">
-                <input type="radio" name="category" value="assigned">
+            <div class="filter-option">
+                <input type="radio" name="category" value="assigned" onchange="filterByCategory('assigned')">
                 <span>Assigned Only</span>
             </div>
-            <div class="filter-option" onclick="filterByCategory('unassigned')">
-                <input type="radio" name="category" value="unassigned">
+            <div class="filter-option">
+                <input type="radio" name="category" value="unassigned" onchange="filterByCategory('unassigned')">
                 <span>Unassigned Only</span>
             </div>
         </div>
@@ -533,12 +585,12 @@
         <!-- Status Filter -->
         <div class="filter-group">
             <label class="filter-label">Status</label>
-            <div class="filter-option" onclick="toggleStatusFilter('active')">
-                <input type="checkbox" id="filter-active" value="active" checked>
+            <div class="filter-option">
+                <input type="checkbox" id="filter-active" value="active" checked onchange="toggleStatusFilter('active')">
                 <span>Active</span>
             </div>
-            <div class="filter-option" onclick="toggleStatusFilter('inactive')">
-                <input type="checkbox" id="filter-inactive" value="inactive" checked>
+            <div class="filter-option">
+                <input type="checkbox" id="filter-inactive" value="inactive" checked onchange="toggleStatusFilter('inactive')">
                 <span>Inactive</span>
             </div>
         </div>
@@ -546,12 +598,12 @@
         <!-- Content Filter -->
         <div class="filter-group">
             <label class="filter-label">Content</label>
-            <div class="filter-option" onclick="toggleContentFilter('with-content')">
-                <input type="checkbox" id="filter-with-content" value="with-content" checked>
+            <div class="filter-option">
+                <input type="checkbox" id="filter-with-content" value="with-content" checked onchange="toggleContentFilter('with-content')">
                 <span>With Content</span>
             </div>
-            <div class="filter-option" onclick="toggleContentFilter('without-content')">
-                <input type="checkbox" id="filter-without-content" value="without-content" checked>
+            <div class="filter-option">
+                <input type="checkbox" id="filter-without-content" value="without-content" checked onchange="toggleContentFilter('without-content')">
                 <span>Without Content</span>
             </div>
         </div>
@@ -582,8 +634,10 @@
                     <th>Status</th>
                     <th>Assignment</th>
                     <th>Content</th>
+                    <th>Weaviate Status</th>
                     <th>Created</th>
                     <th>Updated</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="pagesTableBody">
@@ -626,13 +680,37 @@
                                 <span class="status-badge badge-no-content">No Content</span>
                             {% endif %}
                         </td>
-                        <td>{{ page.created_on }}</td>
-                        <td>{{ page.updated_on }}</td>
+                        <td>
+                            <!-- Debug: {{ page.weaviate_status }} -->
+                            {% if page.weaviate_status == 'COMPLETED' %}
+                                <span class="status-badge badge-completed">Completed</span>
+                            {% elif page.weaviate_status == 'IN_PROGRESS' %}
+                                <span class="status-badge badge-in-progress">In Progress</span>
+                            {% elif page.weaviate_status == 'EXIT_WITH_ERROR' %}
+                                <span class="status-badge badge-error">Error</span>
+                            {% elif page.weaviate_status %}
+                                <span class="status-badge badge-pending" title="Raw value: {{ page.weaviate_status }}">Unknown: {{ page.weaviate_status }}</span>
+                            {% else %}
+                                <span class="status-badge badge-pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ page.created_on|safe if page.created_on else '' }}</td>
+                        <td>{{ page.updated_on|safe if page.updated_on else '' }}</td>
+                        <td>
+                            <button class="action-btn" onclick="editPage({{ page.id }})" title="Edit Page">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            {% if page.weaviate_status == 'EXIT_WITH_ERROR' %}
+                                <button class="action-btn btn-error" onclick="retryWeaviate({{ page.id }})" title="Retry Weaviate Load">
+                                    <i class="bi bi-arrow-clockwise"></i> Retry
+                                </button>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                             No pages found
                         </td>
                     </tr>
@@ -786,7 +864,6 @@
     // Toggle status filter
     function toggleStatusFilter(status) {
         const checkbox = document.getElementById('filter-' + status);
-        checkbox.checked = !checkbox.checked;
         
         if (checkbox.checked) {
             if (!filters.status.includes(status)) {
@@ -800,7 +877,6 @@
     // Toggle content filter
     function toggleContentFilter(content) {
         const checkbox = document.getElementById('filter-' + content);
-        checkbox.checked = !checkbox.checked;
         
         if (checkbox.checked) {
             if (!filters.content.includes(content)) {
@@ -846,7 +922,7 @@
         if (visibleCount === 0 && !existingNoResults) {
             const noResultsRow = document.createElement('tr');
             noResultsRow.className = 'no-results-row';
-            noResultsRow.innerHTML = '<td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">No pages match the selected filters</td>';
+            noResultsRow.innerHTML = '<td colspan="10" style="text-align: center; padding: 40px; color: var(--text-secondary);">No pages match the selected filters</td>';
             tbody.appendChild(noResultsRow);
         } else if (visibleCount > 0 && existingNoResults) {
             existingNoResults.remove();
@@ -1036,5 +1112,45 @@
             alert('An error occurred while deleting pages');
         }
     }
+    
+    // Edit page function
+    window.editPage = function(pageId) {
+        // TODO: Implement edit page functionality
+        // This will open an offcanvas similar to add page, but pre-filled with existing data
+        alert(`Edit page functionality coming soon for page ID: ${pageId}`);
+    }
+    
+    // Retry Weaviate load for pages with errors
+    window.retryWeaviate = async function(pageId) {
+        if (!confirm('Retry loading this page to Weaviate?')) {
+            return;
+        }
+        
+        const token = localStorage.getItem('access_token');
+        
+        try {
+            const response = await fetch(`/user/retry_weaviate_load/${pageId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (handleTokenExpiration(response)) return;
+            
+            if (response.ok) {
+                alert('Weaviate load retried successfully');
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('Error: ' + (data.detail || 'Failed to retry Weaviate load'));
+            }
+        } catch (error) {
+            console.error('Error retrying Weaviate load:', error);
+            alert('An error occurred while retrying Weaviate load');
+        }
+    }
 </script>
 {% endblock %}
+

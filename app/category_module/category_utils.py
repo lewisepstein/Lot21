@@ -8,9 +8,10 @@ from service_utils.helpers import (
     convert_datetime_to_formatted_string,
 )
 from models.categories import Category
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_last_updated(row):
@@ -87,15 +88,11 @@ def get_parent_categories(is_parent = True, is_root=True, is_active=None) -> Opt
         if is_active is not None:
             conditions['is_active'] = is_active
 
-        print(f"Query conditions: {conditions}")
-        
         categories = db.read(
             'categories',
             conditions=conditions,
             columns=['id', 'category_name']
         )
-
-        print(f"Query result: {categories}")
 
         if not categories:
             logger.info("No parent categories found")

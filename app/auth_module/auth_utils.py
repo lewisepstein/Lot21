@@ -6,9 +6,10 @@ import logging
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 from service_utils.db_utils.pg_db import PostgresDB
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Load environment variables
 load_dotenv()

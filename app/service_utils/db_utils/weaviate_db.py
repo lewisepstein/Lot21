@@ -14,9 +14,10 @@ from weaviate.classes.config import Configure, Property, DataType
 from weaviate.exceptions import WeaviateBaseError, WeaviateConnectionError
 
 from service_utils.db_utils.conf.weaviate_conf import WEAVIATE_URL
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WeaviateDB:

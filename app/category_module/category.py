@@ -13,9 +13,10 @@ from category_module.category_utils import (
     check_root_exists
 )
 from category_module.category_responses import CategoryCreateRequest, CategoryCreateResponse, CategoryResponse
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

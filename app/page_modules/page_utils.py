@@ -1,6 +1,4 @@
 from typing import List, Dict, Any, Optional
-import logging
-
 import pandas as pd
 
 from service_utils.db_utils.pg_db import PostgresDB
@@ -8,6 +6,7 @@ from service_utils.helpers import (
     convert_datetime_to_formatted_string,
     validate_url,
 )
+from service_utils.log_management import get_logger
 from data_ingestion_module.scrapper import (
     scrape_page,
     convert_to_wysiwyg_html,
@@ -17,7 +16,7 @@ from content_module.content_utils import create_content_record
 from models.content import ContentActionEnum
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_last_updated(row):
@@ -342,6 +341,36 @@ def get_page_statistics() -> Dict[str, Any]:
         if categories:
             category_map = {cat['id']: cat['category_name'] for cat in categories}
         
+        # Get Weaviate status for pages (latest status per page)
+        weaviate_status_map = {}
+        for page_id in df['id']:
+            latest_weaviate = db.read(
+                'weaviate_data',
+                conditions={'deleted_at': None, 'page_id': int(page_id)},
+                columns=['status'],
+                order_by=[('created_at', False)],  # False = descending order
+                limit=1
+            )
+            
+            if latest_weaviate and len(latest_weaviate) > 0:
+                status = latest_weaviate[0].get('status')
+                logger.info(f"Page {page_id}: Raw status = {status}, Type = {type(status)}")
+                
+                # Extract status value from enum (always get the string value)
+                if hasattr(status, 'value'):
+                    status_value = status.value
+                    logger.info(f"Page {page_id}: Extracted enum value = {status_value}")
+                    weaviate_status_map[int(page_id)] = status_value
+                elif isinstance(status, str):
+                    logger.info(f"Page {page_id}: Using string status = {status}")
+                    weaviate_status_map[int(page_id)] = status
+                else:
+                    status_str = str(status)
+                    logger.info(f"Page {page_id}: Converting to string = {status_str}")
+                    weaviate_status_map[int(page_id)] = status_str
+        
+        logger.info(f"Weaviate status map: {weaviate_status_map}")
+        
         # Calculate statistics
         assigned_pages = len(df[df['category_id'].notna()])
         unassigned_pages = len(df[df['category_id'].isna()])
@@ -359,6 +388,7 @@ def get_page_statistics() -> Dict[str, Any]:
                 'category_name': category_map.get(int(row['category_id'])) if pd.notna(row['category_id']) else None,
                 'is_active': row['is_active'],
                 'has_content': row['id'] in pages_with_content_ids,
+                'weaviate_status': weaviate_status_map.get(row['id']),
                 'created_on': convert_datetime_to_formatted_string(row['created_on']) if pd.notna(row['created_on']) else None,
                 'updated_on': convert_datetime_to_formatted_string(row['updated_on']) if pd.notna(row['updated_on']) else None
             }

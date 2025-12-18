@@ -30,6 +30,8 @@ class WeaviateData(Base):
         no_of_tokens (int): Number of tokens in the content.
         no_of_characters (int): Number of characters in the content.
         data_details (json): JSON object containing additional details like doc_id, chunks_created, etc.
+        page_id (int): Foreign key to the page this data is associated with (nullable).
+        content_id (int): Foreign key to the content this data is associated with (nullable).
         created_by (int): Foreign key to the user who created this record.
         start_time (datetime): Timestamp when processing started.
         end_time (datetime): Timestamp when processing completed.
@@ -49,6 +51,8 @@ class WeaviateData(Base):
     no_of_tokens = Column(Integer, nullable=True)
     no_of_characters = Column(Integer, nullable=True)
     data_details = Column(JSON, nullable=True)
+    page_id = Column(Integer, ForeignKey('pages.id', ondelete='SET NULL'), nullable=True, index=True)
+    content_id = Column(Integer, ForeignKey('content.id', ondelete='SET NULL'), nullable=True, index=True)
     created_by = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
@@ -72,6 +76,8 @@ class WeaviateData(Base):
             "no_of_tokens": self.no_of_tokens,
             "no_of_characters": self.no_of_characters,
             "data_details": self.data_details,
+            "page_id": self.page_id,
+            "content_id": self.content_id,
             "created_by": self.created_by,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,

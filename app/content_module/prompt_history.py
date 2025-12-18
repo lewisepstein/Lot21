@@ -6,9 +6,10 @@ import logging
 from content_module.content_responses import PromptHistoryResponse
 from auth_module.auth_utils import verify_token
 from service_utils.db_utils.pg_db import PostgresDB
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

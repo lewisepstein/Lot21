@@ -7,9 +7,10 @@ import logging
 import re
 
 from service_utils.date_exceptions import DateConversionError, InvalidDateFormatError
+from service_utils.log_management import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def convert_datetime_to_formatted_string(
