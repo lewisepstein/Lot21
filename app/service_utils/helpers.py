@@ -42,16 +42,8 @@ def convert_datetime_to_formatted_string(
             )
         
         if format_type == "display":
-            # Format: 'DDth Mon, YYYY HH:MM AM/PM'
-            # Get day with ordinal suffix
-            day = dt.day
-            if 10 <= day % 100 <= 20:
-                suffix = 'th'
-            else:
-                suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
-            
-            # Format: 11th Dec, 2025 03:15 PM
-            return dt.strftime(f"%d<sup>{suffix}</sup> %b, %Y %I:%M %p")
+            # Format: 'dd-Mon-yyyy hh:mm' (e.g., 18-Dec-2025 14:30)
+            return dt.strftime("%d-%b-%Y %H:%M")
         elif format_type == "iso":
             # ISO 8601 format
             return dt.isoformat()
@@ -94,3 +86,46 @@ def validate_url(url: Optional[str]) -> bool:
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     
     return bool(url_pattern.match(url))
+
+
+def clean_text_for_embedding(text: str) -> str:
+    """
+    Clean text by removing HTML tags, unicode characters, and extra whitespace.
+    Prepares text for embedding/chunking in vector databases.
+    
+    Args:
+        text: Raw text that may contain HTML tags and unicode
+    
+    Returns:
+        Cleaned text with HTML tags removed and normalized whitespace
+    """
+    if not text:
+        return ""
+    
+    try:
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', ' ', text)
+        
+        # Remove HTML entities (e.g., &nbsp;, &amp;, etc.)
+        text = re.sub(r'&[a-zA-Z]+;', ' ', text)
+        text = re.sub(r'&#\d+;', ' ', text)
+        
+        # Remove escape characters (e.g., \n, \r, \t, \\, etc.)
+        text = re.sub(r'\\[nrtfbv\\"\']', ' ', text)
+        
+        # Remove unicode characters (non-ASCII)
+        text = text.encode('ascii', 'ignore').decode('ascii')
+        
+        # Replace multiple whitespace characters with single space
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove leading/trailing whitespace
+        text = text.strip()
+        
+        return text
+        
+    except Exception as e:
+        logger.error(f"Error cleaning text: {e}")
+        # Return original text if cleaning fails
+        return text
+

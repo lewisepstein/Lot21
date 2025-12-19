@@ -1,3 +1,4 @@
+from fastapi import Body
 from fastapi import APIRouter, Request, HTTPException, Depends, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -13,7 +14,8 @@ from page_modules.page_utils import (
     check_root_exists,
     get_page_statistics,
     get_page_by_id,
-    update_page
+    update_page,
+    delete_page
 )
 from page_modules.page_responses import PageCreateRequest, PageCreateResponse, PageResponse
 from category_module.category_utils import get_parent_categories
@@ -294,3 +296,66 @@ async def update_page_endpoint(
             detail="An unexpected error occurred while updating the page"
         )
 
+@router.delete("/delete_page/{page_id}")
+async def delete_page_record(
+    page_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Hard delete a page and all related records.
+    """
+    try:
+        success, status_code, message, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning(f"Token verification failed: {message}")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        try:
+            delete_page(page_id)
+        except ValueError as ve:
+            logger.warning(f"Page deletion validation failed: {ve}")
+            raise HTTPException(status_code=400, detail=str(ve))
+        logger.info(f"Successfully hard deleted page ID: {page_id}")
+        return {"message": "Page hard deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in delete_page: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while deleting the page"
+        )
+
+@router.delete("/delete_pages")
+async def delete_pages(
+    body: dict = Body(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Delete multiple pages and all related records.
+    """
+    try:
+        success, status_code, message, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning(f"Token verification failed: {message}")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        page_ids = body.get("page_ids")
+        if not page_ids or not isinstance(page_ids, list):
+            raise HTTPException(status_code=400, detail="page_ids must be a list of IDs")
+        failed = []
+        for pid in page_ids:
+            try:
+                delete_page(pid)
+            except Exception as e:
+                logger.warning(f"Failed to delete page {pid}: {e}")
+                failed.append(pid)
+        if failed:
+            return {"message": f"Some pages could not be deleted: {failed}", "failed_ids": failed}
+        return {"message": "Pages deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in delete_pages: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while hard deleting pages"
+        )

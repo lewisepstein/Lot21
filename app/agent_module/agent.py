@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict
-import logging
 
 from auth_module.auth_utils import verify_token, require_session_auth
 from agent_module.agent_utils import (

@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict
-import logging
 
 from content_module.content_responses import (
     ContentCreateRequest, 
@@ -14,6 +13,15 @@ from content_module.content_responses import (
     PromptHistoryResponse
 )
 
+from content_module.prompt_history_utils import (
+    create_prompt_history_record,
+    add_draft_to_prompt_history
+)
+
+from validations.content import ContentAddValidation
+from auth_module.auth_utils import verify_token, require_session_auth
+from models.content import ContentActionEnum
+
 from content_module.content_utils import (
     get_latest_content, 
     create_content_record
@@ -23,14 +31,6 @@ from service_utils.log_management import get_logger
 # Set up logging
 logger = get_logger(__name__)
 
-from content_module.prompt_history_utils import (
-    create_prompt_history_record,
-    add_draft_to_prompt_history
-)
-
-from validations.content import ContentAddValidation
-from auth_module.auth_utils import verify_token, require_session_auth
-from models.content import ContentActionEnum
 
 # Create router
 router = APIRouter(prefix="/user", tags=["user"])

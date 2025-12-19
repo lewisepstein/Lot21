@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import HTMLResponse
@@ -8,10 +6,6 @@ from fastapi.responses import JSONResponse
 
 from service_utils.routers import register_routers
 from service_utils.log_management import setup_logger
-
-
-# Load environment variables
-load_dotenv()
 
 # Initialize logging
 logger = setup_logger(__name__)

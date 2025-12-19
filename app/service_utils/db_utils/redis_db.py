@@ -1,6 +1,6 @@
 import redis
-from lot21.app.service_utils.db_utils.conf.redis_conf import REDIS_URL
-from lot21.app.service_utils.custom_exceptions.redis_custom_exceptions import (
+from db_utils.conf.redis_conf import REDIS_URL
+from custom_exceptions.redis_custom_exceptions import (
     RedisConnectionError,
     RedisInsertError,
     RedisReadError,

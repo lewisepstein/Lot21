@@ -578,15 +578,12 @@ def update_page(
         if description is not None:
             page_update_data['description'] = description.strip() if description.strip() else None
         
-        if updated_by is not None:
-            page_update_data['updated_by'] = updated_by
-        
         # Update page record
         if page_update_data:
             db.update(
-                table='pages',
-                conditions={'id': page_id},
-                update_data=page_update_data
+                table_name='pages',
+                data=page_update_data,
+                conditions={'id': page_id}
             )
             logger.info(f"Updated page record {page_id}")
         
@@ -598,13 +595,13 @@ def update_page(
             if old_content_record:
                 # Update existing content
                 db.update(
-                    table='content',
-                    conditions={'id': old_content_record['id']},
-                    update_data={
+                    table_name='content',
+                    data={
                         'generated_content': final_content,
                         'prompt_data': None,
-                        'action': ContentActionEnum.DRAFT
-                    }
+                        'action': ContentActionEnum.DRAFT.value
+                    },
+                    conditions={'id': old_content_record['id']}
                 )
                 logger.info(f"Updated content record {old_content_record['id']}")
             elif category_id or old_page.get('category_id'):
@@ -682,16 +679,15 @@ def update_page(
                 processing_duration = int((end_time - start_time).total_seconds())
                 
                 # Update weaviate_data record
-                data_details_json = json.dumps({
+                data_details_json = {
                     "doc_id": new_doc_id,
                     "chunks_created": chunks_count,
                     "collection_description": description or old_weaviate_record.get('description', '')
-                })
+                }
                 
                 db.update(
-                    table='weaviate_data',
-                    conditions={'id': old_weaviate_record['id']},
-                    update_data={
+                    table_name='weaviate_data',
+                    data={
                         'content': final_content,
                         'description': description or old_weaviate_record.get('description'),
                         'no_of_lines': no_of_lines,
@@ -700,7 +696,8 @@ def update_page(
                         'data_details': data_details_json,
                         'processing_duration': processing_duration,
                         'error_msg': None
-                    }
+                    },
+                    conditions={'id': old_weaviate_record['id']}
                 )
                 
                 logger.info(f"Updated weaviate_data record {old_weaviate_record['id']}")
@@ -712,13 +709,13 @@ def update_page(
                     "no_of_lines": no_of_lines,
                     "no_of_tokens": no_of_tokens,
                     "no_of_characters": no_of_characters,
-                    "data_details": json.loads(data_details_json)
+                    "data_details": data_details_json
                 }
                 
                 try:
                     version_result = create_weaviate_version_snapshot(
                         weaviate_data_id=old_weaviate_record['id'],
-                        user_id=updated_by or old_weaviate_record.get('created_by'),
+                        user_id=old_weaviate_record.get('created_by'),
                         old_data=old_weaviate_data,
                         new_data=new_weaviate_data,
                         operation="UPDATE",
@@ -763,4 +760,72 @@ def update_page(
     except Exception as e:
         logger.error(f"Error updating page {page_id}: {e}", exc_info=True)
         raise ValueError(f"Failed to update page: {str(e)}")
+
+
+def delete_page(page_id: int) -> None:
+    """
+    Hard delete a single page and all related records in a transaction.
+
+    Steps:
+    1. Check if page exists
+    2. Delete from weaviate_data_versions
+    3. Delete from weaviate_data
+    4. Delete from content
+    5. Delete from pages
+
+    Args:
+        page_id: Page ID to delete
+
+    Raises:
+        ValueError: If page does not exist
+        Exception: If deletion fails
+    """
+    db = PostgresDB()
+
+    try:
+        
+        # 1. Check if page exists
+        page = db.read('pages', conditions={'id': page_id})
+        if not page:
+            raise ValueError(f"Page with ID {page_id} not found")
+        
+        weaviate = db.read(
+            'weaviate_data',
+            conditions={'page_id': page_id, 'deleted_at': None}
+        )
+
+        if weaviate:
+            # Delete chunks from Weaviate
+            data_details = weaviate[0].get('data_details') or {}
+            doc_id = data_details.get('doc_id')
+            collection_name = weaviate[0].get('collection_name', 'training_data')
+            if doc_id:
+                try:
+                    logger.info(f"Deleting chunks from Weaviate for page {page_id}, doc_id='{doc_id}'")
+                    delete_result = delete_chunks_from_weaviate(
+                        collection_name=collection_name,
+                        doc_id=doc_id
+                    )
+                    logger.info(f"Deleted {delete_result.get('chunks_deleted', 0)} chunks from Weaviate")
+                except Exception as weaviate_error:
+                    logger.error(f"Error deleting chunks from Weaviate: {str(weaviate_error)}")
+
+            # 2. Delete related records
+            db.delete('weaviate_data_versions', conditions={'weaviate_data_id': weaviate[0]['id']})
+
+        db.delete('weaviate_data', conditions={'page_id': page_id})
+        db.delete('content', conditions={'page_id': page_id})
+
+        # 3. Delete page
+        db.delete('pages', conditions={'id': page_id})
+
+        logger.info(
+            "Hard deleted page and related records for page_id=%s",
+            page_id
+        )
+
+    except Exception as e:
+        logger.exception("Failed to hard delete page_id=%s", page_id)
+        logger.error(f"Error details: {str(e)}")
+        raise
 

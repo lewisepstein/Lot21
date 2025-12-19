@@ -1,16 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict, Any, Optional
-import sys
-from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.append(str(Path(__file__).parent.parent))
-
-from weaviate_module.weaviate_utils import (
-    load_scraped_data_to_weaviate
-)
+from typing import Dict, Any
 from service_utils.log_management import get_logger
+from service_utils.helpers import validate_url
 
 # Set up logging
 logger = get_logger(__name__)
@@ -28,97 +20,86 @@ TIMEOUT = 30  # seconds
 
 TAGS_TO_FIND = ["h1", "h2", "h3"]
 
+# Headings to exclude along with their following content
+EXCLUDE_HEADINGS = ["Attributions", "Go Deeper", "Watch", "Subscribe"]
+
 def scrape_page(url):
-       
-    # Send HTTP GET request with headers
-    response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    response.raise_for_status()  # Raises error if request failed
-
-    # Parse HTML
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    # Extract title
-    title = soup.title.string if soup.title else None
-
-    # Extract headings with their following paragraphs and links
-    headings_with_content = []
-    
-    for heading in soup.find_all(TAGS_TO_FIND):
-        heading_text = heading.get_text(strip=True)
+    try:
         
-        # Get all paragraphs, links, and lists that follow this heading until the next heading
-        paragraphs = []
-        links = []
-        lists = []
+        # Send HTTP GET request with headers
+        response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        response.raise_for_status()  # Raises error if request failed
         
-        for sibling in heading.next_siblings:
-            # Stop if we hit another heading
-            if sibling.name in TAGS_TO_FIND:
-                break
+        # Parse HTML
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Extract title
+        title = soup.title.string if soup.title else None
+        
+        # Extract headings with their following paragraphs and links
+        headings_with_content = []
+        
+        for heading in soup.find_all(TAGS_TO_FIND):
+            heading_text = heading.get_text(strip=True)
             
-            # Collect paragraph text (direct siblings)
-            if sibling.name == 'p':
-                para_text = sibling.get_text(strip=True)
-                if para_text:
-                    paragraphs.append(para_text)
-                # Also collect links within this paragraph
-                for a in sibling.find_all('a', href=True):
-                    links.append({
-                        'text': a.get_text(strip=True),
-                        'href': a['href']
-                    })
+            # Skip headings that match the exclusion list
+            if heading_text in EXCLUDE_HEADINGS:
+                logger.info(f"Excluding heading and its content: {heading_text}")
+                continue
             
-            # Collect unordered lists
-            elif sibling.name == 'ul':
-                list_items = []
-                for li in sibling.find_all('li'):
-                    list_items.append(li.get_text(strip=True))
-                if list_items:
-                    lists.append(list_items)
-                # Also collect links within the list
-                for a in sibling.find_all('a', href=True):
-                    links.append({
-                        'text': a.get_text(strip=True),
-                        'href': a['href']
-                    })
+            # Get all paragraphs, links, and lists that follow this heading until the next heading
+            paragraphs = []
+            links = []
+            lists = []
             
-            # Collect direct anchor tags (not inside paragraphs)
-            elif sibling.name == 'a' and sibling.get('href'):
-                links.append({
-                    'text': sibling.get_text(strip=True),
-                    'href': sibling['href']
-                })
-            
-            # Also fetch all links and nested paragraphs in other elements (divs, spans, etc.)
-            elif hasattr(sibling, 'find_all'):
-                # Find paragraphs nested within other elements (not direct siblings)
-                for p in sibling.find_all('p'):
-                    para_text = p.get_text(strip=True)
+            for sibling in heading.next_siblings:
+                # Stop if we hit another heading
+                if sibling.name in TAGS_TO_FIND:
+                    break
+                
+                # Collect paragraph text (direct siblings)
+                if sibling.name == 'p':
+                    para_text = sibling.get_text(strip=True)
                     if para_text:
                         paragraphs.append(para_text)
                 
-                # Find links in other elements
-                for a in sibling.find_all('a', href=True):
-                    links.append({
-                        'text': a.get_text(strip=True),
-                        'href': a['href']
-                    })
+                # Collect unordered lists
+                elif sibling.name == 'ul':
+                    list_items = []
+                    for li in sibling.find_all('li'):
+                        list_items.append(li.get_text(strip=True))
+                    if list_items:
+                        lists.append(list_items)
+                            
+                # Also fetch all links and nested paragraphs in other elements (divs, spans, etc.)
+                elif hasattr(sibling, 'find_all'):
+                    # Find paragraphs nested within other elements (not direct siblings)
+                    for p in sibling.find_all('p'):
+                        para_text = p.get_text(strip=True)
+                        if para_text:
+                            paragraphs.append(para_text)
+                            
+            # Only add the heading if it has at least one paragraph, link, or list
+            if len(paragraphs) > 0 or len(lists) > 0:
+                headings_with_content.append({
+                    'heading': heading_text,
+                    'heading_level': heading.name,
+                    'paragraphs': paragraphs,
+                    'links': links,
+                    'lists': lists
+                })
         
-        # Only add the heading if it has at least one paragraph, link, or list
-        if len(paragraphs) > 0 or len(links) > 0 or len(lists) > 0:
-            headings_with_content.append({
-                'heading': heading_text,
-                'heading_level': heading.name,
-                'paragraphs': paragraphs,
-                'links': links,
-                'lists': lists
-            })
-
-    return {
-        "title": title,
-        "headings_with_content": headings_with_content
-    }
-
+        result = {
+            "title": title,
+            "headings_with_content": headings_with_content
+        }
+        
+        logger.info(f"Successfully scraped {url}: {len(headings_with_content)} sections found")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to scrape {url}: {str(e)}")
+        raise
 
 def convert_to_wysiwyg_html(scraped_data: Dict[str, Any]) -> str:
     """
@@ -134,12 +115,6 @@ def convert_to_wysiwyg_html(scraped_data: Dict[str, Any]) -> str:
             
     Returns:
         String containing complete HTML formatted content
-        
-    Examples:
-        >>> data = scrape_page(url)
-        >>> html = convert_to_wysiwyg_html(data)
-        >>> with open('output.html', 'w') as f:
-        ...     f.write(html)
     """
     html_parts = []
     
@@ -190,112 +165,34 @@ def convert_to_wysiwyg_html(scraped_data: Dict[str, Any]) -> str:
     # Join all parts with newlines for readability
     return "\n".join(html_parts)
 
-
-def insert_scraped_data_to_weaviate(
-    scraped_data: Dict[str, Any],
-    url: str,
-    collection_name: str = "training_data",
-    doc_id: Optional[str] = None
-) -> Dict[str, Any]:
+def scrape_content_from_url(source_url: str) -> str:
     """
-    Insert scraped web page data into Weaviate collection.
-    
-    Converts scraped data to HTML and loads it as a single document.
+    Scrape content from a URL and convert to WYSIWYG HTML.
     
     Args:
-        scraped_data: Dictionary returned from scrape_page() function with:
-            - title: Page title
-            - headings_with_content: List of heading sections with content
-        url: Source URL of the scraped page
-        collection_name: Name of the Weaviate collection (default: "training_data")
-        doc_id: Unique document identifier (default: uses URL)
+        source_url: URL to scrape content from
         
     Returns:
-        Dictionary with:
-            - success: Boolean indicating success
-            - collection_name: Name of the collection
-            - chunks_created: Number of chunks inserted
-            - doc_id: Document identifier used
-            - source_url: Source URL
-            
+        Scraped HTML content in WYSIWYG format
+        
     Raises:
-        RuntimeError: If Weaviate operations fail
-        
-    Examples:
-        >>> url = "https://example.com/page"
-        >>> data = scrape_page(url)
-        >>> result = insert_scraped_data_to_weaviate(data, url)
-        >>> print(f"Inserted {result['chunks_created']} chunks")
+        ValueError: If URL is invalid or scraping fails
     """
-    try:
-        # Convert scraped data to WYSIWYG HTML
-        html_content = convert_to_wysiwyg_html(scraped_data)
-        
-        # Use URL as doc_id if not provided
-        if not doc_id:
-            doc_id = url
-        
-        # Load to Weaviate using the helper function
-        result = load_scraped_data_to_weaviate(
-            scraped_content=html_content,
-            collection_name=collection_name,
-            source_url=doc_id,
-            description=f"Scraped content from {url}"
-        )
-        
-        logger.info(f"Successfully loaded scraped data from {url} - {result['chunks_created']} chunks created")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Failed to insert scraped data to Weaviate: {str(e)}")
-        raise RuntimeError(f"Failed to insert scraped data to Weaviate: {str(e)}")
-
-
-
-# Example usage:
-if __name__ == "__main__":
-    url = "https://lot21.24livehost.com/discover/solutions/understanding/forest-carbon-practices/"
+    if not source_url:
+        raise ValueError("Source URL is required for scraping")
     
-    # Scrape the page
-    print(f"Scraping URL: {url}")
-    data = scrape_page(url)
-
-    print("Page Title:", data["title"])
-    print("\n" + "="*80)
-    print("SCRAPED DATA")
-    print("="*80)
-    print(f"Found {len(data['headings_with_content'])} sections")
-    
-    # Convert to WYSIWYG HTML
-    print("\n" + "="*80)
-    print("CONVERTING TO WYSIWYG HTML")
-    print("="*80)
-    
-    html_content = convert_to_wysiwyg_html(data)
-    print(html_content)
-    
-    # Save to file
-    output_file = "scraped_content.html"
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(html_content)
-    print(f"\n✓ HTML content saved to {output_file}")
-    
-    # Insert into Weaviate
-    print("\n" + "="*80)
-    print("INSERTING INTO WEAVIATE")
-    print("="*80)
+    # Validate URL format
+    if not validate_url(source_url):
+        raise ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
     
     try:
-        result = insert_scraped_data_to_weaviate(
-            scraped_data=data,
-            url=url,
-        )
-        
-        print("✓ Success!")
-        print(f"  Collection: {result['collection_name']}")
-        print(f"  Headings processed: {result['headings_processed']}")
-        print(f"  Total chunks created: {result['total_chunks_created']}")
-        print(f"  Document ID: {result['doc_id']}")
-    except Exception as e:
-        print(f"✗ Error inserting to Weaviate: {e}")
+        logger.info(f"Scraping content from URL: {source_url}")
+        scraped_data = scrape_page(source_url)
+        scraped_html = convert_to_wysiwyg_html(scraped_data)
+        logger.info(f"Scraped HTML Content length: {len(scraped_html)} characters")
+        logger.info(f"Successfully scraped content from {source_url}")
+        return scraped_html
+    except Exception as scrape_error:
+        logger.error(f"Failed to scrape content from {source_url}: {scrape_error}")
+        raise ValueError(f"Failed to scrape content from URL: {str(scrape_error)}")
+

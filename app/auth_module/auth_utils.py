@@ -5,7 +5,7 @@ import jwt
 import os
 import secrets
 import hashlib
-from fastapi import Request, Cookie
+from fastapi import Request
 from fastapi.responses import RedirectResponse
 from passlib.context import CryptContext
 from dotenv import load_dotenv

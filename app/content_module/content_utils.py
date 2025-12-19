@@ -35,7 +35,9 @@ def create_content_record(
     prompt_data: Optional[str],
     action: Optional[ContentActionEnum],
     user_id: int,
-    content_type: Optional[str] = None
+    content_type: Optional[str] = None,
+    page_id: Optional[int] = None,
+    generated_content: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Create a new content record in the database.
@@ -64,7 +66,9 @@ def create_content_record(
         "prompt_data": prompt_data,
         "action": action_value,
         "approval_status": ContentApprovalStatusEnum.PENDING.value,
-        "created_by": user_id
+        "created_by": user_id,
+        "page_id": page_id,
+        "generated_content": generated_content
     }
     
     # Add content_type if provided
@@ -78,3 +82,4 @@ def create_content_record(
         raise Exception("Failed to create content")
     
     return new_content
+
