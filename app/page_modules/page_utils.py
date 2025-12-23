@@ -829,3 +829,53 @@ def delete_page(page_id: int) -> None:
         logger.error(f"Error details: {str(e)}")
         raise
 
+
+def validate_page_name(page_name: str) -> bool:
+    """
+    Validate if the page name is unique (not already used).
+    
+    Args:
+        page_name: The page name to validate
+    """
+    if not page_name or not page_name.strip():
+        return False
+
+def __create_page(    page_name: str,
+    category_id: Optional[int] = None,
+    created_by: Optional[int] = None,
+    is_active: bool = True,
+    content: Optional[str] = None,
+    source_url: Optional[str] = None,
+    scrape_data: bool = False,
+    description: Optional[str] = None
+) -> Dict[str, Any]:
+    pass
+
+def validate_parameters(
+    page_name: str,
+    source_url: Optional[str] = None
+):
+    if source_url:
+        source_url = source_url.strip()
+        valid_source_url = validate_url(source_url)
+        if not valid_source_url:
+            return ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
+        
+    try:
+        db = PostgresDB()
+        existing_pages = db.read(
+            'pages',
+            conditions={
+                'page_name': page_name.strip().lower,
+                'deleted_on': None
+            }
+        )
+        
+        if existing_pages and len(existing_pages) > 0:
+            raise ValueError("Page name already exists. Please choose a different name")
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error validating page name: {e}")
+        return False
+        
