@@ -188,3 +188,95 @@ def create_category_record(
     except Exception as e:
         logger.error(f"Error creating category: {e}")
         return None
+    
+def category_exists(category_id: int) -> bool:
+    """
+    Check if a category with the given ID exists and is active.
+    
+    Args:
+        category_id: ID of the category to check
+        
+    Returns:
+        True if category exists and is active, False otherwise
+    """
+    try:
+        db = PostgresDB()
+        category = db.read(
+            'categories',
+            conditions={
+                'id': category_id,
+                'is_active': True,
+                'deleted_on': None
+            },
+            limit=1
+        )
+        
+        exists = category is not None and len(category) > 0
+        logger.info(f"Category with ID {category_id} exists: {exists}")
+        return exists
+        
+    except Exception as e:
+        logger.error(f"Error checking category existence: {e}")
+        return False
+    
+def deactivate_category(category_id: int) -> bool:
+    """
+    Deactivate a category by setting its is_active flag to False.
+    
+    Args:
+        category_id: ID of the category to deactivate
+        
+    Returns:
+        True if deactivation was successful, False otherwise
+    """
+    try:
+        db = PostgresDB()
+        update_result = db.update(
+            'categories',
+            conditions={'id': category_id},
+            updates={'is_active': False}
+        )
+        
+        if update_result:
+            logger.info(f"Successfully deactivated category with ID {category_id}")
+            return True
+        
+        logger.error(f"Failed to deactivate category with ID {category_id}")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error deactivating category: {e}")
+        return False
+    
+def get_category_by_id(category_id: int) -> Optional[Category]:
+    """
+    Retrieve a category by its ID.
+    
+    Args:
+        category_id: ID of the category to retrieve
+        
+    Returns:
+        Category object if found, None otherwise
+    """
+    try:
+        db = PostgresDB()
+        category = db.read(
+            'categories',
+            conditions={
+                'id': category_id,
+                'deleted_on': None
+            },
+            limit=1
+        )
+        
+        if category:
+            logger.info(f"Retrieved category with ID {category_id}")
+            category_data = category[0]
+            return Category(**category_data)
+        
+        logger.info(f"No category found with ID {category_id}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error retrieving category by ID: {e}")
+        return None

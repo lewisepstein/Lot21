@@ -840,7 +840,8 @@ def validate_page_name(page_name: str) -> bool:
     if not page_name or not page_name.strip():
         return False
 
-def __create_page(    page_name: str,
+def __create_page(    
+    page_name: str,
     category_id: Optional[int] = None,
     created_by: Optional[int] = None,
     is_active: bool = True,
