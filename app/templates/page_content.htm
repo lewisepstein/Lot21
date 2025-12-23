@@ -1,0 +1,69 @@
+{% extends "base.htm" %}
+
+{% block title %}Page Details{% endblock %}
+
+{% block content %}
+
+<style>
+    .breadcrumb-item.active {
+        color: #f8f9fa;
+    }
+    .my-custom-breadcrumb {
+        --bs-breadcrumb-divider-color: #f8f9fa;
+    }
+    .my-content h1, .my-content h2, .my-content h3, .my-content h4, .my-content h5, .my-content h6{
+        color: var(--accent-teal);
+    }
+
+    .title-strong{
+        color: var(--accent-teal);
+    }
+
+    .my-content{
+        color: #fff;
+        border-radius: 10px;
+        background-color: var(--bg-secondary);
+        border-color: #1f5d48;
+    }
+    .card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 25px;
+    }
+</style>
+
+<div class="container-fluid" style="margin: auto; width:100%;">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" style="margin-bottom: 24px; color:#f8f9fa">
+        <ol class="breadcrumb my-custom-breadcrumb" style="background: none; padding: 0; margin: 0;">
+            <li class="breadcrumb-item"><a style="color:#f8f9fa; text-decoration: none;" href="/user/page-settings">Page Settings</a></li>
+            <li class="breadcrumb-item"><a style="color:#f8f9fa; text-decoration: none;" href="/user/pages/{{ data.category_id if data and data.category_id else 0 }}">Pages</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ data.page_name if data and data.page_name else 'Page Details' }}</li>
+        </ol>
+    </nav>
+    {% if data and data.id %}
+        <div class="card" style="padding: 24px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); color:#fff;">
+            <h3 style="margin-bottom: 12px;">{{ data.page_name }}</h3>
+            <p><strong class="title-strong">Status:</strong> {{ 'Active' if data.is_active else 'Inactive' }}</p>
+            <p><strong class="title-strong">Source URL:</strong> {{ data.source_url if data.source_url else 'N/A' }}</p>
+            <p><strong class="title-strong">Description:</strong> {{ data.description if data.description else 'N/A' }}</p>
+            <p><strong class="title-strong">Created On:</strong> {{ data.created_on }}</p>
+            {% if data.updated_on %}
+            <p><strong class="title-strong">Updated On:</strong> {{ data.updated_on }}</p>
+            {% endif %}
+            <div style="margin-top: 18px;">
+                <div style="padding: 16px; border-radius: 6px; margin-top: 6px;" class="my-content">
+                    {% if data.content %}
+                        {{ data.content|safe }}
+                    {% else %}
+                        <em>No content available.</em>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-warning" style="margin-top: 40px;">No page data found.</div>
+    {% endif %}
+</div>
+{% endblock %}

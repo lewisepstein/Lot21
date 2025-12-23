@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Optional
 import pandas as pd
 import uuid
-import json
 import tiktoken
 
 from service_utils.db_utils.pg_db import PostgresDB
@@ -62,7 +61,7 @@ def get_pages_list(category_id: Optional[int] = None) -> Optional[List[Dict[str,
         pages = db.read(
             'pages',
             conditions=conditions,
-            columns=['id', 'page_name', 'category_id', 'created_on', 'updated_on']
+            columns=['id', 'page_name', 'category_id', 'created_on', 'updated_on', 'description']
         )
 
         if not pages:
@@ -454,6 +453,8 @@ def get_page_by_id(page_id: int) -> Optional[Dict[str, Any]]:
             return None
         
         page = pages[0]
+
+        print("Retrieved page:", page)
         
         # Get content from content table
         content_data = db.read(
@@ -852,16 +853,46 @@ def __create_page(
 ) -> Dict[str, Any]:
     pass
 
-def validate_parameters(
-    page_name: str,
-    source_url: Optional[str] = None
-):
+
+def validate_category_id(category_id: Optional[int]) -> bool:
+    """
+    Validate if the category ID exists in the database.
+    
+    Args:
+        category_id: The category ID to validate
+    """
+    if category_id is None:
+        return True  # No category specified is valid
+
+    try:
+        db = PostgresDB()
+        categories = db.read(
+            'categories',
+            conditions={
+                'id': category_id,
+                'deleted_on': None
+            }
+        )
+        
+        exists = categories is not None and len(categories) > 0
+        logger.info(f"Category ID {category_id} exists: {exists}")
+        return exists
+        
+    except Exception as e:
+        logger.error(f"Error validating category ID {category_id}: {e}")
+        return False
+
+
+def validate_source_url(source_url: str) -> Optional[bool]:
     if source_url:
         source_url = source_url.strip()
         valid_source_url = validate_url(source_url)
         if not valid_source_url:
             return ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
-        
+        return True
+    return False
+
+def page_exists(page_name: str)-> Optional[bool]:
     try:
         db = PostgresDB()
         existing_pages = db.read(
@@ -874,7 +905,7 @@ def validate_parameters(
         
         if existing_pages and len(existing_pages) > 0:
             raise ValueError("Page name already exists. Please choose a different name")
-            
+
         return True
     except Exception as e:
         logger.error(f"Error validating page name: {e}")

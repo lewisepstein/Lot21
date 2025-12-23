@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from service_utils.db_utils.pg_db import PostgresDB
 from models.content import ContentActionEnum, ContentApprovalStatusEnum
 
@@ -28,6 +28,55 @@ def get_latest_content(category_id: int) -> Optional[Dict[str, Any]]:
         return None
     
     return contents[0]
+
+def get_unattached_content() -> Optional[List[Dict[str, Any]]]:
+    """
+    Get content records that are not attached to any page.
+    """
+
+    EXCLUDED_FIELDS = {
+        "id",
+        "created_at",
+        "updated_on",
+        "deleted_at",
+        "page_id",
+        "content_id",
+        "start_time",
+        "end_time",
+        "error_msg",
+        "data_details"
+    }
+
+    db = PostgresDB()
+
+    contents = db.read(
+        "weaviate_data",
+        conditions={"page_id": None, "deleted_on": None},
+        order_by=[("created_on", False)]
+    )
+
+    if not contents:
+        return None
+
+    serialized_data: List[Dict[str, Any]] = []
+
+    for content in contents:
+        item = dict(content)
+
+        # Build filtered data in ONE pass
+        item["data"] = {
+            k: v
+            for k, v in item.items()
+            if k not in EXCLUDED_FIELDS
+        }
+
+        # Remove fields not needed at top-level
+        for field in ("error_msg",):
+            item.pop(field, None)
+
+        serialized_data.append(item)
+
+    return serialized_data
 
 
 def create_content_record(

@@ -3,6 +3,8 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+
 
 from service_utils.routers import register_routers
 from service_utils.log_management import setup_logger
@@ -16,6 +18,12 @@ app = FastAPI(title="Lottie", version="1.0.0")
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
+
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static"
+)
 
 # Register routers
 register_routers(app)

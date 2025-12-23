@@ -1,0 +1,153 @@
+{% extends "base.htm" %}
+{% block title %}Unattached Content - Lottie{% endblock %}
+
+{% block nav_content_generation %}active{% endblock %}
+
+{% block page_title %}Unattached Contents{% endblock %}
+{% block page_subtitle %}Manage and monitor your content{% endblock %}
+
+
+{% block content %}
+
+<style>
+    .card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 5px;
+        color:#fff;
+        margin: 10px;
+    }
+</style>
+
+
+<div class="container-fluid" style="margin: auto; width:100%;">
+    <div class="row">
+    {% if data and data|length > 0 %}
+        {% for content in data %}
+
+        <div class="card col-3">
+            <div class="card-header" style="color: var(--accent-teal); font-weight: bold;">
+                Created On : {{content.created_at.strftime("%d %b, %Y %H:%M")}}
+            </div>
+            <div class="card-body">
+                <strong style="color: var(--accent-teal);">Description:</strong> {{content.description|safe|truncate(20)}}
+                <div style="margin-top: 12px; padding: 10px; border-radius: 6px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    {% if content.content %}
+                        {{ content.content|safe|truncate(200) }}
+                    {% else %}
+                        <em>No content available.</em>
+                    {% endif %} 
+                </div>    
+            </div> 
+            <div class="card-footer" style="text-align: right;">
+                <button onclick='editTrainingRecord({{ content.data|tojson | safe }})' class="btn btn-primary">
+                    <i class="bi bi-pencil"></i>
+                    Edit
+                </button>
+                <button class="btn btn-danger" onclick="deleteTrainingRecord()" onmouseover="this.style.background='#dc2626';" onmouseout="this.style.background='#ef4444';">
+                    <i class="bi bi-trash"></i>
+                    Delete
+                </button>
+            </div>  
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No unattached content available.</p>
+    {% endif %}
+    </div>
+</div>
+
+<!-- Edit Record Modal -->
+<div class="offcanvas-overlay" id="editModalOverlay" onclick="closeEditModal()"></div>
+<div class="offcanvas" id="editModal">
+    <!-- Edit Modal Header -->
+    <div class="offcanvas-header">
+        <div>
+            <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">
+                <i class="bi bi-pencil-square"></i> Edit Training Record
+            </h2>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: var(--text-secondary);">Modify training data and description</p>
+        </div>
+        <button onclick="closeEditModal()" style="background: transparent; border: none; color: var(--text-secondary); font-size: 28px; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='var(--bg-primary)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='transparent'; this.style.color='var(--text-secondary)';">
+            <i class="bi bi-x"></i>
+        </button>
+    </div>
+    
+    <!-- Edit Modal Body -->
+    <div class="offcanvas-body">
+        <!-- Alert Messages for Edit Modal -->
+        <div id="editSuccessAlert" class="alert-success" style="margin-bottom: 15px;"></div>
+        <div id="editErrorAlert" class="alert-error" style="margin-bottom: 15px;"></div>
+        
+        <div style="display: grid; gap: 20px;">
+            <input type="hidden" id="editRecordId">
+            
+            <!-- Collection Name (readonly) -->
+            <div class="form-group">
+                <label class="form-label">Collection Name</label>
+                <input type="text" class="form-input" id="editCollectionName" readonly style="background: var(--bg-primary); cursor: not-allowed;">
+            </div>
+            
+            <!-- Description -->
+            <div class="form-group">
+                <label class="form-label">Description (Optional)</label>
+                <input type="text" class="form-input" id="editDescription" placeholder="Brief description of the training data">
+            </div>
+            
+            <!-- Training Data -->
+            <div class="form-group">
+                <label class="form-label">Training Data</label>
+                <textarea class="form-textarea" id="editTrainingData" placeholder="Paste your training data here..." style="min-height: 300px;"></textarea>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div style="display: flex; gap: 10px; text-align: right;">
+                    <button onclick="closeEditModal()" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 13px; cursor: pointer; border-radius: 6px; transition: all 0.3s; display: flex; align-items: center; gap: 6px; font-weight: 500;" onmouseover="this.style.background='var(--bg-primary)'; this.style.borderColor='var(--text-secondary)';" onmouseout="this.style.background='transparent'; this.style.borderColor='var(--border-color)';">
+                        <i class="bi bi-x"></i>
+                        Cancel
+                    </button>
+                    <button onclick="saveTrainingRecordUpdate()" style="padding: 8px 16px; background: linear-gradient(135deg, var(--accent-teal), var(--accent-green)); border: none; color: white; font-size: 13px; cursor: pointer; border-radius: 6px; transition: all 0.3s; display: flex; align-items: center; gap: 6px; font-weight: 500;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0, 217, 181, 0.3)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                        <i class="bi bi-save"></i>
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+
+    function editTrainingRecord(content) {
+        // Open the edit modal (use 'show' class for consistency)
+        document.getElementById('editModal').classList.add('show');
+        document.getElementById('editModalOverlay').classList.add('show');
+
+        console.log(content);
+
+        editCollectionName.value = content.collection_name; 
+        editDescription.value = content.description || '';
+        editTrainingData.value = content.content || '';
+        editRecordId.value = content.id;
+
+    }
+
+    function closeEditModal() {
+        // Close the edit modal
+        document.getElementById('editModal').classList.remove('show');
+        document.getElementById('editModalOverlay').classList.remove('show');
+
+        editCollectionName.value = null; 
+        editDescription.value = null;
+        editTrainingData.value = null;
+        editRecordId.value = null;
+    }
+
+</script>
+
+{% endblock %}
+
+

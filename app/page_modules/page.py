@@ -33,6 +33,37 @@ security = HTTPBearer()
 # Templates
 templates = Jinja2Templates(directory="templates")
 
+@router.get("/page-content/{page_id}", response_class=HTMLResponse)
+@require_session_auth(redirect_url="/")
+async def page_content(
+    request: Request,
+    page_id: int,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    try:
+        results = get_page_by_id(page_id=page_id)
+        if not results:
+            raise HTTPException(status_code=404, detail="Page not found")
+        return templates.TemplateResponse(
+            request=request,
+            name="page_content.htm",
+            context={
+                "data": results,
+                "message": ""
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading pages page: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            request=request,
+            name="page_content.htm",
+            context={
+                "data": [],
+                "message": "Unable to load pages at this time"
+            }
+        )
+
 
 @router.get("/pages/{category_id}", response_class=HTMLResponse)
 @require_session_auth(redirect_url="/")
@@ -46,16 +77,16 @@ async def pages_page(
     
     try:
         results, msg = get_pages_list(category_id=category_id)
-        parent_pages = get_parent_pages()
-        has_root_page = check_root_exists()
+        # parent_pages = get_parent_pages()
+        # has_root_page = check_root_exists()
 
         return templates.TemplateResponse(
             request=request,
             name="page.htm",
             context={
                 "data": results if results else [],
-                "parent_pages": parent_pages,
-                "has_root_page": has_root_page,
+                # "parent_pages": parent_pages,
+                # "has_root_page": has_root_page,
                 "message": msg,
                 "category_id": category_id
             }

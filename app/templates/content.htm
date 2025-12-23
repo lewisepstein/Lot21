@@ -1,18 +1,11 @@
 {% extends "base.htm" %}
 
-{% block title %}Content Editor - Direct Air Capture{% endblock %}
+{% block title %}Content Editor{% endblock %}
 
-{% block page_title %}Current Website Content{% endblock %}
-{% block page_subtitle %}
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
-            <li class="breadcrumb-item"><a href="/user/dashboard" style="color: var(--text-secondary);">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="#" style="color: var(--text-secondary);">Website</a></li>
-            <li class="breadcrumb-item"><a href="/user/understanding" style="color: var(--text-secondary);">Understanding</a></li>
-            <li class="breadcrumb-item active" style="color: var(--accent-teal);">Direct Air Capture</li>
-        </ol>
-    </nav>
-{% endblock %}
+{% block page_title %}Current Content{% endblock %}
+
+{% block nav_content_generation %}active{% endblock %}
+
 
 {% block content %}
 <style>
@@ -391,13 +384,13 @@
 
         <!-- Top Actions Bar -->
         <div class="top-actions">
-            <button class="action-icon-btn">
-                <i class="bi bi-arrow-left"></i> Back
-            </button>
             <div style="margin-left: auto; display: flex; gap: 15px;">
                 <button class="action-icon-btn" onclick="addNewContent()">
                     <i class="bi bi-plus-circle"></i> Add New
                 </button>
+                <a class="action-icon-btn" href="/user/content/unattached" style="text-decoration: none;">
+                    <i class="bi bi-eye"></i> Show Unattached
+                </a>
                 <button class="action-icon-btn">
                     <i class="bi bi-clock-history"></i> Version History
                 </button>
@@ -419,7 +412,7 @@
             <!-- Left Panel - Current Content -->
             <div class="editor-panel">
                 <div class="panel-header">
-                    <h2 class="panel-title">Current Website Content</h2>
+                    <h2 class="panel-title">Content Generation</h2>
                 </div>
                 
                 <div class="meta-info">
@@ -527,9 +520,8 @@
             </div>
             
         </div>
-{% endblock %}
 
-{% block extra_scripts %}
+<script>
     const CATEGORY_ID = {{ category_id }};
     
     async function addNewContent() {
@@ -857,4 +849,5 @@
             console.error('Error loading prompt history:', error);
         }
     }
+</script>
 {% endblock %}

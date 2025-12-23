@@ -24,6 +24,7 @@ from models.content import ContentActionEnum
 
 from content_module.content_utils import (
     get_latest_content, 
+    get_unattached_content,
     create_content_record
 )
 from service_utils.log_management import get_logger
@@ -73,7 +74,7 @@ async def content_generation_page(
         )
 
 
-@router.get("/content/{category_id}", response_class=HTMLResponse)
+@router.get("/content/{category_id:int}", response_class=HTMLResponse)
 @require_session_auth(redirect_url="/")
 async def content_page(
     request: Request,
@@ -251,3 +252,33 @@ async def add_draft_content(
         raise HTTPException(status_code=500, detail="Unable to add draft content at this time")
 
 
+@router.get("/content/unattached", response_class=HTMLResponse)
+@require_session_auth(redirect_url="/")
+async def get_unattached(
+    request: Request,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """
+    Fetch unattached content
+    
+    Returns:
+        List of unattached content records
+    """
+    try:
+        return templates.TemplateResponse(
+            request=request,
+            name="unattached_content.htm",
+            context={
+                "data": get_unattached_content(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            request=request,
+            name="unattached_content.htm",
+            context={
+                "data": None,
+            }
+        )
