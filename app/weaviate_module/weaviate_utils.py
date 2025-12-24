@@ -251,10 +251,6 @@ def chunk_text(text: str, max_tokens: int = 400, overlap: int = 50) -> List[str]
         
     Returns:
         List of text chunks
-        
-    Examples:
-        >>> chunks = chunk_text("Long document text...", max_tokens=200)
-        >>> print(f"Created {len(chunks)} chunks")
     """
     try:
         enc = tiktoken.get_encoding(ENCODING)
@@ -280,69 +276,6 @@ def chunk_text(text: str, max_tokens: int = 400, overlap: int = 50) -> List[str]
             i += chunk_size - overlap_chars
         return chunks
 
-
-def embed_texts_openai(texts: List[str], model: str = "text-embedding-3-small") -> List[List[float]]:
-    """
-    Compute OpenAI embeddings for a list of texts.
-    
-    Args:
-        texts: List of text strings to embed
-        model: OpenAI embedding model (default: text-embedding-3-small)
-        
-    Returns:
-        List of embedding vectors
-        
-    Raises:
-        RuntimeError: If OPENAI_API_KEY is not configured
-        
-    Examples:
-        >>> embeddings = embed_texts_openai(["text 1", "text 2"])
-        >>> print(f"Generated {len(embeddings)} embeddings")
-    """
-    if not OPENAI_API_KEY or not openai:
-        raise RuntimeError("OPENAI_API_KEY required for local embeddings and openai package must be installed.")
-    
-    try:
-        resp = openai.Embedding.create(model=model, input=texts)
-        return [d["embedding"] for d in resp["data"]]
-    except Exception as e:
-        logger.error(f"Error generating embeddings: {e}")
-        raise RuntimeError(f"Embedding generation failed: {e}")
-
-
-def generate_answer_openai(prompt: str, temperature: float = 0.0, max_tokens: int = 400) -> str:
-    """
-    Generate an answer using OpenAI's chat completion API.
-    
-    Args:
-        prompt: The prompt to send to the model
-        temperature: Sampling temperature (default: 0.0)
-        max_tokens: Maximum tokens in response (default: 400)
-        
-    Returns:
-        Generated answer text
-        
-    Examples:
-        >>> answer = generate_answer_openai("What is...?", temperature=0.7)
-    """
-    if not OPENAI_API_KEY or not openai:
-        logger.warning("OPENAI_API_KEY not configured")
-        return f"No OPENAI_API_KEY configured. Here is the assembled context; call your LLM with it.\n\n{prompt}"
-    
-    try:
-        gen = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  # Change as needed
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        answer = gen["choices"][0]["message"]["content"].strip()
-        return answer
-    except Exception as e:
-        logger.error(f"LLM generation error: {e}")
-        raise RuntimeError(f"LLM generation failed: {e}")
-
-
 def load_chunks_to_weaviate(
     chunks: List[str],
     collection_name: str,
@@ -363,16 +296,6 @@ def load_chunks_to_weaviate(
         
     Raises:
         RuntimeError: If Weaviate operations fail
-        
-    Examples:
-        >>> chunks = ["chunk1", "chunk2", "chunk3"]
-        >>> result = load_chunks_to_weaviate(
-        ...     chunks,
-        ...     "my_collection",
-        ...     "doc-123",
-        ...     description="Training data"
-        ... )
-        >>> print(f"Loaded {result['chunks_created']} chunks")
     """
     try:
         # Initialize Weaviate connection
@@ -443,9 +366,6 @@ def delete_chunks_from_weaviate(
     Raises:
         RuntimeError: If Weaviate operations fail
         
-    Examples:
-        >>> result = delete_chunks_from_weaviate("my_collection", "doc-123")
-        >>> print(f"Deleted {result['chunks_deleted']} chunks")
     """
     try:
         # Initialize Weaviate connection
@@ -521,15 +441,6 @@ def load_scraped_data_with_tracking(
         ValueError: If scraped_content or collection_name is empty
         RuntimeError: If Weaviate operations fail
         
-    Examples:
-        >>> result = load_scraped_data_with_tracking(
-        ...     scraped_content="<h1>Title</h1><p>Content...</p>",
-        ...     collection_name="training_data",
-        ...     source_url="https://example.com/page",
-        ...     user_id=1,
-        ...     description="Scraped from example.com"
-        ... )
-        >>> print(f"Loaded {result['chunks_created']} chunks, record ID: {result['record_id']}")
     """
     if not scraped_content.strip():
         raise ValueError("Scraped content cannot be empty")
@@ -650,13 +561,6 @@ def load_scraped_data_to_weaviate(
         ValueError: If scraped_content or collection_name is empty
         RuntimeError: If Weaviate operations fail
         
-    Examples:
-        >>> result = load_scraped_data_to_weaviate(
-        ...     scraped_content="<h1>Title</h1><p>Content...</p>",
-        ...     collection_name="training_data",
-        ...     source_url="https://example.com/page"
-        ... )
-        >>> print(f"Loaded {result['chunks_created']} chunks")
     """
     if not scraped_content.strip():
         raise ValueError("Scraped content cannot be empty")
@@ -718,14 +622,6 @@ def create_weaviate_version_snapshot(
     Returns:
         Dictionary with version creation status and version number
         
-    Examples:
-        >>> result = create_weaviate_version_snapshot(
-        ...     weaviate_data_id=1,
-        ...     user_id=1,
-        ...     old_data={"content": "old text", "description": "old desc"},
-        ...     new_data={"content": "new text", "description": "new desc"},
-        ...     operation="UPDATE"
-        ... )
     """
     try:
         db = PostgresDB()

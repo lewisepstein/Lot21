@@ -5,7 +5,6 @@ Implements a singleton pattern for shared persistent connections to Weaviate.
 Provides methods for connection management, collection existence checks, and collection creation.
 """
 import threading
-import logging
 from typing import Optional, Dict, Any, List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -160,33 +159,6 @@ class WeaviateDB:
         Raises:
             WeaviateBaseError: If collection creation fails
             
-        Examples:
-            >>> weaviate_db = WeaviateDB()
-            >>> collection = weaviate_db.create_collection(
-            ...     name="Articles",
-            ...     description="News articles collection",
-            ...     properties=[
-            ...         {
-            ...             "name": "title",
-            ...             "data_type": "text",
-            ...             "description": "Article title"
-            ...         },
-            ...         {
-            ...             "name": "content",
-            ...             "data_type": "text",
-            ...             "description": "Article content"
-            ...         },
-            ...         {
-            ...             "name": "author",
-            ...             "data_type": "text"
-            ...         },
-            ...         {
-            ...             "name": "published_date",
-            ...             "data_type": "date"
-            ...         }
-            ...     ],
-            ...     vectorizer="text2vec-transformers"
-            ... )
         """
         try:
             # Check if collection already exists
@@ -252,10 +224,6 @@ class WeaviateDB:
             
         Returns:
             Collection object if exists, None otherwise
-            
-        Examples:
-            >>> weaviate_db = WeaviateDB()
-            >>> collection = weaviate_db.get_collection("Articles")
         """
         try:
             exists = self.client.collections.exists(name)
@@ -277,10 +245,6 @@ class WeaviateDB:
             
         Returns:
             bool: True if deleted successfully, False otherwise
-            
-        Examples:
-            >>> weaviate_db = WeaviateDB()
-            >>> success = weaviate_db.delete_collection("OldCollection")
         """
         try:
             exists = self.client.collections.exists(name)
@@ -299,9 +263,6 @@ class WeaviateDB:
         """
         Close the Weaviate connection and reset instance for reconnection.
         
-        Examples:
-            >>> weaviate_db = WeaviateDB()
-            >>> weaviate_db.close()
         """
         if self._client:
             try:

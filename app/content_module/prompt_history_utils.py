@@ -82,7 +82,7 @@ def add_draft_to_prompt_history(
 
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
-    ai_response = rag.generate_content(query=prompt_text) 
+    ai_response, _ = rag.generate_content(query=prompt_text) 
 
     print("AI RESPONSE FOR DRAFT:", ai_response)
     

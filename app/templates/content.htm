@@ -214,13 +214,14 @@
     
     .ai-message {
         padding: 15px;
-        background-color: rgba(0, 217, 181, 0.05);
-        border-left: 3px solid var(--accent-teal);
+        background-color: #1668ffd4;
+        border-right: 3px solid var(--bg-card);
         border-radius: 6px;
         margin-bottom: 15px;
         font-size: 14px;
         line-height: 1.6;
         color: var(--text-primary);
+        width:90%;
     }
     
     .ai-message ul {
@@ -380,6 +381,38 @@
             height: 500px;
         }
     }
+
+    .dot-loader {
+        display: inline-flex;
+        gap: 6px;
+    }
+
+    .dot-loader span {
+        width: 8px;
+        height: 8px;
+        background-color: #333;
+        border-radius: 50%;
+        animation: dotPulse 1.4s infinite ease-in-out both;
+    }
+
+    .dot-loader span:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+    .dot-loader span:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+
+    @keyframes dotPulse {
+        0%, 80%, 100% {
+            transform: scale(0);
+            opacity: 0.3;
+        }
+        40% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
 </style>
 
         <!-- Top Actions Bar -->
@@ -470,6 +503,12 @@
                     {% else %}
                     <p id="ai-preview-text" style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>
                     {% endif %}
+                    <!-- Spinner placed inside content area so it appears after latest prompts -->
+                    <div id="ai-spinner" style="display:none; margin-top:8px;">
+                        <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="ai-input-area">
@@ -518,6 +557,31 @@
         </div>
 
 <script>
+
+    function showSpinner() {
+        let spinner = document.getElementById('ai-spinner');
+        const aiContentArea = document.getElementById('ai-content-area');
+        if (!spinner) {
+            // If spinner missing, create and append it inside the content area
+            if (!aiContentArea) return; // nothing to attach to
+            spinner = document.createElement('div');
+            spinner.id = 'ai-spinner';
+            spinner.style.marginTop = '8px';
+            spinner.innerHTML = `
+                <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>`;
+            aiContentArea.appendChild(spinner);
+        }
+        spinner.style.display = 'inline-flex';
+    }
+
+    function hideSpinner() {
+        const spinner = document.getElementById('ai-spinner');
+        if (spinner) {
+            spinner.style.display = 'none';
+        }
+    }
     
     async function addNewContent() {
         // Clear the formatted content area
@@ -639,7 +703,6 @@
         const sendBtn = document.getElementById('ai-send-btn');
         const promptText = promptInput.value.trim();
         
-        // Validate input - don't send if empty or only whitespace
         if (!promptText) {
             return false;
         }
@@ -647,34 +710,35 @@
         const aiContentArea = document.getElementById('ai-content-area');
         const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
         
-        // Disable button during submission
         sendBtn.disabled = true;
-        
+
+        // 🔹 START SPINNER BEFORE API CALL
+        showSpinner();
+
         try {
             const token = localStorage.getItem('access_token');
             if (!token) {
+                hideSpinner();
                 window.location.replace('/?error=' + encodeURIComponent('Please login first'));
                 return false;
             }
             
-            // Get stored values from localStorage
             const prompt_session_id = localStorage.getItem('prompt_session_id');
             const content_id = localStorage.getItem('content_id');
             
             if (!prompt_session_id || !content_id) {
+                hideSpinner();
                 alert('Please click "Add New" first to start a new content session');
                 sendBtn.disabled = false;
                 return false;
             }
             
-            // Prepare payload for draft endpoint
             const payload = {
                 prompt_text: promptText,
                 content_id: parseInt(content_id),
                 prompt_session_id: prompt_session_id
             };
-            
-            // Send POST request to add_draft_content endpoint
+
             const response = await fetch('/user/content/draft', {
                 method: 'POST',
                 headers: {
@@ -685,12 +749,12 @@
             });
             
             if (!response.ok) {
-                // Check if token expired using global function
+                hideSpinner();
+
                 if (handleTokenExpiration(response)) {
                     return false;
                 }
                 
-                // On error: change paragraph color to red
                 if (userPromptParagraph) {
                     userPromptParagraph.classList.remove('success');
                     userPromptParagraph.classList.add('error');
@@ -704,55 +768,59 @@
             
             const result = await response.json();
             
-            // Remove the preview paragraph (unsaved one)
             const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
             if (previewParagraph) {
                 previewParagraph.remove();
             }
             
-            // Remove "Latest" badge from previous prompts
             const previousLatest = aiContentArea.querySelectorAll('.latest-badge');
             previousLatest.forEach(badge => badge.remove());
             
-            // Add the saved prompt to the area
             const savedPromptDiv = document.createElement('p');
             savedPromptDiv.className = 'user-prompt success';
-            savedPromptDiv.innerHTML = promptText.replace(/\n/g, '<br>') + '<span class="latest-badge">Latest</span>';
+            savedPromptDiv.innerHTML =
+                promptText.replace(/\n/g, '<br>') +
+                '<span class="latest-badge">Latest</span>';
             aiContentArea.appendChild(savedPromptDiv);
-            
-            // Create timestamp element
+
             const timestamp = document.createElement('div');
             timestamp.className = 'prompt-timestamp';
             const now = new Date();
-            const options = { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            };
-            timestamp.textContent = 'Saved on ' + now.toLocaleDateString('en-US', options);
+            timestamp.textContent =
+                'Saved on ' +
+                now.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
             aiContentArea.appendChild(timestamp);
-            
-            // Clear input after successful send
+
             promptInput.value = '';
-            sendBtn.disabled = true; // Keep disabled after clearing
-            
+            sendBtn.disabled = true;
+
             console.log('Prompt sent successfully:', result);
+
+            // 🔹 STOP SPINNER BEFORE LOADING HISTORY
+            hideSpinner();
+
+            loadPromptHistory();
 
         } catch (error) {
             console.error('Error sending prompt:', error);
-            
-            // On exception: change preview paragraph color to red
+
+            hideSpinner();
+
             const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
             if (previewParagraph) {
                 previewParagraph.classList.add('error');
             }
-            
+
             alert('Failed to send prompt. Please try again.');
             sendBtn.disabled = false;
         }
-        
+
         return false;
     }
     
@@ -837,6 +905,14 @@
                         };
                         timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
                         aiContentArea.appendChild(timestamp);
+
+                        // Add Response from the server if any (optional)
+                        if (ph.ai_response) {
+                            const aiResponseDiv = document.createElement('div');
+                            aiResponseDiv.className = 'ai-message';
+                            aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
+                            aiContentArea.appendChild(aiResponseDiv);
+                        }   
                     }
                 });
             }
