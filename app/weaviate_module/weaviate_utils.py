@@ -310,30 +310,6 @@ def embed_texts_openai(texts: List[str], model: str = "text-embedding-3-small") 
         raise RuntimeError(f"Embedding generation failed: {e}")
 
 
-def build_rag_prompt(context: str, query: str) -> str:
-    """
-    Build a RAG (Retrieval Augmented Generation) prompt.
-    
-    Args:
-        context: Retrieved context from vector database
-        query: User's query
-        
-    Returns:
-        Formatted prompt string
-        
-    Examples:
-        >>> prompt = build_rag_prompt("Context text...", "What is...?")
-    """
-    prompt = (
-        "You are a helpful assistant. Use ONLY the information in CONTEXT to answer the question. "
-        "If the answer is not contained in the context, say 'I don't know'.\n\n"
-        f"CONTEXT:\n{context}\n\n"
-        f"QUESTION: {query}\n\n"
-        "Answer concisely and include citations like [source: source_name]."
-    )
-    return prompt
-
-
 def generate_answer_openai(prompt: str, temperature: float = 0.0, max_tokens: int = 400) -> str:
     """
     Generate an answer using OpenAI's chat completion API.
@@ -415,7 +391,7 @@ def load_chunks_to_weaviate(
                     {"name": "chunk_index", "data_type": "int"},
                     {"name": "doc_id", "data_type": "text"},
                 ],
-                vectorizer="none"  # Use custom vectors or configure as needed
+                vectorizer="text2vec-openai"
             )
         
         chunks_count = len(chunks)

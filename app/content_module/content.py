@@ -4,6 +4,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict
 
+from category_module.category_utils import get_categories_list
+
 from content_module.content_responses import (
     ContentCreateRequest, 
     ContentCreateResponse, 
@@ -54,12 +56,16 @@ async def content_generation_page(
     Render content generation page with empty textarea.
     """
     try:
+
+        category_list, _ = get_categories_list()
+
         return templates.TemplateResponse(
             request=request,
             name="content.htm",
             context={
                 "category_id": None,
-                "latest_content": None
+                "latest_content": None,
+                "category_list": category_list
             }
         )
     except Exception as e:
@@ -69,7 +75,8 @@ async def content_generation_page(
             name="content.htm",
             context={
                 "category_id": None,
-                "latest_content": None
+                "latest_content": None,
+                "category_list": None
             }
         )
 
@@ -169,7 +176,7 @@ async def create_content(
             )
         
         logger.info(f"Content created successfully: ID {new_content['id']}")
-        
+
         return ContentCreateResponse(
             message="Content created successfully",
             content=ContentResponse(

@@ -491,13 +491,9 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
                             <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
-                                <option value="UNDERSTANDING">Understanding</option>
-                                <option value="PROJECTS">Projects</option>
-                                <option value="RESOURCES">Resources</option>
-                                <option value="POLICY">Policy</option>
-                                <option value="LOTS">Lots</option>
-                                <option value="NEWSLETTER">Newsletter</option>
-                                <option value="SOCIAL">Social</option>
+                                {% for category in category_list %}
+                                    <option value="{{ category.id }}">{{ category.category_name }}</option>
+                                {% endfor %}                                
                             </select>
                         </div>
                     </div>
@@ -522,7 +518,6 @@
         </div>
 
 <script>
-    const CATEGORY_ID = {{ category_id }};
     
     async function addNewContent() {
         // Clear the formatted content area
@@ -547,7 +542,7 @@
             
             // Prepare payload with null prompt_data
             const payload = {
-                category_id: CATEGORY_ID,
+                category_id: document.getElementById('contentType').value,
                 prompt_data: null,
                 action: "NEW"
             };
@@ -582,8 +577,8 @@
                 console.log('Stored prompt_session_id:', result.prompt_session_id);
             }
 
-            // Store content_id in localStorage if returned
-            if (result.content.id) {
+            // Store content_id in localStorage if returned 
+            if (result.content && result.content.id) {
                 localStorage.setItem('content_id', result.content.id);
                 console.log('Stored content_id:', result.content.id);
             }
@@ -744,7 +739,7 @@
             sendBtn.disabled = true; // Keep disabled after clearing
             
             console.log('Prompt sent successfully:', result);
-            
+
         } catch (error) {
             console.error('Error sending prompt:', error);
             
@@ -779,6 +774,7 @@
         // Load prompt history on page load
         loadPromptHistory();
     });
+
     
     async function loadPromptHistory() {
         const prompt_session_id = localStorage.getItem('prompt_session_id');

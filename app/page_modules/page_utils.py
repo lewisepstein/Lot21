@@ -13,8 +13,9 @@ from data_ingestion_module.scrapper import (
     scrape_page,
     convert_to_wysiwyg_html,
 )
-from weaviate_module.weaviate_utils import load_scraped_data_with_tracking
+
 from weaviate_module.weaviate_utils import (
+    load_scraped_data_with_tracking,
     delete_chunks_from_weaviate,
     chunk_text,
     load_chunks_to_weaviate,

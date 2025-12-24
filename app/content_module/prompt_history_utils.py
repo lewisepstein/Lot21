@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any, Tuple
 from service_utils.db_utils.pg_db import PostgresDB
 import uuid
+from rag_module.rag import RagModule
 
 
 def create_prompt_history_record(
@@ -37,10 +38,10 @@ def create_prompt_history_record(
     }
     
     prompt_history = db.create("prompt_history", prompt_history_dict)
-    
+
     if not prompt_history:
         raise Exception("Failed to create prompt history")
-    
+        
     return prompt_history, prompt_session_id, prompt_history["id"]
 
 
@@ -78,13 +79,20 @@ def add_draft_to_prompt_history(
             "deleted_on": None
         }
     )
+
+    # Retrieve context for the draft prompt (not used here but could be logged or processed)
+    rag = RagModule()
+    ai_response = rag.generate_content(query=prompt_text) 
+
+    print("AI RESPONSE FOR DRAFT:", ai_response)
     
     if existing_records and len(existing_records) > 0:
         # Update the existing record
         existing_record = existing_records[0]
         update_data = {
             "user_prompt": prompt_text,
-            "prompt_action": "DRAFT"
+            "prompt_action": "DRAFT",
+            "ai_response": ai_response
         }
         
         updated_records = db.update(
@@ -103,7 +111,7 @@ def add_draft_to_prompt_history(
             "prompt_session_id": prompt_session_id,
             "content_id": content_id,
             "user_prompt": prompt_text,
-            "ai_response": None,  # Will be populated later
+            "ai_response": ai_response,
             "prompt_type": "TEXT",
             "prompt_action": "DRAFT"  # Default to DRAFT for drafts
         }

@@ -38,29 +38,14 @@ def get_categories_list() -> Optional[List[Dict[str, Any]]]:
                 'deleted_on': None,
                 'is_root': False
             },
-            columns=['id', 'category_name', 'created_on', 'updated_on']
+            columns=['id', 'category_name']
         )
 
         if not categories:
             logger.info("No active categories found")
             return None, "No active categories found"
         
-        df = pd.DataFrame(categories)
-        
-        df['last_updated_dt'] = df.apply(get_last_updated, axis=1)
-        
-        # Convert last_updated to display format
-        df['last_updated_on'] = df['last_updated_dt'].apply(
-            convert_datetime_to_formatted_string
-        )
-        
-        # Drop columns
-        df.drop('last_updated_dt', axis=1, inplace=True)
-        df.drop('updated_on', axis=1, inplace=True)
-        df.drop('created_on', axis=1, inplace=True)
-        
-        logger.info(f"Retrieved {len(categories)} categories")
-        return df.to_dict('records'), f"Retrieved {len(categories)} categories"
+        return categories, None
         
     except Exception as e:
         logger.error(f"Error retrieving categories: {e}")

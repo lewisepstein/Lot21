@@ -76,3 +76,11 @@ class AddDraftContentResponse(BaseModel):
     """
     message: str
     prompt_history: PromptHistoryResponse
+
+
+class RagRetrieveContextResponse(BaseModel):
+    """
+    Response model for RAG context retrieval.
+    """
+    context: str
+    prompt_session_id: str
