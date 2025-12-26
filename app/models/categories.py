@@ -20,6 +20,7 @@ class Category(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     category_name = Column(String(255), nullable=False, index=True)
+    nav_settings = Column(String(100), nullable=True)
     is_parent = Column(Boolean, default=False, nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     is_root = Column(Boolean, default=False, nullable=False)

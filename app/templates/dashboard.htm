@@ -161,9 +161,8 @@
                 </div>
             </div>
         </div>
-{% endblock %}
 
-{% block extra_scripts %}
+<script>  
         // Check authentication immediately on page load
         (async function() {
             const token = localStorage.getItem('access_token');
@@ -290,4 +289,6 @@
         
         // Load dashboard on page load
         loadDashboard();
-    {% endblock %}
+
+</script>      
+{% endblock %}

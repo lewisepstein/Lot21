@@ -10,8 +10,6 @@ from auth_module.auth_utils import verify_token, require_session_auth
 from page_modules.page_utils import (
     get_pages_list, 
     create_page_record,
-    get_parent_pages,
-    check_root_exists,
     get_page_statistics,
     get_page_by_id,
     update_page,
@@ -33,7 +31,7 @@ security = HTTPBearer()
 # Templates
 templates = Jinja2Templates(directory="templates")
 
-@router.get("/page-content/{page_id}", response_class=HTMLResponse)
+@router.get("/page-content/{page_id:int}", response_class=HTMLResponse)
 @require_session_auth(redirect_url="/")
 async def page_content(
     request: Request,
@@ -65,7 +63,7 @@ async def page_content(
         )
 
 
-@router.get("/pages/{category_id}", response_class=HTMLResponse)
+@router.get("/pages/{category_id:int}", response_class=HTMLResponse)
 @require_session_auth(redirect_url="/")
 async def pages_page(
     request: Request,
@@ -85,10 +83,9 @@ async def pages_page(
             name="page.htm",
             context={
                 "data": results if results else [],
-                # "parent_pages": parent_pages,
-                # "has_root_page": has_root_page,
                 "message": msg,
-                "category_id": category_id
+                "category_id": category_id,
+                "active_nav_block": "nav_understanding"
             }
         )
     except Exception as e:
