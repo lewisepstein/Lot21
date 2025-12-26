@@ -2,14 +2,16 @@
 
 {% block title %}Pages - Lottie{% endblock %}
 
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
-{% block nav_understanding %}{{active if nav_settings == 'nav_understanding' else ''}}{% endblock %}
+{# Macro to centralize active nav logic. Uses `nav_settings` from view context. #}
+{% macro nav_active(name) %}{{ 'active' if (nav_settings|default('') == name) else '' }}{% endmacro %}
+
+{% block nav_understanding %}{{ nav_active('nav_understanding') }}{% endblock %}
+{% block nav_projects %}{{ nav_active('nav_projects') }}{% endblock %}
+{% block nav_resources %}{{ nav_active('nav_resources') }}{% endblock %}
+{% block nav_policy %}{{ nav_active('nav_policy') }}{% endblock %}
+{% block nav_lots %}{{ nav_active('nav_lots') }}{% endblock %}
+{% block nav_newsletter %}{{ nav_active('nav_newsletter') }}{% endblock %}
+{% block nav_social %}{{ nav_active('nav_social') }}{% endblock %}
 
 {% block page_title %}Pages{% endblock %}
 {% block page_subtitle %}Manage and organize content pages{% endblock %}

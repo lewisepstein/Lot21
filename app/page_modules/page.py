@@ -75,8 +75,16 @@ async def pages_page(
     
     try:
         results, msg = get_pages_list(category_id=category_id)
-        # parent_pages = get_parent_pages()
-        # has_root_page = check_root_exists()
+
+        nav_dict = {
+            2: "nav_understanding",
+            3: "nav_projects",
+            4: "nav_resources",
+            5: "nav_policy",
+            6: "nav_lots",
+            7: "nav_newsletter",
+            8: "nav_social",
+        }
 
         return templates.TemplateResponse(
             request=request,
@@ -85,7 +93,7 @@ async def pages_page(
                 "data": results if results else [],
                 "message": msg,
                 "category_id": category_id,
-                "active_nav_block": "nav_understanding"
+                "nav_settings": nav_dict[category_id]
             }
         )
     except Exception as e:
