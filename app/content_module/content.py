@@ -250,7 +250,8 @@ async def add_draft_content(
                 ai_response=prompt_history.get("ai_response"),
                 prompt_type=prompt_history["prompt_type"],
                 created_on=prompt_history["created_on"],
-                deleted_on=prompt_history.get("deleted_on")
+                deleted_on=prompt_history.get("deleted_on"),
+                prompt_action=prompt_history.get("prompt_action")
             )
         )
         

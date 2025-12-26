@@ -72,7 +72,8 @@ async def get_prompt_history(
                 ai_response=ph.get("ai_response"),
                 prompt_type=ph["prompt_type"],
                 created_on=ph["created_on"],
-                deleted_on=ph.get("deleted_on")
+                deleted_on=ph.get("deleted_on"),
+                prompt_action=ph.get("prompt_action")
             ))
         
         logger.info(f"Retrieved {len(response_list)} prompt history records")
