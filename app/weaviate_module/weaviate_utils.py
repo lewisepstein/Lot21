@@ -7,6 +7,7 @@ import json
 import tiktoken
 from typing import List, Dict, Any, Tuple
 from datetime import datetime
+import uuid
 
 from sqlalchemy import text
 
@@ -298,6 +299,13 @@ def load_chunks_to_weaviate(
         RuntimeError: If Weaviate operations fail
     """
     try:
+        # Ensure doc_id is JSON-serializable (UUID objects should be converted to strings)
+        if doc_id is not None and not isinstance(doc_id, str):
+            try:
+                doc_id = str(doc_id)
+            except Exception:
+                doc_id = str(uuid.uuid4())
+
         # Initialize Weaviate connection
         weaviate_db = WeaviateDB()
         client = weaviate_db.client
@@ -411,7 +419,7 @@ def delete_chunks_from_weaviate(
         raise RuntimeError(f"Failed to delete chunks from Weaviate: {str(e)}")
 
 
-def load_scraped_data_with_tracking(
+def load_data_with_tracking(
     scraped_content: str,
     collection_name: str,
     source_url: str,
@@ -458,7 +466,7 @@ def load_scraped_data_with_tracking(
     db_record = create_weaviate_data_record(
         db=db,
         collection_name=collection_name,
-        description=description or f"Scraped content from {source_url}",
+        description=description,
         content=scraped_content,
         no_of_characters=no_of_characters,
         no_of_lines=no_of_lines,
@@ -470,10 +478,8 @@ def load_scraped_data_with_tracking(
     record_id = db_record["id"]
     
     try:
-        logger.info(f"Loading scraped data from {source_url} into collection: {collection_name}")
-        
-        # Use source_url as document ID
-        doc_id = source_url
+        # Use a new UUID as document ID
+        doc_id = str(uuid.uuid4())
         
         # Chunk the scraped content
         logger.info("Chunking scraped content...")
@@ -487,7 +493,7 @@ def load_scraped_data_with_tracking(
             chunks=chunks,
             collection_name=collection_name,
             doc_id=doc_id,
-            description=description or f"Scraped content from {source_url}"
+            description=description
         )
         
         chunks_count = weaviate_result["chunks_created"]
@@ -505,13 +511,13 @@ def load_scraped_data_with_tracking(
             start_time=db_record["start_time"],
             doc_id=doc_id,
             chunks_created=chunks_count,
-            description=description or f"Scraped content from {source_url}",
+            description=description,
             extra_details=extra_details
         )
         
         return {
             "success": True,
-            "message": "Scraped data loaded successfully",
+            "message": "Data loaded successfully",
             "collection_name": collection_name,
             "chunks_created": chunks_count,
             "doc_id": doc_id,
@@ -521,7 +527,7 @@ def load_scraped_data_with_tracking(
         }
         
     except Exception as e:
-        logger.error(f"Failed to load scraped data to Weaviate: {str(e)}")
+        logger.error(f"Failed to load data to Weaviate: {str(e)}")
         
         # Update database record with error using helper function
         update_weaviate_data_error(

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -32,8 +32,8 @@ class PageResponse(BaseModel):
     deleted_on: Optional[datetime]
     updated_on: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    # Pydantic v2 model config
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PageCreateResponse(BaseModel):

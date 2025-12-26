@@ -53,6 +53,13 @@ class AddDraftContentRequest(BaseModel):
     prompt_session_id: str = Field(..., min_length=1, description="UUID of the prompt session")
 
 
+class SaveAsDraftRequest(BaseModel):
+    """
+    Request model for adding draft content to prompt history.
+    """
+    prompt_id: int = Field(..., gt=0, description="ID of the prompt history record")
+
+
 class PromptHistoryResponse(BaseModel):
     """
     Response model for prompt history.
@@ -65,6 +72,7 @@ class PromptHistoryResponse(BaseModel):
     prompt_type: str
     created_on: datetime
     deleted_on: Optional[datetime]
+    prompt_action: Optional[str]
 
     class Config:
         from_attributes = True

@@ -15,7 +15,7 @@ from data_ingestion_module.scrapper import (
 )
 
 from weaviate_module.weaviate_utils import (
-    load_scraped_data_with_tracking,
+    load_data_with_tracking,
     delete_chunks_from_weaviate,
     chunk_text,
     load_chunks_to_weaviate,
@@ -233,21 +233,21 @@ def create_page_record(
         page_id = page_record['id']
         
         # Load scraped content to Weaviate if scraping was performed
-        if scrape_data and content and source_url:
-            try:
-                logger.info(f"Loading scraped content to Weaviate for page {page_id}")
-                weaviate_result = load_scraped_data_with_tracking(
-                    scraped_content=content,
-                    collection_name="training_data",
-                    source_url=source_url,
-                    user_id=created_by,
-                    description=description or f"Scraped content for page: {page_name}",
-                    page_id=page_id
-                )
-                logger.info(f"Loaded {weaviate_result['chunks_created']} chunks to Weaviate (record ID: {weaviate_result['record_id']})")
-            except Exception as weaviate_error:
-                logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
-                # Don't fail page creation if Weaviate loading fails
+        # if scrape_data and content and source_url:
+        try:
+            logger.info(f"Loading scraped content to Weaviate for page {page_id}")
+            weaviate_result = load_data_with_tracking(
+                scraped_content=content,
+                collection_name="training_data",
+                source_url=source_url,
+                user_id=created_by,
+                description=description,
+                page_id=page_id
+            )
+            logger.info(f"Loaded {weaviate_result['chunks_created']} chunks to Weaviate (record ID: {weaviate_result['record_id']})")
+        except Exception as weaviate_error:
+            logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
+            # Don't fail page creation if Weaviate loading fails
         
         # Create corresponding content entry (only if content is provided and category exists)
         if content and category_id is not None:
@@ -832,83 +832,83 @@ def delete_page(page_id: int) -> None:
         raise
 
 
-def validate_page_name(page_name: str) -> bool:
-    """
-    Validate if the page name is unique (not already used).
+# def validate_page_name(page_name: str) -> bool:
+#     """
+#     Validate if the page name is unique (not already used).
     
-    Args:
-        page_name: The page name to validate
-    """
-    if not page_name or not page_name.strip():
-        return False
+#     Args:
+#         page_name: The page name to validate
+#     """
+#     if not page_name or not page_name.strip():
+#         return False
 
-def __create_page(    
-    page_name: str,
-    category_id: Optional[int] = None,
-    created_by: Optional[int] = None,
-    is_active: bool = True,
-    content: Optional[str] = None,
-    source_url: Optional[str] = None,
-    scrape_data: bool = False,
-    description: Optional[str] = None
-) -> Dict[str, Any]:
-    pass
+# def __create_page(    
+#     page_name: str,
+#     category_id: Optional[int] = None,
+#     created_by: Optional[int] = None,
+#     is_active: bool = True,
+#     content: Optional[str] = None,
+#     source_url: Optional[str] = None,
+#     scrape_data: bool = False,
+#     description: Optional[str] = None
+# ) -> Dict[str, Any]:
+#     pass
 
 
-def validate_category_id(category_id: Optional[int]) -> bool:
-    """
-    Validate if the category ID exists in the database.
+# def validate_category_id(category_id: Optional[int]) -> bool:
+#     """
+#     Validate if the category ID exists in the database.
     
-    Args:
-        category_id: The category ID to validate
-    """
-    if category_id is None:
-        return True  # No category specified is valid
+#     Args:
+#         category_id: The category ID to validate
+#     """
+#     if category_id is None:
+#         return True  # No category specified is valid
 
-    try:
-        db = PostgresDB()
-        categories = db.read(
-            'categories',
-            conditions={
-                'id': category_id,
-                'deleted_on': None
-            }
-        )
+#     try:
+#         db = PostgresDB()
+#         categories = db.read(
+#             'categories',
+#             conditions={
+#                 'id': category_id,
+#                 'deleted_on': None
+#             }
+#         )
         
-        exists = categories is not None and len(categories) > 0
-        logger.info(f"Category ID {category_id} exists: {exists}")
-        return exists
+#         exists = categories is not None and len(categories) > 0
+#         logger.info(f"Category ID {category_id} exists: {exists}")
+#         return exists
         
-    except Exception as e:
-        logger.error(f"Error validating category ID {category_id}: {e}")
-        return False
+#     except Exception as e:
+#         logger.error(f"Error validating category ID {category_id}: {e}")
+#         return False
 
 
-def validate_source_url(source_url: str) -> Optional[bool]:
-    if source_url:
-        source_url = source_url.strip()
-        valid_source_url = validate_url(source_url)
-        if not valid_source_url:
-            return ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
-        return True
-    return False
+# def validate_source_url(source_url: str) -> Optional[bool]:
+#     if source_url:
+#         source_url = source_url.strip()
+#         valid_source_url = validate_url(source_url)
+#         if not valid_source_url:
+#             return ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
+#         return True
+#     return False
 
-def page_exists(page_name: str)-> Optional[bool]:
-    try:
-        db = PostgresDB()
-        existing_pages = db.read(
-            'pages',
-            conditions={
-                'page_name': page_name.strip().lower,
-                'deleted_on': None
-            }
-        )
+# def page_exists(page_name: str)-> Optional[bool]:
+#     try:
+#         db = PostgresDB()
+#         existing_pages = db.read(
+#             'pages',
+#             conditions={
+#                 'page_name': page_name.strip().lower,
+#                 'deleted_on': None
+#             }
+#         )
         
-        if existing_pages and len(existing_pages) > 0:
-            raise ValueError("Page name already exists. Please choose a different name")
+#         if existing_pages and len(existing_pages) > 0:
+#             raise ValueError("Page name already exists. Please choose a different name")
 
-        return True
-    except Exception as e:
-        logger.error(f"Error validating page name: {e}")
-        return False
+#         return True
+#     except Exception as e:
+#         logger.error(f"Error validating page name: {e}")
+#         return False
         

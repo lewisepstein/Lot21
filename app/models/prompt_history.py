@@ -22,6 +22,9 @@ class PromptActionEnum(enum.Enum):
     RE_RUN = "RE_RUN"
     CANCEL = "CANCEL"
     RESTORE = "RESTORE"
+    SAVED_AS_DRAFT = "SAVED_AS_DRAFT"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class PromptLikeStatusEnum(enum.Enum):
     UNLIKED = "UNLIKED"

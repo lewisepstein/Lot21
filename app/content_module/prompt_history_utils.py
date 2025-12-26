@@ -48,7 +48,8 @@ def create_prompt_history_record(
 def add_draft_to_prompt_history(
     prompt_session_id: str,
     content_id: int,
-    prompt_text: str
+    prompt_text: str,
+    saved_as_draft: bool = False
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -122,3 +123,27 @@ def add_draft_to_prompt_history(
             raise Exception("Failed to create prompt history")
         
         return prompt_history
+
+
+def save_prompt_as_draft(id: int) -> Dict[str, Any]:
+    """
+    Placeholder function to save content as draft.
+    Actual implementation would depend on application logic.
+    """
+
+    update_data = {
+        "prompt_action": "SAVED_AS_DRAFT"
+    }
+
+    db = PostgresDB()
+
+    updated_records = db.update(
+        "prompt_history",
+        data=update_data,
+        conditions={"id": id}
+    )
+
+    if not updated_records or len(updated_records) == 0:
+        raise Exception("Failed to update prompt history")
+
+    return dict(updated_records[0]._mapping)

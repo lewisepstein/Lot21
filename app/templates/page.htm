@@ -257,9 +257,45 @@
         width: 90%;
     }
 }
+
+.top-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.action-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-icon-btn:hover {
+    color: var(--accent-teal);
+    border-color: var(--accent-teal);
+    background-color: rgba(0, 217, 181, 0.1);
+}
+
 {% endblock %}
 
 {% block content %}
+        <!-- Top Actions Bar -->
+        <div class="top-actions">
+            <div style="margin-left: auto; display: flex; gap: 15px;">
+                <a class="action-icon-btn" href="/user/content/drafts/{{category_id}}" style="text-decoration: none;">
+                    <i class="bi bi-eye"></i> Show Drafts
+                </a>
+            </div>
+        </div>
         <!-- Pages Grid -->
         <div class="row g-4">
             {% if not data %}
@@ -334,9 +370,7 @@
                 </form>
             </div>
         </div>
-{% endblock %}
-
-{% block extra_scripts %}
+<script>
         // Check authentication immediately on page load
         (async function() {
             const token = localStorage.getItem('access_token');
@@ -456,4 +490,5 @@
                 }, 5000);
             }
         }
+</script>
 {% endblock %}

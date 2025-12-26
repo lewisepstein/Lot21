@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 from datetime import datetime
 from models.content import ContentActionEnum, ContentApprovalStatusEnum
@@ -153,5 +153,5 @@ class ContentResponseValidation(BaseModel):
     comments: Optional[str]
     quarter: Optional[str]
 
-    class Config:
-        from_attributes = True  # Allows creation from ORM objects
+    # Pydantic v2 model config
+    model_config = ConfigDict(from_attributes=True)  # Allows creation from ORM objects

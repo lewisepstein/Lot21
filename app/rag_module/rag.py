@@ -165,15 +165,22 @@ You are an expert content writer for Lot21 — a human welfare and climate justi
 
 {query}
 
+Generate the article in PLAIN TEXT format only. 
+DO NOT use any Markdown formatting:
+- No bold, italics, or underlines
+- No headers with #
+- No bullet points with - or *
+# - No numbered lists with 1. 2. etc.
+- No separators like ---
+
+Use simple, clean paragraphs. For lists, write them naturally in sentences using words like "first", "second", etc.
 Style: Warm, professional, hopeful, solution-oriented. Use short paragraphs and natural lists.
 
-Relevant Knowledge from Lot21 Archives:
+Relevant Knowledge from Lottie Archives:
 {context_str}
 
-After completing the article, add a separate section titled "Explanation:" where you briefly describe:
-- Which archived contexts were most useful
-- Any assumptions made
-- How the knowledge was applied
+Important: Output ONLY the article content. Do not add any explanation, notes, or additional sections after the article.
+
 """
 
     def _build_section_rewrite_prompt(self, query: str, target_section: str, relevant_context: str) -> str:
@@ -182,22 +189,24 @@ You are an expert editor for Lot21 content.
 
 Task: Rewrite ONLY the '{target_section}' section based on the query and available context.
 Do NOT include any other sections or full article structure.
+Output in PLAIN TEXT format only:
+- No Markdown formatting
+- No bold, bullets, numbers, or headers
+- No separators
 
+Write in natural, flowing paragraphs.
 Query: {query}
 
 Original/Available Context for this section:
 {relevant_context if relevant_context else "No specific context found."}
 
 Instructions:
-- Maintain Lot21's warm, professional, hopeful, and solution-oriented tone
-- Use short paragraphs and natural lists where appropriate
+- Maintain Lottie warm, professional, hopeful, and solution-oriented tone
+- Use short paragraphs
 - Improve clarity, flow, and engagement
 - Output ONLY the rewritten section content
 
-After the rewritten section, add a separate section titled "Explanation:" where you briefly note:
-- Changes made and why
-- Which contexts were used
-- Any assumptions
+Important: Output ONLY the rewritten section. Do not add any explanation, notes, or additional text after it.
 """
 
     def _normalize_section_name(self, raw: str) -> str:
@@ -229,23 +238,6 @@ After the rewritten section, add a separate section titled "Explanation:" where 
         return "Durability"  # sensible default
 
     def _split_content_and_explanation(self, raw: str) -> Tuple[str, str]:
-        """Split response into main content and explanation part."""
-        lines = raw.splitlines()
-        explanation_start = -1
-
-        for i, line in enumerate(lines):
-            if line.strip().lower().startswith("explanation:"):
-                explanation_start = i
-                break
-
-        if explanation_start != -1:
-            content = "\n".join(lines[:explanation_start]).strip()
-            explanation = "\n".join(lines[explanation_start:]).strip()
-            # Clean up "Explanation:" header if desired
-            if explanation.lower().startswith("explanation:"):
-                explanation = explanation[len("Explanation:"):].strip()
-        else:
-            content = raw.strip()
-            explanation = "No explanation provided by model"
-
-        return content, explanation
+        """Return only the content (no explanation needed anymore)."""
+        content = raw.strip()
+        return content, ""

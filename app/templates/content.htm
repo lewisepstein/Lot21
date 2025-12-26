@@ -214,7 +214,7 @@
     
     .ai-message {
         padding: 15px;
-        background-color: #1668ffd4;
+        background-color: #1668ff2e;
         border-right: 3px solid var(--bg-card);
         border-radius: 6px;
         margin-bottom: 15px;
@@ -222,6 +222,15 @@
         line-height: 1.6;
         color: var(--text-primary);
         width:90%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ai-message .message-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
     }
     
     .ai-message ul {
@@ -413,6 +422,48 @@
         }
     }
 
+    /* Offcanvas smoothing: prefer GPU compositing, reduce repaint/jank */
+    .offcanvas {
+        will-change: transform, visibility;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        transform: translateZ(0);
+        transition: transform 280ms cubic-bezier(.4,0,.2,1), visibility 280ms linear;
+        /* Make offcanvas cover 70% of the main body/container */
+        width: 70% !important;
+    }
+
+    .offcanvas.show {
+        /* ensure hardware acceleration path while visible */
+        will-change: transform;
+    }
+
+    .offcanvas-backdrop {
+        transition: opacity 280ms ease;
+        /* subtle blur can make overlay feel smoother; remove if expensive */
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        will-change: opacity;
+    }
+
+    /* Reduce layout thrash when offcanvas toggles by isolating the panel
+       and avoiding style recalculation on large containers */
+    #ai-content-area {
+        will-change: scroll-position, transform;
+    }
+
+    /* Keep confirm buttons from causing layout shift when spinner appears */
+    #confirmSaveDraftBtn, #confirmApproveBtn {
+        width: 110px;
+    }
+
+    /* Responsive: full width on narrow screens */
+    @media (max-width: 900px) {
+        .offcanvas {
+            width: 100% !important;
+        }
+    }
+
 </style>
 
         <!-- Top Actions Bar -->
@@ -426,15 +477,6 @@
                 </a>
                 <button class="action-icon-btn">
                     <i class="bi bi-clock-history"></i> Version History
-                </button>
-                <button class="action-icon-btn">
-                    <i class="bi bi-file-earmark"></i> Save Draft
-                </button>
-                <button class="action-icon-btn reject-btn">
-                    <i class="bi bi-x-circle"></i> Reject
-                </button>
-                <button class="action-icon-btn approve-btn">
-                    <i class="bi bi-check-circle"></i> Approve
                 </button>
             </div>
         </div>
@@ -556,6 +598,60 @@
             
         </div>
 
+    <!-- Offcanvas panels for response actions -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasSaveDraft" aria-labelledby="offcanvasSaveDraftLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+        <div class="offcanvas-header">
+            <h5 id="offcanvasSaveDraftLabel" style="color:#fff">Save AI Response as Draft</h5>
+            <span>To save the content as a draft, please fill the form</span>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Are you sure you want to save this AI response as a draft? You can edit it later before publishing.</p>
+            <form>
+                <input type="hidden" id="offcanvasSaveDraft_phId" value="" />
+                <div class="mb-3">
+                    <label for="draftName" class="form-label">Name</label>
+                    <input required type="text" class="form-control form-input" id="draftName" placeholder="Add a name for this draft...">
+                </div>
+                <div class="mb-3">
+                    <label for="draftNotes" class="form-label">Description</label>
+                    <textarea readonly class="form-control form-input" id="draftNotes" rows="3" placeholder="Add any notes about this draft..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="draftContent" class="form-label">Content</label>
+                    <div class="form-control form-input" 
+                        id="draftContent" 
+                        style="height:450px; overflow-y:auto; 
+                        background-color: var(--bg-primary);
+                        border: 1px solid var(--border-color); 
+                        color: var(--text-primary);
+                        border-radius:4px; padding:10px;"
+                    ></div>
+                </div>
+            </form>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="confirmSaveDraftBtn" class="btn btn-primary">Save Draft</button>
+                <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasApprove" aria-labelledby="offcanvasApproveLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+        <div class="offcanvas-header">
+            <h5 id="offcanvasApproveLabel" style="color:#fff">Approve AI Response</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Approving will mark this response as approved. This action may publish or mark content for review depending on workflow.</p>
+            <input type="hidden" id="offcanvasApprove_phId" value="" />
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="confirmApproveBtn" class="btn btn-success">Approve</button>
+                <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
 <script>
 
     function showSpinner() {
@@ -572,6 +668,8 @@
                     <span class="visually-hidden">Loading...</span>
                 </div>`;
             aiContentArea.appendChild(spinner);
+            // ensure view scrolls to show spinner/new content
+            scrollAIContentToBottom(false);
         }
         spinner.style.display = 'inline-flex';
     }
@@ -682,6 +780,8 @@
             previewParagraph.className = 'user-prompt';
             previewParagraph.innerHTML = inputText.replace(/\n/g, '<br>');
             aiContentArea.appendChild(previewParagraph);
+            // keep newest preview visible
+            scrollAIContentToBottom();
         } else {
             // Remove only the preview paragraph (not saved prompts)
             const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
@@ -797,6 +897,9 @@
                 });
             aiContentArea.appendChild(timestamp);
 
+            // ensure the saved prompt and timestamp are visible
+            scrollAIContentToBottom();
+
             promptInput.value = '';
             sendBtn.disabled = true;
 
@@ -911,14 +1014,237 @@
                             const aiResponseDiv = document.createElement('div');
                             aiResponseDiv.className = 'ai-message';
                             aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
+                            // Append action buttons inside ai-message at its bottom
+                            const actionsDiv = document.createElement('div');
+                            actionsDiv.className = 'message-actions';
+                            actionsDiv.innerHTML = `
+                                <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-file-earmark"></i> Save Draft
+                                </button>
+                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                            `;
+                            aiResponseDiv.appendChild(actionsDiv);
                             aiContentArea.appendChild(aiResponseDiv);
                         }   
                     }
                 });
+                // after everything is rendered, scroll to bottom so latest items are visible
+                scrollAIContentToBottom(false);
             }
             
         } catch (error) {
             console.error('Error loading prompt history:', error);
+        }
+    }
+
+    // -----------------------------
+    // Actions for AI response buttons
+    // -----------------------------
+    // Open confirmation offcanvas for saving draft
+    function saveDraftFromResponse(phId) {
+        if (!phId) { alert('Invalid prompt history id'); return; }
+        const input = document.getElementById('offcanvasSaveDraft_phId');
+        if (input) input.value = phId;
+            // Try to locate the AI response HTML for this prompt id and populate the draft content
+        try {
+            const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
+            const sourceBtn = document.querySelector(btnSelector);
+                let aiHtml = '';
+            if (sourceBtn) {
+                const aiMsg = sourceBtn.closest('.ai-message');
+                if (aiMsg) {
+                    // Clone the node and remove action buttons so button labels are excluded
+                    const clone = aiMsg.cloneNode(true);
+                    const actions = clone.querySelector('.message-actions');
+                    if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
+                        // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
+                        aiHtml = (clone.innerHTML || '').trim();
+                        // If innerHTML is empty for some reason, fall back to text with <br> replacement
+                        if (!aiHtml) {
+                            const fallbackText = (clone.textContent || '').trim();
+                            aiHtml = fallbackText.replace(/\n/g, '<br>');
+                        }
+                }
+            }
+            const draftContentEl = document.getElementById('draftContent');
+            const draftNotesEl = document.getElementById('draftNotes');
+            const draftNameEl = document.getElementById('draftName');
+            if (draftContentEl) {
+                // Insert HTML so any <br> or markup is preserved and existing content remains.
+                if (aiHtml) {
+                    draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
+                }
+            }
+            if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
+            if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
+        } catch (e) {
+            console.debug('Could not prefill draft content', e);
+        }
+        const el = document.getElementById('offcanvasSaveDraft');
+        if (el && window.bootstrap && bootstrap.Offcanvas) {
+            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+            // show on next frame to avoid layout thrash
+            requestAnimationFrame(() => off.show());
+        }
+    }
+
+    // Immediate reject (keeps current behaviour)
+    async function rejectResponse(phId) {
+        return await _promptHistoryAction(phId, 'reject', 'Rejecting response...');
+    }
+
+    // Open confirmation offcanvas for approve
+    function approveResponse(phId) {
+        if (!phId) { alert('Invalid prompt history id'); return; }
+        const input = document.getElementById('offcanvasApprove_phId');
+        if (input) input.value = phId;
+        const el = document.getElementById('offcanvasApprove');
+        if (el && window.bootstrap && bootstrap.Offcanvas) {
+            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+            // show on next frame to avoid layout thrash
+            requestAnimationFrame(() => off.show());
+        }
+    }
+
+    async function _promptHistoryAction(phId, action, spinnerText, payload = null) {
+        if (!phId) {
+            alert('Action failed: invalid prompt history id');
+            return;
+        }
+
+        // Find the button that invoked this action so we can disable/restore it
+        const selector = `[onclick="${action==='save_draft'?'saveDraftFromResponse':action==='reject'?'rejectResponse':'approveResponse'}(${phId})"]`;
+        const btn = document.querySelector(selector);
+        const originalHtml = btn ? btn.innerHTML : null;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${spinnerText}`;
+        }
+
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+            window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+            return;
+        }
+
+        try {
+            // Primary attempt: a single action endpoint
+            const bodyObj = Object.assign({ action: action }, (payload || {}));
+            let res = await fetch(`/user/prompt_history/${phId}/action`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyObj)
+            });
+
+            // Fallback: try a RESTy /{action} endpoint if /action returned 404
+            if (res.status === 404) {
+                res = await fetch(`/user/prompt_history/${phId}/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload || {})
+                });
+            }
+
+            if (!res.ok) {
+                let errMsg = res.statusText || 'Request failed';
+                try {
+                    const json = await res.json();
+                    if (json && json.detail) errMsg = json.detail;
+                } catch (e) {
+                    // ignore JSON parse errors
+                }
+                alert('Action failed: ' + errMsg);
+            } else {
+                // Refresh prompt history to reflect changes
+                await loadPromptHistory();
+            }
+
+        } catch (error) {
+            console.error('Error performing prompt history action:', error);
+            alert('Network error while performing action. See console for details.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    // Confirm buttons for offcanvas
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmSaveBtn = document.getElementById('confirmSaveDraftBtn');
+        if (confirmSaveBtn) {
+            confirmSaveBtn.addEventListener('click', async function() {
+                const phId = document.getElementById('offcanvasSaveDraft_phId').value;
+                const el = document.getElementById('offcanvasSaveDraft');
+                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
+                // disable while processing
+                confirmSaveBtn.disabled = true;
+                const original = confirmSaveBtn.innerHTML;
+                confirmSaveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+                try {
+                    const draftName = document.getElementById('draftName') ? document.getElementById('draftName').value : '';
+                    const draftNotes = document.getElementById('draftNotes') ? document.getElementById('draftNotes').value : '';
+                    const draftContentEl = document.getElementById('draftContent');
+                    // prefer innerHTML for rich content stored in a div, fallback to textContent
+                    const draftContent = draftContentEl ? (draftContentEl.innerHTML || draftContentEl.textContent || '') : '';
+                    const payload = { draft_name: draftName, draft_notes: draftNotes, draft_content: draftContent };
+                    await _promptHistoryAction(phId, 'save_draft', 'Saving draft...', payload);
+                    if (off) off.hide();
+                } finally {
+                    confirmSaveBtn.disabled = false;
+                    confirmSaveBtn.innerHTML = original;
+                }
+            });
+        }
+
+        const confirmApproveBtn = document.getElementById('confirmApproveBtn');
+        if (confirmApproveBtn) {
+            confirmApproveBtn.addEventListener('click', async function() {
+                const phId = document.getElementById('offcanvasApprove_phId').value;
+                const el = document.getElementById('offcanvasApprove');
+                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
+                confirmApproveBtn.disabled = true;
+                const original = confirmApproveBtn.innerHTML;
+                confirmApproveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Approving...`;
+                try {
+                    await _promptHistoryAction(phId, 'approve', 'Approving response...');
+                    if (off) off.hide();
+                } finally {
+                    confirmApproveBtn.disabled = false;
+                    confirmApproveBtn.innerHTML = original;
+                }
+            });
+        }
+    });
+
+    // Scroll helper: always scroll the AI content area to the bottom.
+    // Pass `smooth = true` for smooth scrolling, or `false` for immediate.
+    function scrollAIContentToBottom(smooth = true) {
+        try {
+            const aiContentArea = document.getElementById('ai-content-area');
+            if (!aiContentArea) return;
+            if (smooth && aiContentArea.scrollTo) {
+                aiContentArea.scrollTo({ top: aiContentArea.scrollHeight, behavior: 'smooth' });
+            } else {
+                aiContentArea.scrollTop = aiContentArea.scrollHeight;
+            }
+        } catch (e) {
+            // silently ignore
+            console.debug('scrollAIContentToBottom error', e);
         }
     }
 </script>

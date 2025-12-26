@@ -12,12 +12,14 @@ from content_module.content_responses import (
     ContentResponse,
     AddDraftContentRequest,
     AddDraftContentResponse,
-    PromptHistoryResponse
+    PromptHistoryResponse,
+    SaveAsDraftRequest
 )
 
 from content_module.prompt_history_utils import (
     create_prompt_history_record,
-    add_draft_to_prompt_history
+    add_draft_to_prompt_history,
+    save_prompt_as_draft
 )
 
 from validations.content import ContentAddValidation
@@ -289,3 +291,56 @@ async def get_unattached(
                 "data": None,
             }
         )
+
+@router.post("/content/save_as_draft", response_model=AddDraftContentResponse)
+async def user_save_as_draft(
+    draft_data: SaveAsDraftRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Add draft content to an existing prompt history session.
+    
+    Args:
+        draft_data: Draft content request data with prompt_text, content_id, and prompt_session_id
+        credentials: Bearer token from Authorization header
+    
+    Returns:
+        JSON response with created prompt_history information
+    """
+    try:
+        token = credentials.credentials
+        
+        # Verify token
+        success, status_code, message, payload = verify_token(token)
+        
+        if not success:
+            logger.warning("Invalid token attempt in add_draft_content")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+        
+        # Add draft to existing prompt history session
+        prompt_history = save_prompt_as_draft(
+            prompt_id=draft_data.prompt_id
+        )
+        
+        logger.info(f"Draft content added successfully: prompt ID {draft_data.prompt_id}")
+        
+        return AddDraftContentResponse(
+            message="Draft content added successfully",
+            prompt_history=PromptHistoryResponse(
+                id=prompt_history["id"],
+                prompt_session_id=prompt_history["prompt_session_id"],
+                content_id=prompt_history["content_id"],
+                user_prompt=prompt_history.get("user_prompt"),
+                ai_response=prompt_history.get("ai_response"),
+                prompt_type=prompt_history["prompt_type"],
+                created_on=prompt_history["created_on"],
+                deleted_on=prompt_history.get("deleted_on"),
+                prompt_action=prompt_history["prompt_action"]
+            )
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding draft content: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to add draft content at this time")
