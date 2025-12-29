@@ -321,10 +321,18 @@
                                 </div>
                             </div>
                             <div class="category-badge">{% if row.description %}{{ row.description|truncate(50, false, '') }}{% else %} N/A {% endif %}</div>
-                            <a href="/user/page-content/{{ row.id }}" class="category-btn" style="text-decoration: none;">
-                                <i class="bi bi-file-earmark-text"></i>
-                                View Content
-                            </a>
+                            <div class="category-actions" style="display:flex; gap:8px; justify-content:center; align-items:center;">
+                                <a href="/user/content/{{ row.id }}" class="action-icon-btn" 
+                                   style="flex:1; min-width:0; text-decoration:none; justify-content:center;">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    <span style="margin-left:6px;">Generate Content</span>
+                                </a>
+                                <a href="/user/page-content/{{ row.id }}" class="action-icon-btn" 
+                                   style="flex:1; min-width:0; text-decoration:none; justify-content:center;">
+                                    <i class="bi bi-gear"></i>
+                                    <span style="margin-left:6px;">Manage Content</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}        

@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict
 
 from category_module.category_utils import get_categories_list
+from page_modules.page_utils import get_page_by_id
 
 from content_module.content_responses import (
     ContentCreateRequest, 
@@ -27,7 +28,6 @@ from auth_module.auth_utils import verify_token, require_session_auth
 from models.content import ContentActionEnum
 
 from content_module.content_utils import (
-    get_latest_content, 
     get_unattached_content,
     create_content_record
 )
@@ -46,80 +46,6 @@ security = HTTPBearer()
 # Templates
 templates = Jinja2Templates(directory="templates")
 
-
-@router.get("/content", response_class=HTMLResponse)
-@require_session_auth(redirect_url="/")
-async def content_generation_page(
-    request: Request,
-    session_token: Optional[str] = Cookie(default=None),
-    authenticated_user: Optional[Dict] = None
-):
-    """
-    Render content generation page with empty textarea.
-    """
-    try:
-
-        category_list, _ = get_categories_list()
-
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": None,
-                "latest_content": None,
-                "category_list": category_list
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": None,
-                "latest_content": None,
-                "category_list": None
-            }
-        )
-
-
-@router.get("/content/{category_id:int}", response_class=HTMLResponse)
-@require_session_auth(redirect_url="/")
-async def content_page(
-    request: Request,
-    category_id: int,
-    session_token: Optional[str] = Cookie(default=None),
-    authenticated_user: Optional[Dict] = None
-):
-    """
-    Render content editor HTML page with category context.
-    Fetches the latest content for the category if available.
-    
-    Args:
-        category_id: ID of the category to generate content for
-    """
-    try:
-        # Get the latest content for this category
-        latest_content = get_latest_content(category_id)
-
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": category_id,
-                "latest_content": latest_content
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error loading content page for category {category_id}: {str(e)}", exc_info=True)
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": category_id,
-                "latest_content": None
-            }
-        )
 
 
 @router.post("/content", response_model=ContentCreateResponse)
@@ -204,6 +130,58 @@ async def create_content(
     except Exception as e:
         logger.error(f"Error creating content: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Unable to create content at this time")
+
+
+
+
+@router.get("/content", response_class=HTMLResponse)
+@router.get("/content/{page_id:int}", response_class=HTMLResponse)
+@require_session_auth(redirect_url="/")
+async def content_generation_page(
+    request: Request,
+    page_id: Optional[int] = None,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """
+    Render content generation page with empty textarea.
+    """
+    try:
+
+        result = None
+        is_page = False
+        category_id = None
+
+        if page_id:
+            result = get_page_by_id(page_id=page_id)
+            is_page = True
+            category_id = result['category_id'] if result else None
+
+        category_list, _ = get_categories_list()
+
+        return templates.TemplateResponse(
+            request=request,
+            name="content.htm",
+            context={
+                "category_id": category_id,
+                "latest_content": result,
+                "category_list": category_list,
+                "is_page": is_page
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            request=request,
+            name="content.htm",
+            context={
+                "category_id": None,
+                "latest_content": None,
+                "category_list": None,
+                "is_page": False
+            }
+        )
+
 
 
 @router.post("/content/draft", response_model=AddDraftContentResponse)

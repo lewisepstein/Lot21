@@ -518,8 +518,8 @@
                 </div>
                 
                 <div class="content-area">
-                    {% if latest_content and latest_content.generated_content %}
-                    {{ latest_content.generated_content | safe }}
+                    {% if latest_content and latest_content.content %}
+                    {{ latest_content.content | safe }}
                     {% else %}
                     <p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>
                     {% endif %}
@@ -573,7 +573,9 @@
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
                             <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
                                 {% for category in category_list %}
-                                    <option value="{{ category.id }}">{{ category.category_name }}</option>
+                                    <option value="{{ category.id }}" {% if category_id == category_id %}selected{% endif %}>
+                                        {{ category.category_name }}
+                                    </option>
                                 {% endfor %}                                
                             </select>
                         </div>
