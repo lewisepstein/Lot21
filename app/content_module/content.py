@@ -20,7 +20,6 @@ from content_module.content_responses import (
 from content_module.prompt_history_utils import (
     create_prompt_history_record,
     add_draft_to_prompt_history,
-    save_prompt_as_draft
 )
 
 from validations.content import ContentAddValidation

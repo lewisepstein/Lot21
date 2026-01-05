@@ -1,0 +1,1548 @@
+{% extends "base.htm" %}
+
+{% block title %}Content Editor{% endblock %}
+
+{% block page_title %}Current Content{% endblock %}
+
+{% block nav_content_generation %}active{% endblock %}
+
+
+{% block content %}
+<style>
+    /* Content Editor Styles */
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: "→";
+        color: var(--text-secondary);
+    }
+    
+    .content-editor-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        height: calc(100vh - 200px);
+    }
+    
+    .editor-panel {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 25px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .panel-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+    
+    .top-actions {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .action-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .action-icon-btn:hover {
+        color: var(--accent-teal);
+        border-color: var(--accent-teal);
+        background-color: rgba(0, 217, 181, 0.1);
+    }
+    
+    .action-icon-btn.reject-btn {
+        color: #ff512f;
+        border-color: #ff512f;
+    }
+    
+    .action-icon-btn.reject-btn:hover {
+        background-color: rgba(255, 81, 47, 0.1);
+    }
+    
+    .action-icon-btn.approve-btn {
+        color: var(--accent-green);
+        border-color: var(--accent-green);
+    }
+    
+    .action-icon-btn.approve-btn:hover {
+        background-color: rgba(0, 208, 132, 0.1);
+    }
+    
+    .meta-info {
+        display: flex;
+        gap: 30px;
+        margin-bottom: 15px;
+        font-size: 13px;
+    }
+    
+    .meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .meta-label {
+        color: var(--text-secondary);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .meta-value {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+    
+    .version-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        background-color: rgba(0, 217, 181, 0.15);
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .view-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .view-tab {
+        padding: 8px 16px;
+        background: transparent;
+        color: var(--text-secondary);
+        border: none;
+        border-bottom: 2px solid transparent;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .view-tab.active {
+        color: var(--text-primary);
+        border-bottom-color: var(--accent-teal);
+    }
+    
+    .view-tab:hover {
+        color: var(--text-primary);
+    }
+    
+    .content-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        color: var(--text-primary);
+        line-height: 1.8;
+        font-size: 14px;
+    }
+    
+    .content-area::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .content-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .content-area::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 3px;
+    }
+    
+    /* AI Assistant Panel */
+    .ai-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .ai-icon {
+        color: var(--accent-teal);
+        font-size: 20px;
+    }
+    
+    .regenerate-btn {
+        margin-left: auto;
+        padding: 8px 14px;
+        background: transparent;
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .regenerate-btn:hover {
+        background-color: rgba(0, 217, 181, 0.1);
+    }
+    
+    .ai-message {
+        padding: 15px;
+        background-color: #1668ff2e;
+        border-right: 3px solid var(--bg-card);
+        border-radius: 6px;
+        margin-bottom: 15px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-primary);
+        width:90%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ai-message .message-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    
+    .ai-message ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+    
+    .ai-message li {
+        margin: 8px 0;
+    }
+    
+    .ai-timestamp {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 10px;
+    }
+    
+    .user-prompt {
+        padding: 15px;
+        background-color: rgba(100, 100, 100, 0.15);
+        border-radius: 8px;
+        margin-bottom: 5px;
+        font-size: 14px;
+        line-height: 1.8;
+        color: var(--text-primary);
+        width: 80%;
+        margin-left: auto;
+        margin-right: 0;
+        transition: all 0.3s ease;
+    }
+    
+    .user-prompt.success {
+        background-color: rgba(0, 217, 181, 0.1);
+        border-left: 3px solid var(--accent-teal);
+        color: var(--accent-teal);
+        position: relative;
+    }
+    
+    .user-prompt.error {
+        background-color: rgba(255, 81, 47, 0.1);
+        border-left: 3px solid #ff512f;
+        color: #ff512f;
+    }
+    
+    .latest-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+    
+    .prompt-timestamp {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-left: auto;
+        width: 80%;
+        text-align: right;
+        margin-bottom: 15px;
+    }
+    
+    .ai-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 15px 0;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .ai-action-btn {
+        padding: 8px 16px;
+        background: transparent;
+        color: var(--accent-teal);
+        border: 1px solid var(--accent-teal);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .ai-action-btn:hover {
+        background-color: rgba(0, 217, 181, 0.1);
+    }
+    
+    .ai-input-area {
+        margin-top: auto;
+        padding-top: 15px;
+    }
+    
+    .ai-input-wrapper {
+        position: relative;
+    }
+    
+    .ai-input {
+        width: 100%;
+        padding: 12px 50px 12px 15px;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 14px;
+        resize: none;
+        min-height: 100px;
+    }
+    
+    .ai-input:focus {
+        outline: none;
+        border-color: var(--accent-teal);
+    }
+    
+    .ai-input::placeholder {
+        color: var(--text-secondary);
+    }
+    
+    .ai-send-btn {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        width: 36px;
+        height: 36px;
+        background-color: var(--accent-teal);
+        color: var(--bg-primary);
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    .ai-send-btn:hover {
+        background-color: #00f5cc;
+    }
+    
+    .ai-input-hint {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 8px;
+    }
+    
+    @media (max-width: 1200px) {
+        .content-editor-container {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+        
+        .editor-panel {
+            height: 500px;
+        }
+    }
+
+    .dot-loader {
+        display: inline-flex;
+        gap: 6px;
+    }
+
+    .dot-loader span {
+        width: 8px;
+        height: 8px;
+        background-color: #333;
+        border-radius: 50%;
+        animation: dotPulse 1.4s infinite ease-in-out both;
+    }
+
+    .dot-loader span:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+    .dot-loader span:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+
+    @keyframes dotPulse {
+        0%, 80%, 100% {
+            transform: scale(0);
+            opacity: 0.3;
+        }
+        40% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    /* Offcanvas smoothing: prefer GPU compositing, reduce repaint/jank */
+    .offcanvas {
+        will-change: transform, visibility;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        transform: translateZ(0);
+        transition: transform 280ms cubic-bezier(.4,0,.2,1), visibility 280ms linear;
+        /* Make offcanvas cover 70% of the main body/container */
+        width: 70% !important;
+    }
+
+    .offcanvas.show {
+        /* ensure hardware acceleration path while visible */
+        will-change: transform;
+    }
+
+    .offcanvas-backdrop {
+        transition: opacity 280ms ease;
+        /* subtle blur can make overlay feel smoother; remove if expensive */
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        will-change: opacity;
+    }
+
+    /* Reduce layout thrash when offcanvas toggles by isolating the panel
+       and avoiding style recalculation on large containers */
+    #ai-content-area {
+        will-change: scroll-position, transform;
+    }
+
+    /* Keep confirm buttons from causing layout shift when spinner appears */
+    #confirmSaveDraftBtn, #confirmApproveBtn {
+        width: 110px;
+    }
+
+    /* Responsive: full width on narrow screens */
+    @media (max-width: 900px) {
+        .offcanvas {
+            width: 100% !important;
+        }
+    }
+
+</style>
+
+        <!-- Top Actions Bar -->
+        <div class="top-actions">
+            <div style="margin-left: auto; display: flex; gap: 15px;">
+                <button class="action-icon-btn" onclick="addNewContent()">
+                    <i class="bi bi-plus-circle"></i> Add New
+                </button>
+                <a class="action-icon-btn" href="/user/content/unattached" style="text-decoration: none;">
+                    <i class="bi bi-eye"></i> Show Unattached
+                </a>
+                <button class="action-icon-btn">
+                    <i class="bi bi-clock-history"></i> Version History
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Content Grid -->
+        <div class="content-editor-container">
+            
+            <!-- Left Panel - Current Content -->
+            <div class="editor-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Please provide a context</h2>
+                </div>
+                
+                <div class="meta-info">
+                    <div class="meta-item">
+                        <span class="meta-label">Last Approved</span>
+                        <span class="meta-value"></span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Updated By</span>
+                        <span id="updated_by_agent" class="meta-value">Auto Filled</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Version</span>
+                        <span class="version-badge">v1.0</span>
+                    </div>
+                </div>
+                
+                <div class="view-tabs">
+                    <button class="view-tab active" data-view="formatted">
+                        <i class="bi bi-justify-left"></i> Formatted
+                    </button>
+                    <button class="view-tab" data-view="raw">
+                        <i class="bi bi-code-slash"></i> Raw HTML
+                    </button>
+                    <button class="view-tab" data-view="raw">
+                        <i class="bi bi-database"></i> Source Data
+                    </button>
+                </div>
+                
+                <!-- Formatted view (rendered HTML) -->
+                <div id="formattedContent" class="content-area formatted-view">
+                    {% if latest_content and latest_content.content %}
+                        {{ latest_content.content | safe }}
+                    {% else %}
+                        <p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Raw / Source view (editable textarea). Hidden by default. -->
+                <textarea id="rawContent" class="content-area raw-view" style="display:none;" readonly>{% if latest_content and latest_content.content %}{{ latest_content.content | e }}{% else %}No content yet. Use AI Assistant to generate new content.{% endif %}</textarea>
+            </div>
+            
+            <!-- Right Panel - AI Assistant -->
+            <div class="editor-panel">
+                <div class="ai-header">
+                    <i class="bi bi-stars ai-icon"></i>
+                    <h2 class="panel-title">AI Generation Assistant</h2>
+                    <button class="regenerate-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Regenerate
+                    </button>
+                </div>
+                
+                <div id="ai-content-area" class="content-area">
+                    {% if latest_content and latest_content.prompt_data %}
+                    <p class="user-prompt success">
+                        {{ latest_content.prompt_data }}
+                        <span class="latest-badge">Latest</span>
+                    </p>
+                    {% else %}
+                    <p id="ai-preview-text" style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>
+                    {% endif %}
+                    <!-- Spinner placed inside content area so it appears after latest prompts -->
+                    <div id="ai-spinner" style="display:none; margin-top:8px;">
+                        <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="ai-input-area">
+                    <div class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 8px;">
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrow-clockwise"></i> Refine
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrows-angle-expand"></i> Expand
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-arrows-collapse"></i> Shorten
+                            </button>
+                            <button class="ai-action-btn">
+                                <i class="bi bi-list-ul"></i> Add References
+                            </button>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
+                            <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                                {% for category in category_list %}
+                                    <option value="{{ category.id }}" {% if category_id == category_id %}selected{% endif %}>
+                                        {{ category.category_name }}
+                                    </option>
+                                {% endfor %}                                
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ai-input-wrapper">
+                        <form id="prompt-form" onsubmit="return handleFormSubmit(event)">
+                            <textarea 
+                                id="ai-prompt-input"
+                                class="ai-input" 
+                                placeholder="Ask AI to refine, expand, or modify the content..."
+                                rows="1"
+                                oninput="toggleSendButton(); updateAIPreview();"
+                            ></textarea>
+                            <button id="ai-send-btn" class="ai-send-btn" type="submit" disabled>
+                                <i class="bi bi-send-fill"></i>
+                            </button>
+                        </form>
+                    </div>
+                    <div class="ai-input-hint">Press Enter to send. Shift+Enter for new line</div>
+                </div>
+            </div>
+            
+        </div>
+
+    <!-- Offcanvas panels for response actions -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasSaveDraft" aria-labelledby="offcanvasSaveDraftLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+        <div class="offcanvas-header">
+            <h5 id="offcanvasSaveDraftLabel" style="color:#fff">Save AI Response as Draft</h5>
+            <span>To save the content as a draft, please fill the form</span>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Are you sure you want to save this AI response as a draft? You can edit it later before publishing.</p>
+            <form>
+                <input type="hidden" id="offcanvasSaveDraft_phId" value="" />
+                <div class="mb-3">
+                    <label for="draftName" class="form-label">Name</label>
+                    <input required type="text" class="form-control form-input" id="draftName" placeholder="Add a name for this draft...">
+                </div>
+                <div class="mb-3">
+                    <label for="draftNotes" class="form-label">Description</label>
+                    <textarea readonly class="form-control form-input" id="draftNotes" rows="3" placeholder="Add any notes about this draft..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="draftContent" class="form-label">Content</label>
+                    <div class="form-control form-input" 
+                        id="draftContent" 
+                        style="height:450px; overflow-y:auto; 
+                        background-color: var(--bg-primary);
+                        border: 1px solid var(--border-color); 
+                        color: var(--text-primary);
+                        border-radius:4px; padding:10px;"
+                    ></div>
+                </div>
+            </form>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="confirmSaveDraftBtn" class="btn btn-primary">Save Draft</button>
+                <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasApprove" aria-labelledby="offcanvasApproveLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+        <div class="offcanvas-header">
+            <h5 id="offcanvasApproveLabel" style="color:#fff">Approve AI Response</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p>Approving will mark this response as approved. This action may publish or mark content for review depending on workflow.</p>
+            <input type="hidden" id="offcanvasApprove_phId" value="" />
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="confirmApproveBtn" class="btn btn-success">Approve</button>
+                <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+
+    let updated_by_agent = "Auto Filled";
+    document.getElementById('updated_by_agent').innerText = updated_by_agent; 
+
+    function showSpinner() {
+        let spinner = document.getElementById('ai-spinner');
+        const aiContentArea = document.getElementById('ai-content-area');
+        if (!spinner) {
+            // If spinner missing, create and append it inside the content area
+            if (!aiContentArea) return; // nothing to attach to
+            spinner = document.createElement('div');
+            spinner.id = 'ai-spinner';
+            spinner.style.marginTop = '8px';
+            spinner.innerHTML = `
+                <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>`;
+            aiContentArea.appendChild(spinner);
+            // ensure view scrolls to show spinner/new content
+            scrollAIContentToBottom(false);
+        }
+        spinner.style.display = 'inline-flex';
+    }
+
+    function hideSpinner() {
+        const spinner = document.getElementById('ai-spinner');
+        if (spinner) {
+            spinner.style.display = 'none';
+        }
+    }
+
+    function clear_the_area() {
+        updated_by_agent = "User Initiated";
+
+        document.getElementById('updated_by_agent').innerText = updated_by_agent;
+
+        // Clear the formatted content area
+        const currentContentArea = document.querySelector('.editor-panel:first-of-type .ai-content-area');
+        if (currentContentArea) {
+            currentContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>';
+        }
+        
+        // Clear the AI message area and show centralized ready placeholder
+        const aiContentArea = document.querySelector('.editor-panel:last-of-type .ai-content-area');
+        if (aiContentArea) {
+            // hide existing content and set unified message element
+            aiContentArea.innerHTML = '';
+            let msg = document.getElementById('aiPanelMessage');
+            if (!msg) {
+                msg = document.createElement('p');
+                msg.id = 'aiPanelMessage';
+                msg.style.color = 'var(--text-secondary)';
+                msg.style.textAlign = 'center';
+                msg.style.padding = '40px';
+                msg.style.margin = '0';
+                aiContentArea.insertBefore(msg, aiContentArea.firstChild);
+            }
+            msg.textContent = 'Ready to generate content. Type your request below or use action buttons.';
+            msg.style.display = '';
+        }
+        // Show raw/source view and highlight the "Source Data" tab
+        try {
+            const rawEl = document.getElementById('rawContent');
+            const formattedEl = document.getElementById('formattedContent');
+            // hide formatted view
+            if (formattedEl) {
+                formattedEl.style.display = 'none';
+            }
+            // clear and show raw/source textarea
+            if (rawEl) {
+                rawEl.value = '';
+                rawEl.readOnly = false;
+                rawEl.style.display = '';
+            }
+
+            // Update tab active states and select the Source Data tab
+            const viewTabs = Array.from(document.querySelectorAll('.view-tab'));
+            viewTabs.forEach(t => t.classList.remove('active'));
+            // Prefer exact text match for 'Source Data' (case-insensitive)
+            let sourceTab = viewTabs.find(t => /source\s*data/i.test(t.textContent || ''));
+            if (!sourceTab) {
+                // Fallback: pick the last tab with data-view='raw'
+                const rawTabs = viewTabs.filter(t => t.getAttribute('data-view') === 'raw');
+                sourceTab = rawTabs.length ? rawTabs[rawTabs.length - 1] : (viewTabs[0] || null);
+            }
+            if (sourceTab) {
+                sourceTab.classList.add('active');
+                // Use existing switchView function if available to keep behavior consistent
+                try {
+                    const target = sourceTab.getAttribute('data-view') || 'raw';
+                    if (typeof switchView === 'function') {
+                        switchView(target);
+                    } else {
+                        // replicate expected behavior
+                        if (target === 'formatted') {
+                            if (formattedEl) formattedEl.style.display = '';
+                            if (rawEl) rawEl.style.display = 'none';
+                        } else {
+                            if (formattedEl) formattedEl.style.display = 'none';
+                            if (rawEl) rawEl.style.display = '';
+                        }
+                    }
+                } catch (e) {
+                    console.debug('addNewContent: switchView call failed', e);
+                }
+                // focus the raw textarea so user can start editing immediately
+                try {
+                    if (rawEl) {
+                        rawEl.focus();
+                        // move caret to end
+                        rawEl.selectionStart = rawEl.selectionEnd = rawEl.value ? rawEl.value.length : 0;
+                    }
+                } catch (e) {
+                    console.debug('addNewContent: focus failed', e);
+                }
+            }
+            // After clearing and preparing views, ensure prompt availability reflects empty source data
+            try { updatePromptAvailability(); } catch (e) { console.debug('clear_the_area: updatePromptAvailability failed', e); }
+        } catch (e) {
+            console.debug('addNewContent: could not show/highlight source tab', e);
+        }
+    }
+    
+    async function addNewContent() {
+
+        clear_the_area();
+
+        // Send POST request to create new content entry
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return;
+            }
+            
+            // Prepare payload with null prompt_data
+            const payload = {
+                category_id: document.getElementById('contentType').value,
+                prompt_data: null,
+                action: "NEW"
+            };
+            
+            // Send POST request
+            const response = await fetch('/user/content', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                // Check if token expired using global function
+                if (handleTokenExpiration(response)) {
+                    return;
+                }
+                
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || 'Failed to create new content'));
+                return;
+            }
+            
+            const result = await response.json();
+            console.log('New content created successfully:', result);
+            
+            // Store prompt_session_id in localStorage if returned
+            if (result.prompt_session_id) {
+                localStorage.setItem('prompt_session_id', result.prompt_session_id);
+                console.log('Stored prompt_session_id:', result.prompt_session_id);
+            }
+
+            // Store content_id in localStorage if returned 
+            if (result.content && result.content.id) {
+                localStorage.setItem('content_id', result.content.id);
+                console.log('Stored content_id:', result.content.id);
+            }
+            
+        } catch (error) {
+            console.error('Error creating new content:', error);
+            alert('Failed to create new content. Please try again.');
+        }
+        // Update prompt availability state after showing the raw textarea
+        try { updatePromptAvailability(); } catch (e) { /* ignore */ }
+    }
+    
+    function toggleSendButton() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        const sendBtn = document.getElementById('ai-send-btn');
+        const promptText = promptInput.value.trim();
+        
+        // Enable button only if there's non-whitespace text
+        sendBtn.disabled = !promptText;
+    }
+    
+    function updateAIPreview() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        const aiContentArea = document.getElementById('ai-content-area');
+        const inputText = promptInput.value.trim();
+        
+        // Check if there's already existing prompt history
+        const existingPrompts = aiContentArea.querySelectorAll('.user-prompt.success');
+        
+        if (inputText) {
+            // Remove any existing preview (not saved prompts)
+            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+            
+            // Add new preview paragraph at the end
+            const previewParagraph = document.createElement('p');
+            previewParagraph.className = 'user-prompt';
+            previewParagraph.innerHTML = inputText.replace(/\n/g, '<br>');
+            aiContentArea.appendChild(previewParagraph);
+            // keep newest preview visible
+            scrollAIContentToBottom();
+        } else {
+            // Remove only the preview paragraph (not saved prompts)
+            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+
+            // Show centralized placeholder only if no saved prompts exist
+            if (existingPrompts.length === 0) {
+                // ensure aiPanelMessage exists and set to start placeholder
+                let msg = document.getElementById('aiPanelMessage');
+                if (!msg) {
+                    msg = document.createElement('p');
+                    msg.id = 'aiPanelMessage';
+                    msg.style.color = 'var(--text-secondary)';
+                    msg.style.textAlign = 'center';
+                    msg.style.padding = '40px';
+                    msg.style.margin = '0';
+                    aiContentArea.insertBefore(msg, aiContentArea.firstChild);
+                }
+                msg.textContent = 'Start typing to see your prompt...';
+                msg.style.display = '';
+            }
+        }
+    }
+
+    // Enable/disable the AI prompt input based on whether Source Data (rawContent)
+    // contains any non-whitespace content. Also show a short message in the
+    // AI panel when context is required.
+    function updatePromptAvailability() {
+        try {
+            const rawEl = document.getElementById('rawContent');
+            const promptInput = document.getElementById('ai-prompt-input');
+            const aiContentArea = document.getElementById('ai-content-area');
+            if (!promptInput) return;
+
+            const hasContext = rawEl && rawEl.value && rawEl.value.trim().length > 0;
+
+            // Ensure the prompt input is disabled until context exists
+            promptInput.disabled = !hasContext;
+
+            // Keep the send button disabled until user types into prompt
+            const sendBtn = document.getElementById('ai-send-btn');
+            if (sendBtn) {
+                // If there is no context, keep send disabled. If there is context,
+                // leave send disabled until user types (toggleSendButton will enable it).
+                sendBtn.disabled = !hasContext || true;
+                // The above keeps it disabled by default; toggleSendButton controls it on input.
+            }
+
+            // Manage the contextual message inside the AI panel
+            if (aiContentArea) {
+                // Centralized AI panel message element
+                let msg = document.getElementById('aiPanelMessage');
+                if (!msg) {
+                    msg = document.createElement('p');
+                    msg.id = 'aiPanelMessage';
+                    msg.style.color = 'var(--text-secondary)';
+                    msg.style.textAlign = 'center';
+                    msg.style.padding = '40px';
+                    msg.style.margin = '0';
+                    aiContentArea.insertBefore(msg, aiContentArea.firstChild);
+                }
+                msg.textContent = hasContext ? '' : 'Please provide context in Source Data before using the AI assistant.';
+                msg.style.display = hasContext ? 'none' : '';
+            }
+            // Disable/enable specific areas: ai-header and ai-input-area
+            try {
+                // ai-header buttons (e.g., regenerate)
+                const aiHeader = document.querySelector('.ai-header');
+                if (aiHeader) {
+                    const headerButtons = aiHeader.querySelectorAll('button');
+                    headerButtons.forEach(b => {
+                        b.disabled = !hasContext;
+                        if (!b.disabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled','true');
+                    });
+                }
+
+                // ai-input-area controls (prompt textarea + action buttons + send)
+                const aiInputArea = document.querySelector('.ai-input-area');
+                if (aiInputArea) {
+                    // Disable all action buttons inside input area when no context
+                    const inputButtons = aiInputArea.querySelectorAll('button');
+                    inputButtons.forEach(b => {
+                        // The send button should remain disabled until user types; ensure it's disabled when no context
+                        if (b.id === 'ai-send-btn') {
+                            b.disabled = !hasContext || true;
+                        } else {
+                            b.disabled = !hasContext;
+                        }
+                        if (!b.disabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled','true');
+                    });
+
+                    // Also control the prompt textarea explicitly
+                    if (promptInput) {
+                        promptInput.disabled = !hasContext;
+                        if (!promptInput.disabled) promptInput.removeAttribute('aria-disabled'); else promptInput.setAttribute('aria-disabled','true');
+                    }
+
+                    // Visual cue: add/remove a disabled class on the input area
+                    if (!hasContext) aiInputArea.classList.add('disabled-panel'); else aiInputArea.classList.remove('disabled-panel');
+                }
+            } catch (e) {
+                console.debug('updatePromptAvailability: disabling specific areas failed', e);
+            }
+        } catch (e) {
+            console.debug('updatePromptAvailability error', e);
+        }
+    }
+    
+    async function handleFormSubmit(event) {
+        event.preventDefault();
+        
+        const promptInput = document.getElementById('ai-prompt-input');
+        const sendBtn = document.getElementById('ai-send-btn');
+        const promptText = promptInput.value.trim();
+        
+        if (!promptText) {
+            return false;
+        }
+        
+        const aiContentArea = document.getElementById('ai-content-area');
+        const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
+        
+        sendBtn.disabled = true;
+
+        // 🔹 START SPINNER BEFORE API CALL
+        showSpinner();
+
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                hideSpinner();
+                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+                return false;
+            }
+            
+            const prompt_session_id = localStorage.getItem('prompt_session_id');
+            const content_id = localStorage.getItem('content_id');
+            
+            if (!prompt_session_id || !content_id) {
+                hideSpinner();
+                alert('Please click "Add New" first to start a new content session');
+                sendBtn.disabled = false;
+                return false;
+            }
+            
+            const payload = {
+                prompt_text: promptText,
+                content_id: parseInt(content_id),
+                prompt_session_id: prompt_session_id
+            };
+
+            const response = await fetch('/user/content/draft', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                hideSpinner();
+
+                if (handleTokenExpiration(response)) {
+                    return false;
+                }
+                
+                if (userPromptParagraph) {
+                    userPromptParagraph.classList.remove('success');
+                    userPromptParagraph.classList.add('error');
+                }
+                
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
+                sendBtn.disabled = false;
+                return false;
+            }
+            
+            const result = await response.json();
+            
+            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (previewParagraph) {
+                previewParagraph.remove();
+            }
+            
+            const previousLatest = aiContentArea.querySelectorAll('.latest-badge');
+            previousLatest.forEach(badge => badge.remove());
+            
+            const savedPromptDiv = document.createElement('p');
+            savedPromptDiv.className = 'user-prompt success';
+            savedPromptDiv.innerHTML =
+                promptText.replace(/\n/g, '<br>') +
+                '<span class="latest-badge">Latest</span>';
+            aiContentArea.appendChild(savedPromptDiv);
+
+            const timestamp = document.createElement('div');
+            timestamp.className = 'prompt-timestamp';
+            const now = new Date();
+            timestamp.textContent =
+                'Saved on ' +
+                now.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            aiContentArea.appendChild(timestamp);
+
+            // ensure the saved prompt and timestamp are visible
+            scrollAIContentToBottom();
+
+            promptInput.value = '';
+            sendBtn.disabled = true;
+
+            console.log('Prompt sent successfully:', result);
+
+            // 🔹 STOP SPINNER BEFORE LOADING HISTORY
+            hideSpinner();
+
+            loadPromptHistory();
+
+        } catch (error) {
+            console.error('Error sending prompt:', error);
+
+            hideSpinner();
+
+            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+            if (previewParagraph) {
+                previewParagraph.classList.add('error');
+            }
+
+            alert('Failed to send prompt. Please try again.');
+            sendBtn.disabled = false;
+        }
+
+        return false;
+    }
+    
+    // Allow Enter key to submit (Shift+Enter for new line)
+    document.addEventListener('DOMContentLoaded', function() {
+        const promptInput = document.getElementById('ai-prompt-input');
+        if (promptInput) {
+            promptInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const form = document.getElementById('prompt-form');
+                    if (form) {
+                        form.dispatchEvent(new Event('submit'));
+                    }
+                }
+            });
+        }
+        
+        // Load prompt history on page load
+        loadPromptHistory();
+
+        // --- View tab switching: formatted vs raw/source ---
+        function switchView(view) {
+            const formattedEl = document.getElementById('formattedContent');
+            const rawEl = document.getElementById('rawContent');
+            if (!formattedEl || !rawEl) return;
+            if (view === 'formatted') {
+                // show formatted, hide raw
+                formattedEl.style.display = '';
+                rawEl.style.display = 'none';
+            } else {
+                // show raw, hide formatted
+                formattedEl.style.display = 'none';
+                rawEl.style.display = '';
+            }
+        }
+
+        // Wire up view-tab buttons
+        const viewTabs = document.querySelectorAll('.view-tab');
+        viewTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                // update active class
+                viewTabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                const target = this.getAttribute('data-view') || 'formatted';
+                switchView(target);
+            });
+        });
+
+        // Ensure initial view matches active tab
+        const initialActive = document.querySelector('.view-tab.active');
+        if (initialActive) {
+            const initialView = initialActive.getAttribute('data-view') || 'formatted';
+            switchView(initialView);
+        }
+        // Wire raw/source textarea to control AI prompt availability
+        try {
+            const rawEl = document.getElementById('rawContent');
+            if (rawEl) {
+                rawEl.addEventListener('input', updatePromptAvailability);
+            }
+            // initialize prompt availability on page load
+            updatePromptAvailability();
+        } catch (e) {
+            console.debug('DOMContentLoaded: updatePromptAvailability setup failed', e);
+        }
+    });
+
+    // Ensure source-data validation wiring is applied for routes like '/user/content'
+    function ensureSourceDataValidation() {
+        try {
+            const rawEl = document.getElementById('rawContent');
+            if (!rawEl) return;
+            // Avoid attaching listener multiple times
+            if (!rawEl.dataset.sourceValidationAttached) {
+                rawEl.addEventListener('input', updatePromptAvailability);
+                rawEl.dataset.sourceValidationAttached = '1';
+            }
+            // If the AI panel is empty (or only has the initial preview), set the
+            // same placeholder text used by Add New so users see the same message.
+            try {
+                const aiContentArea = document.getElementById('ai-content-area');
+                if (aiContentArea) {
+                    // If the panel is empty or contains only the default preview text,
+                    // ensure centralized aiPanelMessage shows the ready placeholder.
+                    let msg = document.getElementById('aiPanelMessage');
+                    if (!msg) {
+                        msg = document.createElement('p');
+                        msg.id = 'aiPanelMessage';
+                        msg.style.color = 'var(--text-secondary)';
+                        msg.style.textAlign = 'center';
+                        msg.style.padding = '40px';
+                        msg.style.margin = '0';
+                        aiContentArea.insertBefore(msg, aiContentArea.firstChild);
+                    }
+                    const trimmed = (aiContentArea.textContent || '').trim();
+                    if (!trimmed || /Start typing to see your prompt|Start typing to see your prompt.../i.test(trimmed)) {
+                        msg.textContent = 'Ready to generate content. Type your request below or use action buttons.';
+                        msg.style.display = '';
+                    }
+                }
+            } catch (e) {
+                console.debug('ensureSourceDataValidation: could not set AI panel placeholder', e);
+            }
+            updatePromptAvailability();
+        } catch (e) {
+            console.debug('ensureSourceDataValidation error', e);
+        }
+    }
+
+    // If the current path is /user/content, ensure validation wiring runs.
+    try {
+        if (window && window.location && window.location.pathname) {
+            const pathname = window.location.pathname || '';
+            // Exact path '/user/content' should activate the Source Data tab immediately
+            if (pathname === '/user/content' || pathname === '/user/content/') {
+                clear_the_area();
+            } else if (pathname.indexOf('/user/content') !== -1) {
+                // run on next tick to ensure DOM is ready in cases where this script
+                // executes before DOMContentLoaded
+                setTimeout(() => ensureSourceDataValidation(), 0);
+            }
+        }
+    } catch (e) {
+        console.debug('initial source data validation check failed', e);
+    }
+
+    
+    async function loadPromptHistory() {
+        const prompt_session_id = localStorage.getItem('prompt_session_id');
+        const content_id = localStorage.getItem('content_id');
+        
+        // Only load if we have both values
+        if (!prompt_session_id || !content_id) {
+            console.log('No prompt session found in localStorage');
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                return;
+            }
+            
+            const response = await fetch(`/user/prompt_history/${prompt_session_id}/${content_id}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                if (handleTokenExpiration(response)) {
+                    return;
+                }
+                console.error('Failed to load prompt history');
+                return;
+            }
+            
+            const promptHistories = await response.json();
+            
+            // Display prompt histories in AI content area
+            const aiContentArea = document.getElementById('ai-content-area');
+            if (aiContentArea && promptHistories.length > 0) {
+                aiContentArea.innerHTML = '';
+                // hide centralized aiPanelMessage when rendering prompt history
+                try { const msg = document.getElementById('aiPanelMessage'); if (msg) msg.style.display = 'none'; } catch (e) {}
+                
+                promptHistories.forEach((ph, index) => {
+                    if (ph.user_prompt) {
+                        const isLatest = index === promptHistories.length - 1;
+                        const promptDiv = document.createElement('p');
+                        promptDiv.className = 'user-prompt success';
+                        promptDiv.innerHTML = ph.user_prompt + 
+                            (isLatest ? '<span class="latest-badge">Latest</span>' : '');
+                        aiContentArea.appendChild(promptDiv);
+                        
+                        // Add timestamp
+                        const timestamp = document.createElement('div');
+                        timestamp.className = 'prompt-timestamp';
+                        const createdDate = new Date(ph.created_on);
+                        const options = { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        };
+                        timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
+                        aiContentArea.appendChild(timestamp);
+
+                        // Add Response from the server if any (optional)
+                        if (ph.ai_response) {
+                            const aiResponseDiv = document.createElement('div');
+                            aiResponseDiv.className = 'ai-message';
+                            aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
+                            // Append action buttons inside ai-message at its bottom
+                            const actionsDiv = document.createElement('div');
+                            actionsDiv.className = 'message-actions';
+                            actionsDiv.innerHTML = `
+                                <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-file-earmark"></i> Save Draft
+                                </button>
+                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                            `;
+                            aiResponseDiv.appendChild(actionsDiv);
+                            aiContentArea.appendChild(aiResponseDiv);
+                        }   
+                    }
+                });
+                // after everything is rendered, scroll to bottom so latest items are visible
+                scrollAIContentToBottom(false);
+            }
+            
+        } catch (error) {
+            console.error('Error loading prompt history:', error);
+        }
+    }
+
+    // -----------------------------
+    // Actions for AI response buttons
+    // -----------------------------
+    // Open confirmation offcanvas for saving draft
+    function saveDraftFromResponse(phId) {
+        if (!phId) { alert('Invalid prompt history id'); return; }
+        const input = document.getElementById('offcanvasSaveDraft_phId');
+        if (input) input.value = phId;
+            // Try to locate the AI response HTML for this prompt id and populate the draft content
+        try {
+            const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
+            const sourceBtn = document.querySelector(btnSelector);
+                let aiHtml = '';
+            if (sourceBtn) {
+                const aiMsg = sourceBtn.closest('.ai-message');
+                if (aiMsg) {
+                    // Clone the node and remove action buttons so button labels are excluded
+                    const clone = aiMsg.cloneNode(true);
+                    const actions = clone.querySelector('.message-actions');
+                    if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
+                        // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
+                        aiHtml = (clone.innerHTML || '').trim();
+                        // If innerHTML is empty for some reason, fall back to text with <br> replacement
+                        if (!aiHtml) {
+                            const fallbackText = (clone.textContent || '').trim();
+                            aiHtml = fallbackText.replace(/\n/g, '<br>');
+                        }
+                }
+            }
+            const draftContentEl = document.getElementById('draftContent');
+            const draftNotesEl = document.getElementById('draftNotes');
+            const draftNameEl = document.getElementById('draftName');
+            if (draftContentEl) {
+                // Insert HTML so any <br> or markup is preserved and existing content remains.
+                if (aiHtml) {
+                    draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
+                }
+            }
+            if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
+            if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
+        } catch (e) {
+            console.debug('Could not prefill draft content', e);
+        }
+        const el = document.getElementById('offcanvasSaveDraft');
+        if (el && window.bootstrap && bootstrap.Offcanvas) {
+            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+            // show on next frame to avoid layout thrash
+            requestAnimationFrame(() => off.show());
+        }
+    }
+
+    // Immediate reject (keeps current behaviour)
+    async function rejectResponse(phId) {
+        return await _promptHistoryAction(phId, 'reject', 'Rejecting response...');
+    }
+
+    // Open confirmation offcanvas for approve
+    function approveResponse(phId) {
+        if (!phId) { alert('Invalid prompt history id'); return; }
+        const input = document.getElementById('offcanvasApprove_phId');
+        if (input) input.value = phId;
+        const el = document.getElementById('offcanvasApprove');
+        if (el && window.bootstrap && bootstrap.Offcanvas) {
+            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+            // show on next frame to avoid layout thrash
+            requestAnimationFrame(() => off.show());
+        }
+    }
+
+    async function _promptHistoryAction(phId, action, spinnerText, payload = null) {
+        if (!phId) {
+            alert('Action failed: invalid prompt history id');
+            return;
+        }
+
+        // Find the button that invoked this action so we can disable/restore it
+        const selector = `[onclick="${action==='save_draft'?'saveDraftFromResponse':action==='reject'?'rejectResponse':'approveResponse'}(${phId})"]`;
+        const btn = document.querySelector(selector);
+        const originalHtml = btn ? btn.innerHTML : null;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${spinnerText}`;
+        }
+
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+            window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+            return;
+        }
+
+        try {
+            // Primary attempt: a single action endpoint
+            const bodyObj = Object.assign({ action: action }, (payload || {}));
+            let res = await fetch(`/user/prompt_history/${phId}/action`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyObj)
+            });
+
+            // Fallback: try a RESTy /{action} endpoint if /action returned 404
+            if (res.status === 404) {
+                res = await fetch(`/user/prompt_history/${phId}/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload || {})
+                });
+            }
+
+            if (!res.ok) {
+                let errMsg = res.statusText || 'Request failed';
+                try {
+                    const json = await res.json();
+                    if (json && json.detail) errMsg = json.detail;
+                } catch (e) {
+                    // ignore JSON parse errors
+                }
+                alert('Action failed: ' + errMsg);
+            } else {
+                // Refresh prompt history to reflect changes
+                await loadPromptHistory();
+            }
+
+        } catch (error) {
+            console.error('Error performing prompt history action:', error);
+            alert('Network error while performing action. See console for details.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    // Confirm buttons for offcanvas
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmSaveBtn = document.getElementById('confirmSaveDraftBtn');
+        if (confirmSaveBtn) {
+            confirmSaveBtn.addEventListener('click', async function() {
+                const phId = document.getElementById('offcanvasSaveDraft_phId').value;
+                const el = document.getElementById('offcanvasSaveDraft');
+                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
+                // disable while processing
+                confirmSaveBtn.disabled = true;
+                const original = confirmSaveBtn.innerHTML;
+                confirmSaveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+                try {
+                    const draftName = document.getElementById('draftName') ? document.getElementById('draftName').value : '';
+                    const draftNotes = document.getElementById('draftNotes') ? document.getElementById('draftNotes').value : '';
+                    const draftContentEl = document.getElementById('draftContent');
+                    // prefer innerHTML for rich content stored in a div, fallback to textContent
+                    const draftContent = draftContentEl ? (draftContentEl.innerHTML || draftContentEl.textContent || '') : '';
+                    const payload = { draft_name: draftName, draft_notes: draftNotes, draft_content: draftContent };
+                    await _promptHistoryAction(phId, 'save_draft', 'Saving draft...', payload);
+                    if (off) off.hide();
+                } finally {
+                    confirmSaveBtn.disabled = false;
+                    confirmSaveBtn.innerHTML = original;
+                }
+            });
+        }
+
+        const confirmApproveBtn = document.getElementById('confirmApproveBtn');
+        if (confirmApproveBtn) {
+            confirmApproveBtn.addEventListener('click', async function() {
+                const phId = document.getElementById('offcanvasApprove_phId').value;
+                const el = document.getElementById('offcanvasApprove');
+                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
+                confirmApproveBtn.disabled = true;
+                const original = confirmApproveBtn.innerHTML;
+                confirmApproveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Approving...`;
+                try {
+                    await _promptHistoryAction(phId, 'approve', 'Approving response...');
+                    if (off) off.hide();
+                } finally {
+                    confirmApproveBtn.disabled = false;
+                    confirmApproveBtn.innerHTML = original;
+                }
+            });
+        }
+    });
+
+    // Scroll helper: always scroll the AI content area to the bottom.
+    // Pass `smooth = true` for smooth scrolling, or `false` for immediate.
+    function scrollAIContentToBottom(smooth = true) {
+        try {
+            const aiContentArea = document.getElementById('ai-content-area');
+            if (!aiContentArea) return;
+            if (smooth && aiContentArea.scrollTo) {
+                aiContentArea.scrollTo({ top: aiContentArea.scrollHeight, behavior: 'smooth' });
+            } else {
+                aiContentArea.scrollTop = aiContentArea.scrollHeight;
+            }
+        } catch (e) {
+            // silently ignore
+            console.debug('scrollAIContentToBottom error', e);
+        }
+    }
+</script>
+{% endblock %}

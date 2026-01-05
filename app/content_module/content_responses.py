@@ -57,7 +57,10 @@ class SaveAsDraftRequest(BaseModel):
     """
     Request model for adding draft content to prompt history.
     """
-    prompt_id: int = Field(..., gt=0, description="ID of the prompt history record")
+    prompt_history_id: int = Field(..., gt=0, description="ID of the prompt history record")
+    prompt_action: str = Field(default="SAVE_AS_DRAFT", description="Action to perform on the prompt (e.g., SAVE_AS_DRAFT)")
+    prompt_name: Optional[str] = Field(default=None, description="Name of the prompt")
+    prompt_description: Optional[str] = Field(default=None, description="Description of the prompt")
 
 
 class PromptHistoryResponse(BaseModel):
@@ -73,6 +76,7 @@ class PromptHistoryResponse(BaseModel):
     created_on: datetime
     deleted_on: Optional[datetime]
     prompt_action: Optional[str]
+    updated_on: Optional[datetime] = None
 
     class Config:
         from_attributes = True

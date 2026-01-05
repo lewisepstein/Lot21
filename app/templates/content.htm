@@ -225,6 +225,10 @@
         display: flex;
         flex-direction: column;
     }
+    .ai-message-draft {
+        background-color: #e8ebeb !important;
+        color: #000;
+    }
 
     .ai-message .message-actions {
         margin-top: 12px;
@@ -286,6 +290,10 @@
         text-transform: uppercase;
         margin-left: 8px;
         vertical-align: middle;
+    }
+    .badge-draft {
+        background-color: var(--accent-yellow) !important;
+        color: var(--text-primary) !important;
     }
     
     .prompt-timestamp {
@@ -487,7 +495,7 @@
             <!-- Left Panel - Current Content -->
             <div class="editor-panel">
                 <div class="panel-header">
-                    <h2 class="panel-title">Content Generation</h2>
+                    <h2 class="panel-title">Please provide a context</h2>
                 </div>
                 
                 <div class="meta-info">
@@ -497,7 +505,7 @@
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Updated By</span>
-                        <span class="meta-value">AI Agent</span>
+                        <span id="updated_by_agent" class="meta-value">Auto Filled</span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Version</span>
@@ -506,24 +514,52 @@
                 </div>
                 
                 <div class="view-tabs">
-                    <button class="view-tab active">
+                    <button class="view-tab active" data-view="formatted" id="formattedTab">
                         <i class="bi bi-justify-left"></i> Formatted
                     </button>
-                    <button class="view-tab">
+                    <button class="view-tab" data-view="raw" id="rawTab">
                         <i class="bi bi-code-slash"></i> Raw HTML
                     </button>
-                    <button class="view-tab">
+                    <button class="view-tab" data-view="source" id="sourceTab">
                         <i class="bi bi-database"></i> Source Data
                     </button>
                 </div>
                 
-                <div class="content-area">
+                <!-- Formatted view (rendered HTML) -->
+                <div id="formattedContent" class="content-area formatted-view">
                     {% if latest_content and latest_content.content %}
-                    {{ latest_content.content | safe }}
-                    {% else %}
-                    <p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>
+                        {{ latest_content.content | safe }}
                     {% endif %}
                 </div>
+
+                <!-- Raw / Source view (editable textarea). Hidden by default. -->
+                <textarea id="rawContent" class="content-area raw-view" style="display:none; text-align: left;">
+                    {% if latest_content and latest_content.content %}
+                        {{ latest_content.content | e }}
+                    {% endif %}
+                </textarea>
+
+                <div id="sourceContent" style="display:none;">
+                    
+                    <form id="getDataSourceForm" style="margin-top:12px;">                    
+                        <label for="source_data_url" class="form-label">Source URL</label>
+                        <input type="text" id="source_data_url" class="form-input form-class" 
+                        style="width:100%; margin-bottom:12px;"
+                            {% if latest_content and latest_content.source_url %}
+                                value="{{ latest_content.source_url }}"
+                            {% endif %}
+                        >
+                        <button type="button" class="ai-action-btn" onclick="fetchSourceData()" 
+                            style="margin-top:6px; float:right;">
+                            <i class="bi bi-cloud-download"></i> Fetch Source Data
+                        </button>
+                    </form>
+
+                    <div style="margin-top: 10px;">
+                        <div id="pageSuccessAlert" class="alert-success"></div>
+                        <div id="pageErrorAlert" class="alert-danger"></div>
+                    </div>
+                </div>  
             </div>
             
             <!-- Right Panel - AI Assistant -->
@@ -542,8 +578,6 @@
                         {{ latest_content.prompt_data }}
                         <span class="latest-badge">Latest</span>
                     </p>
-                    {% else %}
-                    <p id="ai-preview-text" style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>
                     {% endif %}
                     <!-- Spinner placed inside content area so it appears after latest prompts -->
                     <div id="ai-spinner" style="display:none; margin-top:8px;">
@@ -572,8 +606,9 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
                             <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                                <option value="">--Select Category--</option>
                                 {% for category in category_list %}
-                                    <option value="{{ category.id }}" {% if category_id == category_id %}selected{% endif %}>
+                                    <option value="{{ category.id }}" {% if category_id == category.id %}selected{% endif %}>
                                         {{ category.category_name }}
                                     </option>
                                 {% endfor %}                                
@@ -632,7 +667,7 @@
                 </div>
             </form>
             <div style="display:flex; gap:8px; margin-top:12px;">
-                <button id="confirmSaveDraftBtn" class="btn btn-primary">Save Draft</button>
+                <button id="confirmSaveDraftBtn" class="btn btn-primary" onclick="confirmSaveDraft(event)">Save Draft</button>
                 <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
             </div>
         </div>
@@ -653,372 +688,468 @@
         </div>
     </div>
 
-
 <script>
 
-    function showSpinner() {
-        let spinner = document.getElementById('ai-spinner');
-        const aiContentArea = document.getElementById('ai-content-area');
-        if (!spinner) {
-            // If spinner missing, create and append it inside the content area
-            if (!aiContentArea) return; // nothing to attach to
-            spinner = document.createElement('div');
-            spinner.id = 'ai-spinner';
-            spinner.style.marginTop = '8px';
-            spinner.innerHTML = `
-                <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
-                    <span class="visually-hidden">Loading...</span>
-                </div>`;
-            aiContentArea.appendChild(spinner);
-            // ensure view scrolls to show spinner/new content
-            scrollAIContentToBottom(false);
-        }
-        spinner.style.display = 'inline-flex';
-    }
-
-    function hideSpinner() {
-        const spinner = document.getElementById('ai-spinner');
-        if (spinner) {
-            spinner.style.display = 'none';
-        }
-    }
-    
-    async function addNewContent() {
-        // Clear the formatted content area
-        const currentContentArea = document.querySelector('.editor-panel:first-of-type .content-area');
-        if (currentContentArea) {
-            currentContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No content yet. Use AI Assistant to generate new content.</p>';
-        }
-        
-        // Clear the AI message area
-        const aiContentArea = document.querySelector('.editor-panel:last-of-type .content-area');
-        if (aiContentArea) {
-            aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Ready to generate content. Type your request below or use action buttons.</p>';
-        }
-        
-        // Send POST request to create new content entry
-        try {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
-                return;
-            }
-            
-            // Prepare payload with null prompt_data
-            const payload = {
-                category_id: document.getElementById('contentType').value,
-                prompt_data: null,
-                action: "NEW"
-            };
-            
-            // Send POST request
-            const response = await fetch('/user/content', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                // Check if token expired using global function
-                if (handleTokenExpiration(response)) {
-                    return;
-                }
-                
-                const errorData = await response.json();
-                alert('Error: ' + (errorData.detail || 'Failed to create new content'));
-                return;
-            }
-            
-            const result = await response.json();
-            console.log('New content created successfully:', result);
-            
-            // Store prompt_session_id in localStorage if returned
-            if (result.prompt_session_id) {
-                localStorage.setItem('prompt_session_id', result.prompt_session_id);
-                console.log('Stored prompt_session_id:', result.prompt_session_id);
-            }
-
-            // Store content_id in localStorage if returned 
-            if (result.content && result.content.id) {
-                localStorage.setItem('content_id', result.content.id);
-                console.log('Stored content_id:', result.content.id);
-            }
-            
-        } catch (error) {
-            console.error('Error creating new content:', error);
-            alert('Failed to create new content. Please try again.');
-        }
-    }
-    
-    function toggleSendButton() {
-        const promptInput = document.getElementById('ai-prompt-input');
-        const sendBtn = document.getElementById('ai-send-btn');
-        const promptText = promptInput.value.trim();
-        
-        // Enable button only if there's non-whitespace text
-        sendBtn.disabled = !promptText;
-    }
-    
-    function updateAIPreview() {
-        const promptInput = document.getElementById('ai-prompt-input');
-        const aiContentArea = document.getElementById('ai-content-area');
-        const inputText = promptInput.value.trim();
-        
-        // Check if there's already existing prompt history
-        const existingPrompts = aiContentArea.querySelectorAll('.user-prompt.success');
-        
-        if (inputText) {
-            // Remove any existing preview (not saved prompts)
-            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
-            if (existingPreview) {
-                existingPreview.remove();
-            }
-            
-            // Add new preview paragraph at the end
-            const previewParagraph = document.createElement('p');
-            previewParagraph.className = 'user-prompt';
-            previewParagraph.innerHTML = inputText.replace(/\n/g, '<br>');
-            aiContentArea.appendChild(previewParagraph);
-            // keep newest preview visible
-            scrollAIContentToBottom();
-        } else {
-            // Remove only the preview paragraph (not saved prompts)
-            const existingPreview = aiContentArea.querySelector('.user-prompt:not(.success)');
-            if (existingPreview) {
-                existingPreview.remove();
-            }
-            
-            // Show placeholder only if no saved prompts exist
-            if (existingPrompts.length === 0) {
-                aiContentArea.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Start typing to see your prompt...</p>';
-            }
-        }
-    }
-    
-    async function handleFormSubmit(event) {
-        event.preventDefault();
-        
-        const promptInput = document.getElementById('ai-prompt-input');
-        const sendBtn = document.getElementById('ai-send-btn');
-        const promptText = promptInput.value.trim();
-        
-        if (!promptText) {
-            return false;
-        }
-        
-        const aiContentArea = document.getElementById('ai-content-area');
-        const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
-        
-        sendBtn.disabled = true;
-
-        // 🔹 START SPINNER BEFORE API CALL
-        showSpinner();
-
-        try {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                hideSpinner();
-                window.location.replace('/?error=' + encodeURIComponent('Please login first'));
-                return false;
-            }
-            
-            const prompt_session_id = localStorage.getItem('prompt_session_id');
-            const content_id = localStorage.getItem('content_id');
-            
-            if (!prompt_session_id || !content_id) {
-                hideSpinner();
-                alert('Please click "Add New" first to start a new content session');
-                sendBtn.disabled = false;
-                return false;
-            }
-            
-            const payload = {
-                prompt_text: promptText,
-                content_id: parseInt(content_id),
-                prompt_session_id: prompt_session_id
-            };
-
-            const response = await fetch('/user/content/draft', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                hideSpinner();
-
-                if (handleTokenExpiration(response)) {
-                    return false;
-                }
-                
-                if (userPromptParagraph) {
-                    userPromptParagraph.classList.remove('success');
-                    userPromptParagraph.classList.add('error');
-                }
-                
-                const errorData = await response.json();
-                alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
-                sendBtn.disabled = false;
-                return false;
-            }
-            
-            const result = await response.json();
-            
-            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
-            if (previewParagraph) {
-                previewParagraph.remove();
-            }
-            
-            const previousLatest = aiContentArea.querySelectorAll('.latest-badge');
-            previousLatest.forEach(badge => badge.remove());
-            
-            const savedPromptDiv = document.createElement('p');
-            savedPromptDiv.className = 'user-prompt success';
-            savedPromptDiv.innerHTML =
-                promptText.replace(/\n/g, '<br>') +
-                '<span class="latest-badge">Latest</span>';
-            aiContentArea.appendChild(savedPromptDiv);
-
-            const timestamp = document.createElement('div');
-            timestamp.className = 'prompt-timestamp';
-            const now = new Date();
-            timestamp.textContent =
-                'Saved on ' +
-                now.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            aiContentArea.appendChild(timestamp);
-
-            // ensure the saved prompt and timestamp are visible
-            scrollAIContentToBottom();
-
-            promptInput.value = '';
-            sendBtn.disabled = true;
-
-            console.log('Prompt sent successfully:', result);
-
-            // 🔹 STOP SPINNER BEFORE LOADING HISTORY
-            hideSpinner();
-
-            loadPromptHistory();
-
-        } catch (error) {
-            console.error('Error sending prompt:', error);
-
-            hideSpinner();
-
-            const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
-            if (previewParagraph) {
-                previewParagraph.classList.add('error');
-            }
-
-            alert('Failed to send prompt. Please try again.');
-            sendBtn.disabled = false;
-        }
-
-        return false;
-    }
-    
-    // Allow Enter key to submit (Shift+Enter for new line)
-    document.addEventListener('DOMContentLoaded', function() {
-        const promptInput = document.getElementById('ai-prompt-input');
-        if (promptInput) {
-            promptInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    const form = document.getElementById('prompt-form');
-                    if (form) {
-                        form.dispatchEvent(new Event('submit'));
-                    }
-                }
-            });
-        }
-        
-        // Load prompt history on page load
+/* -------------------------
+   Document Init
+-------------------------- */
+function onDocumentLoad() {
+    try {
+        initViewTabs();
+        initAIInput();
+        showEmptyContextMessage();
         loadPromptHistory();
+    } catch (e) {
+        console.debug('onDocumentLoad error', e);
+    }
+}
+
+/* DOM ready */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onDocumentLoad);
+} else {
+    setTimeout(onDocumentLoad, 0);
+}
+
+window.onDocumentLoad = onDocumentLoad;
+
+/* ==========================================================
+   Scrape Source Data from URL
+========================================================== */
+
+async function fetchSourceData() {
+    const formData = {
+        source_url: document.getElementById('source_data_url').value.trim(),
+        page_name: `New page from URL ${document.getElementById('source_data_url').value.trim()}`,
+        category_id: document.getElementById('contentType').value || null,
+        scrape_data: true,
+        is_active: true
+    };
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        showAlert('Please login first', 'danger');
+        return;
+    }
+    
+    const sourceUrlInput = document.getElementById('source_data_url');
+
+    if (!sourceUrlInput) return;
+
+    const url = sourceUrlInput.value.trim();
+    if (!url) {
+        alert('Please enter a valid Source URL.');
+        return;
+    }
+
+    try {
+        
+        const response = await fetch('/user/create_page', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        showAISpinner();
+
+        const result = await response.json();
+
+        hideAISpinner();
+
+        if (response.ok) {
+            showAlert(result.message || 'Page created successfully!', 'success');
+        } else {
+            showAlert(result.detail || 'Failed to create page', 'danger');
+        }
+    } catch (error) {
+        console.error('Error creating page:', error);
+        showAlert('An error occurred while creating the page', 'danger');
+    }
+}
+
+// Show alert helper function
+function showAlert(message, type) {
+    const successAlert = document.getElementById('pageSuccessAlert');
+    const errorAlert = document.getElementById('pageErrorAlert');
+    
+    if (type === 'success') {
+        successAlert.textContent = message;
+        successAlert.style.display = 'block';
+        errorAlert.style.display = 'none';
+        
+        setTimeout(() => {
+            successAlert.style.display = 'none';
+        }, 5000);
+    } else {
+        errorAlert.textContent = message;
+        errorAlert.style.display = 'block';
+        successAlert.style.display = 'none';
+        
+        setTimeout(() => {
+            errorAlert.style.display = 'none';
+        }, 5000);
+    }
+}
+
+/* ==========================================================
+   View Tabs (Formatted / Raw / Source)
+========================================================== */
+function initViewTabs() {
+    const tabs = document.querySelectorAll('.view-tab');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const view = tab.dataset.view;
+            switchView(view);
+        });
     });
 
+    // Default view
+    switchView('formatted');
+}
+
+/*
+* Show or hide empty context message in formatted and AI content areas
+*/
+
+function showEmptyContextMessage() {
+    try {
+        const rawEl = document.getElementById('rawContent');
+        const aiContentArea = document.getElementById('ai-content-area');
+        const aiPromptInput = document.getElementById('ai-prompt-input');
+
+        if (!aiContentArea) return;
+        const isEmpty = !rawEl || !rawEl.value || rawEl.value.trim().length === 0;
+        let msg = document.getElementById('aiPanelMessage');
+        if (!msg) {
+            msg = document.createElement('p');
+            msg.id = 'aiPanelMessage';
+            msg.style.color = 'var(--text-secondary)';
+            msg.style.textAlign = 'center';
+            msg.style.padding = '40px';
+            msg.style.margin = '0';
+            aiContentArea.insertBefore(msg, aiContentArea.firstChild);
+        }
+        // Disable/enable Formatted and Source Data tabs if empty
+        const viewTabs = document.querySelectorAll('.view-tab');
+        viewTabs.forEach(tab => {
+            const tabText = (tab.textContent || '').toLowerCase();
+            if (tabText.includes('formatted') || tabText.includes('source data')) {
+                tab.disabled = isEmpty;
+                if (isEmpty) {
+                    tab.setAttribute('aria-disabled', 'true');
+                    tab.classList.add('disabled-tab');
+                } else {
+                    tab.removeAttribute('aria-disabled');
+                    tab.classList.remove('disabled-tab');
+                }
+            }
+        });
+        if (aiPromptInput) {
+            aiPromptInput.disabled = isEmpty;
+        }
+        if (isEmpty) {
+            msg.textContent = 'Please provide context in Source Data before using the AI assistant.';
+            msg.style.display = '';
+            // Force select the Source Data tab and view
+
+            const updated_by_agent = document.getElementById('updated_by_agent');
+            updated_by_agent.textContent = 'User Initiated';
+
+            switchView('source', true);
+            // Focus the rawContent textarea
+            if (rawEl) {
+                setTimeout(() => { rawEl.focus(); }, 100);
+            }
+        } else {
+            msg.textContent = '';
+            msg.style.display = 'none';
+        }
+    } catch (e) {
+        console.debug('showEmptyContextMessage error', e);
+    }
+}
+
+function switchView(view, strict = false) {
+    const formattedEl = document.getElementById('formattedContent');
+    const rawEl = document.getElementById('rawContent');
+    const sourceContent = document.getElementById('sourceContent');
     
-    async function loadPromptHistory() {
-        const prompt_session_id = localStorage.getItem('prompt_session_id');
-        const content_id = localStorage.getItem('content_id');
+    const formattedTab = document.getElementById('formattedTab');
+    const rawTab = document.getElementById('rawTab');
+    const sourceTab = document.getElementById('sourceTab');
+
+    if (!formattedEl || !rawEl || !sourceContent) return;
+
+    // Hide all views
+    formattedEl.style.display = 'none';
+    rawEl.style.display = 'none';
+
+    // Show selected view
+    if (view === 'formatted') {
+        formattedEl.style.display = '';
+    } else if (view === 'raw') {
+        rawEl.style.display = '';
+    } else if (view === 'source') {
+        sourceContent.style.display = '';
+    }
+
+    if (strict) {
+
+        formattedTab.style.pointerEvents = 'none';
+        rawTab.style.pointerEvents = 'none';
         
-        // Only load if we have both values
-        if (!prompt_session_id || !content_id) {
-            console.log('No prompt session found in localStorage');
+        formattedTab.classList.remove('active');
+        rawTab.classList.remove('active');
+
+        formattedTab.disabled = true;
+        rawTab.disabled = true;
+        sourceTab.classList.add('active');
+        sourceTab.disabled = false;
+        return;
+    }
+}
+
+
+
+
+/* ==========================================================
+   Top Actions
+   ========================================================== */
+function addNewContent() {
+    
+    const ai_content_area = document.getElementById('ai-content-area');
+    const updated_by_agent = document.getElementById('updated_by_agent');
+
+    updated_by_agent.textContent = 'User Initiated';
+
+    if (!ai_content_area) {
+        return;
+    }    
+
+    // Clear content areas
+    ai_content_area.innerHTML = '';
+    const formattedEl = document.getElementById('formattedContent');
+    const rawEl = document.getElementById('rawContent');
+
+    if (formattedEl) {
+        formattedEl.innerHTML = '';
+    }
+    if (rawEl) {
+        rawEl.value = '';
+    }
+    switchView('source', true);
+    showEmptyContextMessage();
+}
+
+
+
+/* ==========================================================
+   AI Prompt Handling
+==========================================================*/
+function initAIInput() {
+    toggleSendButton();
+}
+
+function toggleSendButton() {
+    const input = document.getElementById('ai-prompt-input');
+    const sendBtn = document.getElementById('ai-send-btn');
+
+    if (!input || !sendBtn) return;
+
+    sendBtn.disabled = input.value.trim().length === 0;
+}
+
+function updateAIPreview() {
+    const input = document.getElementById('ai-prompt-input');
+    const preview = document.getElementById('ai-preview-text');
+
+    if (!input || !preview) return;
+
+    if (input.value.trim()) {
+        preview.textContent = input.value;
+    } else {
+        preview.textContent = 'Start typing to see your prompt...';
+    }
+}
+
+
+/* ==========================================================
+   AI Utility Helpers
+   ========================================================== */
+function scrollAIContentToBottom(smooth = true) {
+    const area = document.getElementById('ai-content-area');
+    if (!area) return;
+
+    if (smooth && area.scrollTo) {
+        area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
+    } else {
+        area.scrollTop = area.scrollHeight;
+    }
+}
+
+function showAISpinner() {
+    const spinner = document.getElementById('ai-spinner');
+    if (spinner) spinner.style.display = 'block';
+}
+
+function hideAISpinner() {
+    const spinner = document.getElementById('ai-spinner');
+    if (spinner) spinner.style.display = 'none';
+}
+
+function showSpinner() {
+    let spinner = document.getElementById('ai-spinner');
+    const aiContentArea = document.getElementById('ai-content-area');
+    if (!spinner) {
+        // If spinner missing, create and append it inside the content area
+        if (!aiContentArea) return; // nothing to attach to
+        spinner = document.createElement('div');
+        spinner.id = 'ai-spinner';
+        spinner.style.marginTop = '8px';
+        spinner.innerHTML = `
+            <div class="spinner-border text-light" role="status" style="width:20px; height:20px;">
+                <span class="visually-hidden">Loading...</span>
+            </div>`;
+        aiContentArea.appendChild(spinner);
+        // ensure view scrolls to show spinner/new content
+        scrollAIContentToBottom(false);
+    }
+    spinner.style.display = 'inline-flex';
+}
+
+function hideSpinner() {
+    const spinner = document.getElementById('ai-spinner');
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+}
+
+async function loadPromptHistory() {
+    const prompt_session_id = localStorage.getItem('prompt_session_id');
+    const content_id = localStorage.getItem('content_id');
+    
+    // Only load if we have both values
+    if (!prompt_session_id || !content_id) {
+        console.log('No prompt session found in localStorage');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
             return;
         }
         
-        try {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
+        const response = await fetch(`/user/prompt_history/${prompt_session_id}/${content_id}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            if (handleTokenExpiration(response)) {
                 return;
             }
-            
-            const response = await fetch(`/user/prompt_history/${prompt_session_id}/${content_id}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                if (handleTokenExpiration(response)) {
-                    return;
-                }
-                console.error('Failed to load prompt history');
-                return;
-            }
-            
-            const promptHistories = await response.json();
-            
-            // Display prompt histories in AI content area
-            const aiContentArea = document.getElementById('ai-content-area');
-            if (aiContentArea && promptHistories.length > 0) {
-                aiContentArea.innerHTML = '';
-                
-                promptHistories.forEach((ph, index) => {
-                    if (ph.user_prompt) {
-                        const isLatest = index === promptHistories.length - 1;
-                        const promptDiv = document.createElement('p');
-                        promptDiv.className = 'user-prompt success';
-                        promptDiv.innerHTML = ph.user_prompt + 
-                            (isLatest ? '<span class="latest-badge">Latest</span>' : '');
-                        aiContentArea.appendChild(promptDiv);
-                        
-                        // Add timestamp
-                        const timestamp = document.createElement('div');
-                        timestamp.className = 'prompt-timestamp';
-                        const createdDate = new Date(ph.created_on);
-                        const options = { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric', 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                        };
-                        timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
-                        aiContentArea.appendChild(timestamp);
+            console.error('Failed to load prompt history');
+            return;
+        }
+        
+        const promptHistories = await response.json();
+        
+        // Display prompt histories in AI content area
+        const aiContentArea = document.getElementById('ai-content-area');
+        if (aiContentArea && promptHistories.length > 0) {
+            aiContentArea.innerHTML = '';
+            // hide centralized aiPanelMessage when rendering prompt history
+            try { const msg = document.getElementById('aiPanelMessage'); if (msg) msg.style.display = 'none'; } catch (e) {}
 
-                        // Add Response from the server if any (optional)
-                        if (ph.ai_response) {
-                            const aiResponseDiv = document.createElement('div');
-                            aiResponseDiv.className = 'ai-message';
-                            aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
-                            // Append action buttons inside ai-message at its bottom
-                            const actionsDiv = document.createElement('div');
-                            actionsDiv.className = 'message-actions';
+            let lastAction = null;
+            let lastActionDate = null;
+            let lastActionLabel = null;
+
+            promptHistories.forEach((ph, index) => {
+                if (ph.user_prompt) {
+                    const isLatest = index === promptHistories.length - 1;
+                    const promptDiv = document.createElement('p');
+                    promptDiv.className = 'user-prompt success';
+                    promptDiv.innerHTML = ph.user_prompt + 
+                        (isLatest ? '<span class="latest-badge">Latest</span>' : '');
+                    aiContentArea.appendChild(promptDiv);
+
+                    // Add timestamp
+                    const timestamp = document.createElement('div');
+                    timestamp.className = 'prompt-timestamp';
+                    const createdDate = new Date(ph.created_on);
+                    const options = { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    };
+                    timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
+                    aiContentArea.appendChild(timestamp);
+
+                    // Track last action for status line
+                    if (["SAVED_AS_DRAFT", "APPROVED", "REJECTED"].includes(ph.prompt_action) && ph.updated_on) {
+                        lastAction = ph.prompt_action;
+                        lastActionDate = ph.updated_on;
+                        switch (ph.prompt_action) {
+                            case "SAVED_AS_DRAFT":
+                                lastActionLabel = "Saved as Draft";
+                                break;
+                            case "APPROVED":
+                                lastActionLabel = "Approved";
+                                break;
+                            case "REJECTED":
+                                lastActionLabel = "Rejected";
+                                break;
+                        }
+                    }
+
+                    // Add Response from the server if any (optional)
+                    if (ph.ai_response) {
+                        const aiResponseDiv = document.createElement('div');
+                        aiResponseDiv.className = 'ai-message';
+                        if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                            aiResponseDiv.classList.add('ai-message-draft');
+                        }
+                        aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
+                        // Append action buttons inside ai-message at its bottom
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'message-actions';
+
+                        // Render action buttons
+                        if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                            actionsDiv.innerHTML = `
+                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                            `;
+                        }
+                        else if (ph.prompt_action === "REJECTED") {
+                            actionsDiv.innerHTML = `
+                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                            `;
+                        }
+                        else if (ph.prompt_action === "APPROVED") {
+                            actionsDiv.innerHTML = `
+                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                    <i class="bi bi-x-circle"></i> Reject
+                                </button>
+                            `;
+                        }else{
                             actionsDiv.innerHTML = `
                                 <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
                                     <i class="bi bi-file-earmark"></i> Save Draft
@@ -1030,224 +1161,319 @@
                                     <i class="bi bi-check-circle"></i> Approve
                                 </button>
                             `;
-                            aiResponseDiv.appendChild(actionsDiv);
-                            aiContentArea.appendChild(aiResponseDiv);
-                        }   
-                    }
-                });
-                // after everything is rendered, scroll to bottom so latest items are visible
-                scrollAIContentToBottom(false);
-            }
-            
-        } catch (error) {
-            console.error('Error loading prompt history:', error);
-        }
-    }
-
-    // -----------------------------
-    // Actions for AI response buttons
-    // -----------------------------
-    // Open confirmation offcanvas for saving draft
-    function saveDraftFromResponse(phId) {
-        if (!phId) { alert('Invalid prompt history id'); return; }
-        const input = document.getElementById('offcanvasSaveDraft_phId');
-        if (input) input.value = phId;
-            // Try to locate the AI response HTML for this prompt id and populate the draft content
-        try {
-            const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
-            const sourceBtn = document.querySelector(btnSelector);
-                let aiHtml = '';
-            if (sourceBtn) {
-                const aiMsg = sourceBtn.closest('.ai-message');
-                if (aiMsg) {
-                    // Clone the node and remove action buttons so button labels are excluded
-                    const clone = aiMsg.cloneNode(true);
-                    const actions = clone.querySelector('.message-actions');
-                    if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
-                        // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
-                        aiHtml = (clone.innerHTML || '').trim();
-                        // If innerHTML is empty for some reason, fall back to text with <br> replacement
-                        if (!aiHtml) {
-                            const fallbackText = (clone.textContent || '').trim();
-                            aiHtml = fallbackText.replace(/\n/g, '<br>');
                         }
+                        aiResponseDiv.appendChild(actionsDiv);
+                        aiContentArea.appendChild(aiResponseDiv);
+                    }   
                 }
+            });
+
+            // Show last action line if available
+            if (lastAction && lastActionDate && lastActionLabel) {
+                const statusLine = document.createElement('div');
+                statusLine.style.cssText = 'margin-top: 18px; padding: 10px 0 0 0; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 11px; text-align: left;';
+                // Format date as Dec 31, 2025, 05:53 PM
+                const d = new Date(lastActionDate);
+                const dateStr = d.toLocaleString('en-US', {
+                    month: 'short',
+                    day: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
+                aiContentArea.appendChild(statusLine);
             }
-            const draftContentEl = document.getElementById('draftContent');
-            const draftNotesEl = document.getElementById('draftNotes');
-            const draftNameEl = document.getElementById('draftName');
-            if (draftContentEl) {
-                // Insert HTML so any <br> or markup is preserved and existing content remains.
-                if (aiHtml) {
-                    draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
-                }
-            }
-            if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
-            if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
-        } catch (e) {
-            console.debug('Could not prefill draft content', e);
+
+            // after everything is rendered, scroll to bottom so latest items are visible
+            scrollAIContentToBottom(false);
         }
-        const el = document.getElementById('offcanvasSaveDraft');
-        if (el && window.bootstrap && bootstrap.Offcanvas) {
-            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
-            // show on next frame to avoid layout thrash
-            requestAnimationFrame(() => off.show());
-        }
+        
+    } catch (error) {
+        console.error('Error loading prompt history:', error);
     }
+}
 
-    // Immediate reject (keeps current behaviour)
-    async function rejectResponse(phId) {
-        return await _promptHistoryAction(phId, 'reject', 'Rejecting response...');
+
+async function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    const promptInput = document.getElementById('ai-prompt-input');
+    const sendBtn = document.getElementById('ai-send-btn');
+    const promptText = promptInput.value.trim();
+    
+    if (!promptText) {
+        return false;
     }
+    
+    const aiContentArea = document.getElementById('ai-content-area');
+    const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
+    
+    sendBtn.disabled = true;
 
-    // Open confirmation offcanvas for approve
-    function approveResponse(phId) {
-        if (!phId) { alert('Invalid prompt history id'); return; }
-        const input = document.getElementById('offcanvasApprove_phId');
-        if (input) input.value = phId;
-        const el = document.getElementById('offcanvasApprove');
-        if (el && window.bootstrap && bootstrap.Offcanvas) {
-            const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
-            // show on next frame to avoid layout thrash
-            requestAnimationFrame(() => off.show());
-        }
-    }
+    // START SPINNER BEFORE API CALL
+    showSpinner();
 
-    async function _promptHistoryAction(phId, action, spinnerText, payload = null) {
-        if (!phId) {
-            alert('Action failed: invalid prompt history id');
-            return;
-        }
-
-        // Find the button that invoked this action so we can disable/restore it
-        const selector = `[onclick="${action==='save_draft'?'saveDraftFromResponse':action==='reject'?'rejectResponse':'approveResponse'}(${phId})"]`;
-        const btn = document.querySelector(selector);
-        const originalHtml = btn ? btn.innerHTML : null;
-
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${spinnerText}`;
-        }
-
+    try {
         const token = localStorage.getItem('access_token');
         if (!token) {
-            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+            hideSpinner();
             window.location.replace('/?error=' + encodeURIComponent('Please login first'));
-            return;
+            return false;
         }
+        
+        const prompt_session_id = localStorage.getItem('prompt_session_id');
+        const content_id = localStorage.getItem('content_id');
+        
+        if (!prompt_session_id || !content_id) {
+            hideSpinner();
+            alert('Please click "Add New" first to start a new content session');
+            sendBtn.disabled = false;
+            return false;
+        }
+        
+        const payload = {
+            prompt_text: promptText,
+            content_id: parseInt(content_id),
+            prompt_session_id: prompt_session_id
+        };
 
-        try {
-            // Primary attempt: a single action endpoint
-            const bodyObj = Object.assign({ action: action }, (payload || {}));
-            let res = await fetch(`/user/prompt_history/${phId}/action`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyObj)
+        const response = await fetch('/user/content/draft', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            hideSpinner();
+
+            if (handleTokenExpiration(response)) {
+                return false;
+            }
+            
+            if (userPromptParagraph) {
+                userPromptParagraph.classList.remove('success');
+                userPromptParagraph.classList.add('error');
+            }
+            
+            const errorData = await response.json();
+            alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
+            sendBtn.disabled = false;
+            return false;
+        }
+        
+        const result = await response.json();
+        
+        const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+        if (previewParagraph) {
+            previewParagraph.remove();
+        }
+        
+        const savedPromptDiv = document.createElement('p');
+        savedPromptDiv.className = 'user-prompt success';
+        savedPromptDiv.innerHTML = promptText.replace(/\n/g, '<br>') + '<span class="latest-badge">Latest</span>';
+        aiContentArea.appendChild(savedPromptDiv);
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'prompt-timestamp';
+        const now = new Date();
+        timestamp.textContent =
+            'Saved on ' +
+            now.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
+        aiContentArea.appendChild(timestamp);
 
-            // Fallback: try a RESTy /{action} endpoint if /action returned 404
-            if (res.status === 404) {
-                res = await fetch(`/user/prompt_history/${phId}/${action}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload || {})
-                });
-            }
+        // ensure the saved prompt and timestamp are visible
+        scrollAIContentToBottom();
 
-            if (!res.ok) {
-                let errMsg = res.statusText || 'Request failed';
-                try {
-                    const json = await res.json();
-                    if (json && json.detail) errMsg = json.detail;
-                } catch (e) {
-                    // ignore JSON parse errors
-                }
-                alert('Action failed: ' + errMsg);
-            } else {
-                // Refresh prompt history to reflect changes
-                await loadPromptHistory();
-            }
+        promptInput.value = '';
+        sendBtn.disabled = true;
 
-        } catch (error) {
-            console.error('Error performing prompt history action:', error);
-            alert('Network error while performing action. See console for details.');
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-            }
+        console.log('Prompt sent successfully:', result);
+
+        // STOP SPINNER BEFORE LOADING HISTORY
+        hideSpinner();
+
+        loadPromptHistory();
+
+    } catch (error) {
+        console.error('Error sending prompt:', error);
+
+        hideSpinner();
+
+        const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
+        if (previewParagraph) {
+            previewParagraph.classList.add('error');
         }
+
+        alert('Failed to send prompt. Please try again.');
+        sendBtn.disabled = false;
     }
 
-    // Confirm buttons for offcanvas
-    document.addEventListener('DOMContentLoaded', function() {
-        const confirmSaveBtn = document.getElementById('confirmSaveDraftBtn');
-        if (confirmSaveBtn) {
-            confirmSaveBtn.addEventListener('click', async function() {
-                const phId = document.getElementById('offcanvasSaveDraft_phId').value;
-                const el = document.getElementById('offcanvasSaveDraft');
-                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
-                // disable while processing
-                confirmSaveBtn.disabled = true;
-                const original = confirmSaveBtn.innerHTML;
-                confirmSaveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
-                try {
-                    const draftName = document.getElementById('draftName') ? document.getElementById('draftName').value : '';
-                    const draftNotes = document.getElementById('draftNotes') ? document.getElementById('draftNotes').value : '';
-                    const draftContentEl = document.getElementById('draftContent');
-                    // prefer innerHTML for rich content stored in a div, fallback to textContent
-                    const draftContent = draftContentEl ? (draftContentEl.innerHTML || draftContentEl.textContent || '') : '';
-                    const payload = { draft_name: draftName, draft_notes: draftNotes, draft_content: draftContent };
-                    await _promptHistoryAction(phId, 'save_draft', 'Saving draft...', payload);
-                    if (off) off.hide();
-                } finally {
-                    confirmSaveBtn.disabled = false;
-                    confirmSaveBtn.innerHTML = original;
-                }
-            });
-        }
+    return false;
+}
 
-        const confirmApproveBtn = document.getElementById('confirmApproveBtn');
-        if (confirmApproveBtn) {
-            confirmApproveBtn.addEventListener('click', async function() {
-                const phId = document.getElementById('offcanvasApprove_phId').value;
-                const el = document.getElementById('offcanvasApprove');
-                const off = (window.bootstrap && bootstrap.Offcanvas) ? (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })) : null;
-                confirmApproveBtn.disabled = true;
-                const original = confirmApproveBtn.innerHTML;
-                confirmApproveBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Approving...`;
-                try {
-                    await _promptHistoryAction(phId, 'approve', 'Approving response...');
-                    if (off) off.hide();
-                } finally {
-                    confirmApproveBtn.disabled = false;
-                    confirmApproveBtn.innerHTML = original;
-                }
-            });
+
+
+function saveDraftFromResponse(phId) {
+    if (!phId) { alert('Invalid prompt history id'); return; }
+    const input = document.getElementById('offcanvasSaveDraft_phId');
+    if (input) input.value = phId;
+        // Try to locate the AI response HTML for this prompt id and populate the draft content
+    try {
+        const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
+        const sourceBtn = document.querySelector(btnSelector);
+            let aiHtml = '';
+        if (sourceBtn) {
+            const aiMsg = sourceBtn.closest('.ai-message');
+            if (aiMsg) {
+                // Clone the node and remove action buttons so button labels are excluded
+                const clone = aiMsg.cloneNode(true);
+                const actions = clone.querySelector('.message-actions');
+                if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
+                    // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
+                    aiHtml = (clone.innerHTML || '').trim();
+                    // If innerHTML is empty for some reason, fall back to text with <br> replacement
+                    if (!aiHtml) {
+                        const fallbackText = (clone.textContent || '').trim();
+                        aiHtml = fallbackText.replace(/\n/g, '<br>');
+                    }
+            }
         }
+        const draftContentEl = document.getElementById('draftContent');
+        const draftNotesEl = document.getElementById('draftNotes');
+        const draftNameEl = document.getElementById('draftName');
+        if (draftContentEl) {
+            // Insert HTML so any <br> or markup is preserved and existing content remains.
+            if (aiHtml) {
+                draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
+            }
+        }
+        if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
+        if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
+    } catch (e) {
+        console.debug('Could not prefill draft content', e);
+    }
+    const el = document.getElementById('offcanvasSaveDraft');
+    if (el && window.bootstrap && bootstrap.Offcanvas) {
+        const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+        // show on next frame to avoid layout thrash
+        requestAnimationFrame(() => off.show());
+    }
+}
+
+
+
+
+/* ==========================================================
+   Offcanvas Actions (Draft / Approve)
+   ========================================================== */
+function openSaveDraftOffcanvas(promptHistoryId) {
+    // TODO: populate & open save draft offcanvas
+}
+
+async function confirmSaveDraft(event) {
+    event.preventDefault();
+
+    const phIdInput = document.getElementById('offcanvasSaveDraft_phId');
+    if (!phIdInput || !phIdInput.value) {
+        alert('Invalid prompt history id');
+        return;
+    }
+
+    const phId = phIdInput.value;
+    alert('Save draft for prompt history id: ' + phId);
+
+    await setPromptAction(
+        phId, 
+        'SAVED_AS_DRAFT',
+        prompt_name = document.getElementById('draftName').value.trim(),
+        prompt_description = document.getElementById('draftNotes').value.trim(),
+    );
+}
+
+async function setPromptAction(
+    phId, 
+    prompt_action = 'SAVED_AS_DRAFT',
+    prompt_name = null,
+    prompt_description = null
+) {
+
+    showSpinner();
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        hideSpinner();
+        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+        return false;
+    }
+
+    payload = {
+        prompt_history_id: parseInt(phId),
+        prompt_action: prompt_action,
+        prompt_name: prompt_name,
+        prompt_description: prompt_description,
+    };
+
+    const response = await fetch(`/user/prompt_history/set_action`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
     });
+    
+    if (!response.ok) {
+        hideSpinner();
 
-    // Scroll helper: always scroll the AI content area to the bottom.
-    // Pass `smooth = true` for smooth scrolling, or `false` for immediate.
-    function scrollAIContentToBottom(smooth = true) {
-        try {
-            const aiContentArea = document.getElementById('ai-content-area');
-            if (!aiContentArea) return;
-            if (smooth && aiContentArea.scrollTo) {
-                aiContentArea.scrollTo({ top: aiContentArea.scrollHeight, behavior: 'smooth' });
-            } else {
-                aiContentArea.scrollTop = aiContentArea.scrollHeight;
-            }
-        } catch (e) {
-            // silently ignore
-            console.debug('scrollAIContentToBottom error', e);
+        if (handleTokenExpiration(response)) {
+            return false;
         }
     }
+    
+    const result = await response.json();
+
+}
+
+async function rejectResponse(phId) {
+    await setPromptAction(
+        phId, 
+        'REJECTED',
+        prompt_name = null,
+        prompt_description = null,
+    );
+}
+
+function openApproveOffcanvas(promptHistoryId) {
+    // TODO: populate & open approve offcanvas
+}
+
+function confirmApprove() {
+    // TODO: implement approve confirmation
+}
+
+
+/* ==========================================================
+   Regenerate Content
+   ========================================================== */
+function regenerateContent() {
+    // TODO: implement regenerate logic
+}
+
+
 </script>
+
+
+
+
 {% endblock %}

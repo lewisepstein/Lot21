@@ -1,0 +1,5 @@
+2026-01-03 11:42:39 - rag_module.rag - INFO - Weaviate client initialized in RagModule
+2026-01-03 11:42:39 - rag_module.rag - INFO - OpenAI client initialized in RagModule
+2026-01-03 11:42:39 - rag_module.rag - INFO - Generating content | Query: Refine content... | Category: understanding
+2026-01-03 11:42:39 - rag_module.rag - ERROR - Error retrieving context from Weaviate: Query call with protocol GRPC search failed with message VectorFromInput was called without vectorizer on class Training_data for input Refine content.
+2026-01-03 11:42:44 - rag_module.rag - INFO - Generation complete | Content: 1717 chars | Explanation: 0 chars
