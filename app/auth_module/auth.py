@@ -20,7 +20,6 @@ from auth_module.auth_utils import (
     verify_token,
     get_user_data,
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    invalidate_all_user_sessions
 )
 
 from validations.auth import (

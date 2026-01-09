@@ -472,6 +472,17 @@
         }
     }
 
+    .prompt-action-status{
+        margin-top: 18px; 
+        margin-bottom:15px; 
+        padding: 10px 0 0 0; 
+        border-top: 1px solid var(--border-color); 
+        color: var(--text-secondary); 
+        font-weight:bold; 
+        font-size: 13px; 
+        text-align: left;
+    }
+
 </style>
 
         <!-- Top Actions Bar -->
@@ -1093,7 +1104,7 @@ async function loadPromptHistory() {
                         hour: '2-digit', 
                         minute: '2-digit' 
                     };
-                    timestamp.textContent = 'Saved on ' + createdDate.toLocaleDateString('en-US', options);
+                    timestamp.textContent = createdDate.toLocaleDateString('en-US', options);
                     aiContentArea.appendChild(timestamp);
 
                     // Track last action for status line
@@ -1164,27 +1175,37 @@ async function loadPromptHistory() {
                         }
                         aiResponseDiv.appendChild(actionsDiv);
                         aiContentArea.appendChild(aiResponseDiv);
+                        // Show last action line if available
+                        if (lastActionDate && lastActionLabel) {
+                            const statusLine = document.createElement('div');
+                            statusLine.className = 'prompt-action-status';
+                            
+                            if(lastAction == "APPROVED"){
+                                statusLine.style.color = '#28a745';
+                            } else if(lastAction == "REJECTED"){
+                                statusLine.style.color = '#ff0000';
+                            } else {
+                                statusLine.style.color = 'var(--text-secondary)';
+                            }
+                            
+                            // Format date as Dec 31, 2025, 05:53 PM
+                            const d = new Date(lastActionDate);
+                            const dateStr = d.toLocaleString('en-US', {
+                                month: 'short',
+                                day: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                            });
+                            statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
+                            aiContentArea.appendChild(statusLine);
+                        }
                     }   
                 }
             });
 
-            // Show last action line if available
-            if (lastAction && lastActionDate && lastActionLabel) {
-                const statusLine = document.createElement('div');
-                statusLine.style.cssText = 'margin-top: 18px; padding: 10px 0 0 0; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 11px; text-align: left;';
-                // Format date as Dec 31, 2025, 05:53 PM
-                const d = new Date(lastActionDate);
-                const dateStr = d.toLocaleString('en-US', {
-                    month: 'short',
-                    day: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                });
-                statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
-                aiContentArea.appendChild(statusLine);
-            }
+            
 
             // after everything is rendered, scroll to bottom so latest items are visible
             scrollAIContentToBottom(false);
@@ -1381,33 +1402,12 @@ function openSaveDraftOffcanvas(promptHistoryId) {
     // TODO: populate & open save draft offcanvas
 }
 
-async function confirmSaveDraft(event) {
-    event.preventDefault();
-
-    const phIdInput = document.getElementById('offcanvasSaveDraft_phId');
-    if (!phIdInput || !phIdInput.value) {
-        alert('Invalid prompt history id');
-        return;
-    }
-
-    const phId = phIdInput.value;
-    alert('Save draft for prompt history id: ' + phId);
-
-    await setPromptAction(
-        phId, 
-        'SAVED_AS_DRAFT',
-        prompt_name = document.getElementById('draftName').value.trim(),
-        prompt_description = document.getElementById('draftNotes').value.trim(),
-    );
-}
-
 async function setPromptAction(
     phId, 
     prompt_action = 'SAVED_AS_DRAFT',
     prompt_name = null,
     prompt_description = null
 ) {
-
     showSpinner();
 
     const token = localStorage.getItem('access_token');
@@ -1442,24 +1442,54 @@ async function setPromptAction(
     }
     
     const result = await response.json();
-
+    loadPromptHistory();
 }
 
-async function rejectResponse(phId) {
+async function confirmSaveDraft(event) {
+    event.preventDefault();
+
+    const phIdInput = document.getElementById('offcanvasSaveDraft_phId');
+    if (!phIdInput || !phIdInput.value) {
+        alert('Invalid prompt history id');
+        return;
+    }
+
+    const phId = phIdInput.value;
+    alert('Save draft for prompt history id: ' + phId);
+
     await setPromptAction(
         phId, 
-        'REJECTED',
-        prompt_name = null,
-        prompt_description = null,
+        'SAVED_AS_DRAFT',
+        prompt_name = document.getElementById('draftName').value.trim(),
+        prompt_description = document.getElementById('draftNotes').value.trim(),
     );
 }
 
-function openApproveOffcanvas(promptHistoryId) {
-    // TODO: populate & open approve offcanvas
+async function rejectResponse(phId) {
+
+    confirm = confirm('Are you sure you want to reject this AI response? This action cannot be undone.');
+    if (!confirm) return;
+    else{
+        await setPromptAction(
+            phId, 
+            'REJECTED',
+            prompt_name = null,
+            prompt_description = null,
+        );
+    }
 }
 
-function confirmApprove() {
-    // TODO: implement approve confirmation
+async function approveResponse(phId) {
+    confirm = confirm('Are you sure you want to approve this AI response?');
+    if (!confirm) return;
+    else{
+        await setPromptAction(
+            phId, 
+            'APPROVED',
+            prompt_name = null,
+            prompt_description = null,
+        );
+    }
 }
 
 
