@@ -3,7 +3,6 @@ Helper utility functions for common operations.
 """
 from typing import Optional
 from datetime import datetime
-import logging
 import re
 
 from service_utils.date_exceptions import DateConversionError, InvalidDateFormatError

@@ -49,7 +49,7 @@ class Content(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     task_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     page_id = Column(Integer, ForeignKey("pages.id"), nullable=True)
     prompt_data = Column(Text, nullable=True)
     generated_content = Column(Text, nullable=True)

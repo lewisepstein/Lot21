@@ -526,10 +526,10 @@
                 
                 <div class="view-tabs">
                     <button class="view-tab active" data-view="formatted" id="formattedTab">
-                        <i class="bi bi-justify-left"></i> Formatted
+                        <i class="bi bi-justify-left"></i> Formatted Data
                     </button>
                     <button class="view-tab" data-view="raw" id="rawTab">
-                        <i class="bi bi-code-slash"></i> Raw HTML
+                        <i class="bi bi-code-slash"></i> Raw Data
                     </button>
                     <button class="view-tab" data-view="source" id="sourceTab">
                         <i class="bi bi-database"></i> Source Data
@@ -578,9 +578,6 @@
                 <div class="ai-header">
                     <i class="bi bi-stars ai-icon"></i>
                     <h2 class="panel-title">AI Generation Assistant</h2>
-                    <button class="regenerate-btn">
-                        <i class="bi bi-arrow-clockwise"></i> Regenerate
-                    </button>
                 </div>
                 
                 <div id="ai-content-area" class="content-area">
@@ -599,20 +596,12 @@
                 </div>
                 
                 <div class="ai-input-area">
-                    <div class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div id="ai-actions-area" class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; gap: 8px;">
-                            <button class="ai-action-btn">
-                                <i class="bi bi-arrow-clockwise"></i> Refine
-                            </button>
-                            <button class="ai-action-btn">
-                                <i class="bi bi-arrows-angle-expand"></i> Expand
-                            </button>
-                            <button class="ai-action-btn">
-                                <i class="bi bi-arrows-collapse"></i> Shorten
-                            </button>
-                            <button class="ai-action-btn">
-                                <i class="bi bi-list-ul"></i> Add References
-                            </button>
+                            <input type="file" id="uploadInput" style="display: none;" accept="*/*">
+                            <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;">
+                                <i class="bi bi-paperclip"></i> Attach
+                            </label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
@@ -684,7 +673,7 @@
         </div>
     </div>
 
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasApprove" aria-labelledby="offcanvasApproveLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+    <!-- <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasApprove" aria-labelledby="offcanvasApproveLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
         <div class="offcanvas-header">
             <h5 id="offcanvasApproveLabel" style="color:#fff">Approve AI Response</h5>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -697,6 +686,12 @@
                 <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
             </div>
         </div>
+    </div> -->
+
+    <!-- Image Preview Modal -->
+    <div id="imageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); cursor: pointer;" onclick="closeImageModal()">
+        <span style="position: absolute; top: 20px; right: 40px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;" onclick="closeImageModal()">&times;</span>
+        <img id="modalImage" style="margin: auto; display: block; max-width: 90%; max-height: 90%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
     </div>
 
 <script>
@@ -710,8 +705,104 @@ function onDocumentLoad() {
         initAIInput();
         showEmptyContextMessage();
         loadPromptHistory();
+        initFileUpload();
     } catch (e) {
         console.debug('onDocumentLoad error', e);
+    }
+}
+
+/* ==========================================================
+   File Upload Handler
+========================================================== */
+function initFileUpload() {
+    const uploadInput = document.getElementById('uploadInput');
+    if (uploadInput) {
+        uploadInput.addEventListener('change', handleFileUpload);
+    }
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check if it's an image
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        event.target.value = ''; // Clear the input
+        return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const base64String = e.target.result;
+        console.log('Image converted to base64:', base64String);
+        
+        // Store the base64 string in a global variable for access
+        window.lastUploadedImage = base64String;
+        
+        // Insert the base64 image into the ai-actions area
+        const aiActionsArea = document.getElementById('ai-actions-area');
+        if (aiActionsArea) {
+            const imgId = 'attachedImage_' + Date.now();
+            const imgTag = `<img id="${imgId}" src="${base64String}" alt="Attached Image" 
+                onclick="openImageModal('${imgId}')"
+                style="max-width: 50px;
+                height: auto;
+                margin-left: 8px;
+                border: 2px solid #eeeeee; 
+                border-radius: 5px;
+                cursor: pointer;" 
+            />`;
+            
+            // Find the first div inside ai-actions-area and append the image
+            const firstDiv = aiActionsArea.querySelector('div');
+            if (firstDiv) {
+                firstDiv.insertAdjacentHTML('beforeend', imgTag);
+            }
+            
+            // Check and enable prompt input if content is now available
+            checkAndEnablePromptInput();
+        }
+        
+        alert('Image uploaded and converted to base64 successfully! Click on the image to view it.');
+    };
+    
+    reader.onerror = function(error) {
+        console.error('Error reading file:', error);
+        alert('Failed to read the image file.');
+    };
+    
+    // Read the file as a data URL (base64)
+    reader.readAsDataURL(file);
+    
+    // Clear the input so the same file can be selected again if needed
+    event.target.value = '';
+}
+
+/* ==========================================================
+   Image Modal Functions
+========================================================== */
+function openImageModal(imgId) {
+    console.log('openImageModal called with imgId:', imgId);
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const sourceImg = document.getElementById(imgId);
+    
+    if (modal && modalImg && sourceImg) {
+        modal.style.display = 'block';
+        modalImg.src = sourceImg.src;
+        console.log('Modal opened with image');
+    } else {
+        console.error('Modal elements not found:', {modal, modalImg, sourceImg});
+    }
+}
+
+function closeImageModal() {
+    console.log('closeImageModal called');
+    const modal = document.getElementById('imageModal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 }
 
@@ -898,28 +989,37 @@ function switchView(view, strict = false) {
     // Hide all views
     formattedEl.style.display = 'none';
     rawEl.style.display = 'none';
+    sourceContent.style.display = 'none';
 
-    // Show selected view
+    // Remove active class from all tabs
+    if (formattedTab) formattedTab.classList.remove('active');
+    if (rawTab) rawTab.classList.remove('active');
+    if (sourceTab) sourceTab.classList.remove('active');
+
+    // Show selected view and activate corresponding tab
     if (view === 'formatted') {
         formattedEl.style.display = '';
+        if (formattedTab) formattedTab.classList.add('active');
     } else if (view === 'raw') {
         rawEl.style.display = '';
+        if (rawTab) rawTab.classList.add('active');
     } else if (view === 'source') {
         sourceContent.style.display = '';
+        if (sourceTab) sourceTab.classList.add('active');
     }
 
     if (strict) {
-
-        formattedTab.style.pointerEvents = 'none';
-        rawTab.style.pointerEvents = 'none';
-        
-        formattedTab.classList.remove('active');
-        rawTab.classList.remove('active');
-
-        formattedTab.disabled = true;
-        rawTab.disabled = true;
-        sourceTab.classList.add('active');
-        sourceTab.disabled = false;
+        if (formattedTab) {
+            formattedTab.style.pointerEvents = 'none';
+            formattedTab.disabled = true;
+        }
+        if (rawTab) {
+            rawTab.style.pointerEvents = 'none';
+            rawTab.disabled = true;
+        }
+        if (sourceTab) {
+            sourceTab.disabled = false;
+        }
         return;
     }
 }
@@ -937,6 +1037,10 @@ function addNewContent() {
 
     updated_by_agent.textContent = 'User Initiated';
 
+    localStorage.removeItem('content_id');
+    localStorage.removeItem('prompt_session_id');
+    localStorage.setItem('new_content', true);
+
     if (!ai_content_area) {
         return;
     }    
@@ -952,8 +1056,52 @@ function addNewContent() {
     if (rawEl) {
         rawEl.value = '';
     }
-    switchView('source', true);
-    showEmptyContextMessage();
+    
+    // Enable rawTab and sourceTab, disable formattedTab
+    const formattedTab = document.getElementById('formattedTab');
+    const rawTab = document.getElementById('rawTab');
+    const sourceTab = document.getElementById('sourceTab');
+    
+    if (formattedTab) {
+        formattedTab.disabled = true;
+        formattedTab.style.pointerEvents = 'none';
+        formattedTab.style.opacity = '0.5';
+        formattedTab.classList.remove('active');
+    }
+    
+    if (rawTab) {
+        rawTab.disabled = false;
+        rawTab.style.pointerEvents = 'auto';
+        rawTab.style.opacity = '1';
+        rawTab.classList.add('active');
+    }
+    
+    if (sourceTab) {
+        sourceTab.disabled = false;
+        sourceTab.style.pointerEvents = 'auto';
+        sourceTab.style.opacity = '1';
+        sourceTab.classList.remove('active');
+    }
+    
+    // Show raw view by default
+    switchView('raw');
+    
+    // Update AI panel message
+    const aiPanelMessage = document.getElementById('aiPanelMessage');
+    if (aiPanelMessage) {
+        aiPanelMessage.textContent = 'Please add content in Raw HTML or fetch from Source Data to use the AI assistant.';
+        aiPanelMessage.style.display = '';
+    }
+    
+    // Disable AI prompt input until content is added
+    const aiPromptInput = document.getElementById('ai-prompt-input');
+    if (aiPromptInput) {
+        aiPromptInput.disabled = true;
+    }
+
+    initAIInput();
+
+
 }
 
 
@@ -963,6 +1111,39 @@ function addNewContent() {
 ==========================================================*/
 function initAIInput() {
     toggleSendButton();
+    
+    // Enable/disable AI prompt input based on rawContent
+    const rawContent = document.getElementById('rawContent');
+    const aiPromptInput = document.getElementById('ai-prompt-input');
+    
+    if (rawContent && aiPromptInput) {
+        // Check initial state
+        checkAndEnablePromptInput();
+        
+        // Add listener for content changes
+        rawContent.addEventListener('input', checkAndEnablePromptInput);
+    }
+}
+
+function checkAndEnablePromptInput() {
+    const rawContent = document.getElementById('rawContent');
+    const aiPromptInput = document.getElementById('ai-prompt-input');
+    
+    if (!rawContent || !aiPromptInput) return;
+    
+    const hasContent = rawContent.value && rawContent.value.trim().length > 0;
+    aiPromptInput.disabled = !hasContent;
+    
+    // Update AI panel message
+    const aiPanelMessage = document.getElementById('aiPanelMessage');
+    if (aiPanelMessage) {
+        if (hasContent) {
+            aiPanelMessage.style.display = 'none';
+        } else {
+            aiPanelMessage.textContent = 'Please add content in Raw Data or fetch from Source Data to use the AI assistant.';
+            aiPanelMessage.style.display = '';
+        }
+    }
 }
 
 function toggleSendButton() {
@@ -1124,6 +1305,13 @@ async function loadPromptHistory() {
                         }
                     }
 
+                    // Do not add buttons if rejected prompts
+
+                    const isRejected =  [
+                        "I am sorry, but as a Lot21 specialist, I only provide information and content related to climate justice and environmental solutions.",
+                        "Generation unavailable."
+                    ]
+
                     // Add Response from the server if any (optional)
                     if (ph.ai_response) {
                         const aiResponseDiv = document.createElement('div');
@@ -1132,74 +1320,81 @@ async function loadPromptHistory() {
                             aiResponseDiv.classList.add('ai-message-draft');
                         }
                         aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
-                        // Append action buttons inside ai-message at its bottom
-                        const actionsDiv = document.createElement('div');
-                        actionsDiv.className = 'message-actions';
 
-                        // Render action buttons
-                        if (ph.prompt_action === "SAVED_AS_DRAFT") {
-                            actionsDiv.innerHTML = `
-                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-x-circle"></i> Reject
-                                </button>
-                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-check-circle"></i> Approve
-                                </button>
-                            `;
-                        }
-                        else if (ph.prompt_action === "REJECTED") {
-                            actionsDiv.innerHTML = `
-                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-check-circle"></i> Approve
-                                </button>
-                            `;
-                        }
-                        else if (ph.prompt_action === "APPROVED") {
-                            actionsDiv.innerHTML = `
-                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-x-circle"></i> Reject
-                                </button>
-                            `;
+                        if (isRejected.includes(ph.ai_response)) {
+                            aiContentArea.appendChild(aiResponseDiv);
+                            return; // skip adding buttons for this response
                         }else{
-                            actionsDiv.innerHTML = `
-                                <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-file-earmark"></i> Save Draft
-                                </button>
-                                <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-x-circle"></i> Reject
-                                </button>
-                                <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                    <i class="bi bi-check-circle"></i> Approve
-                                </button>
-                            `;
-                        }
-                        aiResponseDiv.appendChild(actionsDiv);
-                        aiContentArea.appendChild(aiResponseDiv);
-                        // Show last action line if available
-                        if (lastActionDate && lastActionLabel) {
-                            const statusLine = document.createElement('div');
-                            statusLine.className = 'prompt-action-status';
-                            
-                            if(lastAction == "APPROVED"){
-                                statusLine.style.color = '#28a745';
-                            } else if(lastAction == "REJECTED"){
-                                statusLine.style.color = '#ff0000';
-                            } else {
-                                statusLine.style.color = 'var(--text-secondary)';
+
+                            // Append action buttons inside ai-message at its bottom
+                            const actionsDiv = document.createElement('div');
+                            actionsDiv.className = 'message-actions';
+
+                            // Render action buttons
+                            if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle"></i> Reject
+                                    </button>
+                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle"></i> Approve
+                                    </button>
+                                `;
                             }
-                            
-                            // Format date as Dec 31, 2025, 05:53 PM
-                            const d = new Date(lastActionDate);
-                            const dateStr = d.toLocaleString('en-US', {
-                                month: 'short',
-                                day: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true
-                            });
-                            statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
-                            aiContentArea.appendChild(statusLine);
+                            else if (ph.prompt_action === "REJECTED") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle"></i> Approve
+                                    </button>
+                                `;
+                            }
+                            else if (ph.prompt_action === "APPROVED") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle"></i> Reject
+                                    </button>
+                                `;
+                            }else{
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-file-earmark"></i> Save Draft
+                                    </button>
+                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle"></i> Reject
+                                    </button>
+                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle"></i> Approve
+                                    </button>
+                                `;
+                            }
+                            aiResponseDiv.appendChild(actionsDiv);
+                            aiContentArea.appendChild(aiResponseDiv);
+                            // Show last action line if available
+                            if (lastActionDate && lastActionLabel) {
+                                const statusLine = document.createElement('div');
+                                statusLine.className = 'prompt-action-status';
+                                
+                                if(lastAction == "APPROVED"){
+                                    statusLine.style.color = '#28a745';
+                                } else if(lastAction == "REJECTED"){
+                                    statusLine.style.color = '#ff0000';
+                                } else {
+                                    statusLine.style.color = 'var(--text-secondary)';
+                                }
+                                
+                                // Format date as Dec 31, 2025, 05:53 PM
+                                const d = new Date(lastActionDate);
+                                const dateStr = d.toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true
+                                });
+                                statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
+                                aiContentArea.appendChild(statusLine);
+                            }
                         }
                     }   
                 }
@@ -1223,14 +1418,19 @@ async function handleFormSubmit(event) {
     const promptInput = document.getElementById('ai-prompt-input');
     const sendBtn = document.getElementById('ai-send-btn');
     const promptText = promptInput.value.trim();
-    
+    const rawContent = document.getElementById('rawContent');
+    const aiContentArea = document.getElementById('ai-content-area');
+    const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
+
+    const updated_by_agent_set = localStorage.getItem('new_content');
+
     if (!promptText) {
         return false;
     }
-    
-    const aiContentArea = document.getElementById('ai-content-area');
-    const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
-    
+        
+    console.log('Sending prompt:', promptText);
+    console.log('Updated by agent set:', updated_by_agent_set);
+
     sendBtn.disabled = true;
 
     // START SPINNER BEFORE API CALL
@@ -1243,51 +1443,85 @@ async function handleFormSubmit(event) {
             window.location.replace('/?error=' + encodeURIComponent('Please login first'));
             return false;
         }
-        
-        const prompt_session_id = localStorage.getItem('prompt_session_id');
-        const content_id = localStorage.getItem('content_id');
-        
-        if (!prompt_session_id || !content_id) {
-            hideSpinner();
-            alert('Please click "Add New" first to start a new content session');
-            sendBtn.disabled = false;
-            return false;
-        }
-        
-        const payload = {
-            prompt_text: promptText,
-            content_id: parseInt(content_id),
-            prompt_session_id: prompt_session_id
-        };
 
-        const response = await fetch('/user/content/draft', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
+        let prompt_session_id = null;
+        let content_id = null;
         
-        if (!response.ok) {
-            hideSpinner();
+        if (!updated_by_agent_set) {
+            prompt_session_id = localStorage.getItem('prompt_session_id');
+            content_id = localStorage.getItem('content_id');
 
-            if (handleTokenExpiration(response)) {
+            console.log('Using stored prompt_session_id:', prompt_session_id);
+            console.log('Using stored content_id:', content_id);
+
+            const payload = {
+                prompt_text: promptText,
+                content_id: parseInt(content_id),
+                prompt_session_id: prompt_session_id
+            };
+
+            const response = await fetch('/user/content/draft', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                hideSpinner();
+
+                if (handleTokenExpiration(response)) {
+                    return false;
+                }
+                
+                if (userPromptParagraph) {
+                    userPromptParagraph.classList.remove('success');
+                    userPromptParagraph.classList.add('error');
+                }
+                
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
+                sendBtn.disabled = false;
                 return false;
             }
             
-            if (userPromptParagraph) {
-                userPromptParagraph.classList.remove('success');
-                userPromptParagraph.classList.add('error');
-            }
-            
-            const errorData = await response.json();
-            alert('Error: ' + (errorData.detail || 'Failed to send prompt'));
+            const result = await response.json();
+        }else{
+            response = await fetch(`/user/content`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    generated_content: rawContent.value.trim(),
+                    category_id: document.getElementById('contentType').value || null,
+                    action: "NEW",
+                    prompt_data: promptText
+                })
+            });
+            const content_data_json = await response.json();
+            content_id = content_data_json.content.id;
+            prompt_session_id = content_data_json.prompt_session_id;
+
+            localStorage.setItem('prompt_session_id', prompt_session_id);
+            localStorage.setItem('content_id', content_id);
+            localStorage.removeItem('new_content');
+        }
+
+        console.log('Using prompt_session_id:', prompt_session_id);
+        console.log('Using content_id:', content_id);
+
+        if (!content_id) {
+            hideSpinner();
+            alert('Content ID not found. Please refresh the page and try again.');
             sendBtn.disabled = false;
             return false;
         }
         
-        const result = await response.json();
+        
         
         const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
         if (previewParagraph) {
@@ -1319,12 +1553,12 @@ async function handleFormSubmit(event) {
         promptInput.value = '';
         sendBtn.disabled = true;
 
-        console.log('Prompt sent successfully:', result);
-
         // STOP SPINNER BEFORE LOADING HISTORY
         hideSpinner();
 
         loadPromptHistory();
+
+
 
     } catch (error) {
         console.error('Error sending prompt:', error);
@@ -1342,8 +1576,6 @@ async function handleFormSubmit(event) {
 
     return false;
 }
-
-
 
 function saveDraftFromResponse(phId) {
     if (!phId) { alert('Invalid prompt history id'); return; }

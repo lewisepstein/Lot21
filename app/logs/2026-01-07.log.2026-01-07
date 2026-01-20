@@ -1,4 +1,0 @@
-2026-01-08 19:57:02 - agent_module.agent_utils - INFO - Loading training data into collection: training_data
-2026-01-08 19:57:02 - agent_module.agent_utils - INFO - Chunking training data...
-2026-01-08 19:57:02 - agent_module.agent_utils - INFO - Created 71 chunks
-2026-01-08 19:57:02 - agent_module.agent_utils - INFO - Successfully loaded 71 chunks into collection 'training_data'

@@ -30,8 +30,11 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 SESSION_EXPIRE_MINS = int(os.getenv("SESSION_EXPIRE_MINS"))
 
+MAX_PASSWORD_LENGTH = 64  # safe under 72 bytes
+MIN_PASSWORD_LENGTH = 3
+
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # Token blacklist for logout (in production, use Redis or database)
 token_blacklist = set()
@@ -84,54 +87,29 @@ def require_session_auth(redirect_url: str = "/"):
         return wrapper
     return decorator
 
-
-def _truncate_password(plain_password: str) -> bytes:
-    """
-    Truncate password to 72 bytes for bcrypt compatibility.
-    
-    Args:
-        plain_password: Plain text password to truncate
-    
-    Returns:
-        Truncated password as bytes
-    """
-    password_bytes = plain_password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
-    return password_bytes
-
-
-# Helper Functions
 def hash_password(plain_password: str) -> str:
-    """
-    Hash a password for manual use (e.g., creating users).
-    
-    Args:
-        plain_password: Plain text password to hash
-    
-    Returns:
-        Hashed password string
-    """
-    truncated = _truncate_password(plain_password)
-    return pwd_context.hash(truncated)
+    if not (MIN_PASSWORD_LENGTH <= len(plain_password) <= MAX_PASSWORD_LENGTH):
+        raise ValueError(
+            f"Password must be between {MIN_PASSWORD_LENGTH} and {MAX_PASSWORD_LENGTH} characters"
+        )
+    return pwd_context.hash(plain_password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a password against its hash.
+    if len(plain_password) > MAX_PASSWORD_LENGTH:
+        return False
     
-    Args:
-        plain_password: Plain text password to verify
-        hashed_password: Hashed password from database
+    # Check if hashed_password is valid before attempting verification
+    if not hashed_password or not isinstance(hashed_password, str):
+        logger.error("Invalid hashed_password: empty or not a string")
+        return False
     
-    Returns:
-        True if password matches, False otherwise
-    
-    Note:
-        Bcrypt has a 72-byte limit, so passwords are automatically truncated.
-    """
-    truncated = _truncate_password(plain_password)
-    return pwd_context.verify(truncated, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        logger.error(f"Password verification failed: {str(e)}")
+        logger.error("Hash format may be invalid or not supported by pwd_context")
+        return False
 
 
 def get_user(username: str) -> Optional[Dict[str, Any]]:
@@ -176,6 +154,11 @@ def authenticate_user(username: str, password: str) -> Tuple[bool, int, str, Opt
     user = get_user(username)
     if not user:
         return False, 401, "User not found", None
+    
+    # Check if hashed_password exists in user record
+    if "hashed_password" not in user or not user["hashed_password"]:
+        logger.error(f"User {username} has no hashed_password stored")
+        return False, 500, "Authentication configuration error", None
     
     if not verify_password(password, user["hashed_password"]):
         return False, 401, "Incorrect password", None

@@ -89,7 +89,8 @@ async def create_content(
             prompt_data=validated_data.prompt_data,
             action=validated_data.action,
             user_id=payload.get("user_id"),
-            content_type=content_data.content_type
+            content_type=content_data.content_type,
+            generated_content=content_data.generated_content
         )
         
         # Initialize prompt_session_id as None
@@ -209,6 +210,11 @@ async def add_draft_content(
             raise HTTPException(status_code=status_code, detail="Authentication failed")
         
         # Add draft to existing prompt history session
+
+        if not draft_data.content_id or not draft_data.prompt_session_id:
+            logger.warning("Content ID or Prompt Session ID missing in add_draft_content")
+            raise HTTPException(status_code=400, detail="Content ID and Prompt Session ID are required")
+
         prompt_history = add_draft_to_prompt_history(
             prompt_session_id=draft_data.prompt_session_id,
             content_id=draft_data.content_id,

@@ -1,105 +1,111 @@
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag, NavigableString
 from typing import Dict, Any
 from service_utils.log_management import get_logger
 from service_utils.helpers import validate_url
+from collections import defaultdict
 
 # Set up logging
 logger = get_logger(__name__)
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1'
 }
 
+
 TIMEOUT = 30  # seconds
+TEXT_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "span", "li", "blockquote", "pre", "code"}
 
-TAGS_TO_FIND = ["h1", "h2", "h3"]
+EXCLUDE_TEXT = {"attributions", "go deeper", "watch", "subscribe"}
 
-# Headings to exclude along with their following content
-EXCLUDE_HEADINGS = ["Attributions", "Go Deeper", "Watch", "Subscribe"]
+def get_main_container(soup: BeautifulSoup):
+    # WordPress (highest priority)
+    for selector in [
+        "div.entry-content",
+        "div.page-content",
+        "div.content-area",
+        "div.site-content"
+    ]:
+        el = soup.select_one(selector)
+        if el and el.get_text(strip=True):
+            return el
 
-def scrape_page(url):
-    try:
+    # Semantic HTML
+    for selector in ["article", "main", "[role=main]"]:
+        el = soup.select_one(selector)
+        if el and el.get_text(strip=True):
+            return el
         
-        # Send HTTP GET request with headers
-        response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-        response.raise_for_status()  # Raises error if request failed
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.text, "html.parser")
+    
 
-        # Extract title
-        title = soup.title.string if soup.title else None
-        
-        # Extract headings with their following paragraphs and links
-        headings_with_content = []
-        
-        for heading in soup.find_all(TAGS_TO_FIND):
-            heading_text = heading.get_text(strip=True)
-            
-            # Skip headings that match the exclusion list
-            if heading_text in EXCLUDE_HEADINGS:
-                logger.info(f"Excluding heading and its content: {heading_text}")
-                continue
-            
-            # Get all paragraphs, links, and lists that follow this heading until the next heading
-            paragraphs = []
-            links = []
-            lists = []
-            
-            for sibling in heading.next_siblings:
-                # Stop if we hit another heading
-                if sibling.name in TAGS_TO_FIND:
-                    break
-                
-                # Collect paragraph text (direct siblings)
-                if sibling.name == 'p':
-                    para_text = sibling.get_text(strip=True)
-                    if para_text:
-                        paragraphs.append(para_text)
-                
-                # Collect unordered lists
-                elif sibling.name == 'ul':
-                    list_items = []
-                    for li in sibling.find_all('li'):
-                        list_items.append(li.get_text(strip=True))
-                    if list_items:
-                        lists.append(list_items)
-                            
-                # Also fetch all links and nested paragraphs in other elements (divs, spans, etc.)
-                elif hasattr(sibling, 'find_all'):
-                    # Find paragraphs nested within other elements (not direct siblings)
-                    for p in sibling.find_all('p'):
-                        para_text = p.get_text(strip=True)
-                        if para_text:
-                            paragraphs.append(para_text)
-                            
-            # Only add the heading if it has at least one paragraph, link, or list
-            if len(paragraphs) > 0 or len(lists) > 0:
-                headings_with_content.append({
-                    'heading': heading_text,
-                    'heading_level': heading.name,
-                    'paragraphs': paragraphs,
-                    'links': links,
-                    'lists': lists
-                })
-        
-        result = {
-            "title": title,
-            "headings_with_content": headings_with_content
-        }
-        
-        logger.info(f"Successfully scraped {url}: {len(headings_with_content)} sections found")
-        return result
-        
-    except Exception as e:
-        logger.error(f"Failed to scrape {url}: {str(e)}")
-        raise
+    # Largest text-heavy div
+    candidates = [
+        d for d in soup.find_all("div")
+        if len(d.get_text(strip=True)) > 200
+    ]
+    if candidates:
+        return max(candidates, key=lambda d: len(d.get_text(strip=True)))
+
+    # Fallbacks
+    return soup.body or soup
+
+def scrape_page(url: str):
+    response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    main = get_main_container(soup)
+
+    if not main:
+        logger.warning("No main container found, using full document")
+        main = soup
+
+    blocks = []
+    seen = set()
+    order = 0
+
+    for node in main.descendants:
+        if not isinstance(node, Tag):
+            continue
+
+        if node.name not in TEXT_TAGS:
+            continue
+
+        text = node.get_text(strip=True)
+
+        # Skip empty or very short noise
+        if not text or len(text) < 5:
+            continue
+
+        # Deduplicate repeated CMS artifacts
+        if text in seen:
+            continue
+        seen.add(text)
+
+        blocks.append({
+            "tag": node.name,
+            "text": text,
+            "order": order
+        })
+        order += 1
+
+    title = soup.title.string.strip() if soup.title else None
+
+    full_text = "\n\n".join(
+        block["text"] for block in blocks if block["text"]
+    )
+
+    logger.info(f"Extracted {len(blocks)} text blocks")
+
+    return {
+        "title": title,
+        "blocks": blocks,
+        "content": full_text   
+    }
 
 def convert_to_wysiwyg_html(scraped_data: Dict[str, Any]) -> str:
     """

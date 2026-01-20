@@ -310,7 +310,8 @@ async def update_page_endpoint(
                 content=page_data.content,
                 source_url=page_data.source_url,
                 description=page_data.description,
-                updated_by=user_id
+                updated_by=user_id,
+                scrape_data=page_data.scrape_data 
             )
         except ValueError as ve:
             logger.warning(f"Page update validation failed: {ve}")

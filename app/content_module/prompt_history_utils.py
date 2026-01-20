@@ -48,9 +48,9 @@ def create_prompt_history_record(
 
 
 def add_draft_to_prompt_history(
-    prompt_session_id: str,
-    content_id: int,
     prompt_text: str,
+    prompt_session_id: Optional[str] = None,
+    content_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -86,8 +86,6 @@ def add_draft_to_prompt_history(
     rag = RagModule()
     ai_response, _ = rag.generate_content(query=prompt_text) 
 
-    print("AI RESPONSE FOR DRAFT:", ai_response)
-    
     if existing_records and len(existing_records) > 0:
         # Update the existing record
         existing_record = existing_records[0]
@@ -147,8 +145,6 @@ def get_prompt_histories(
     
     # Convert to response models
     response_list = []
-
-    print("PROMPT HISTORIES:", prompt_histories)
 
     for ph in prompt_histories:
         response_list.append(PromptHistoryResponse(

@@ -7,10 +7,11 @@ class ContentCreateRequest(BaseModel):
     """
     Request model for creating new content.
     """
-    category_id: int = Field(..., gt=0, description="ID of the category")
+    category_id: Optional[int] = Field(default=None, description="ID of the category")
     prompt_data: Optional[str] = Field(default=None, description="Input prompt data")
     action: Optional[str] = Field(default=None, description="Action to perform on the content")
     content_type: Optional[str] = Field(default=None, description="Type of content being created")
+    generated_content: Optional[str] = Field(default=None, description="AI-generated content output")
 
 
 class ContentResponse(BaseModel):
@@ -18,7 +19,7 @@ class ContentResponse(BaseModel):
     Response model for content operations.
     """
     id: int
-    category_id: int
+    category_id: Optional[int]
     prompt_data: Optional[str]
     generated_content: Optional[str]
     created_on: datetime
@@ -49,8 +50,8 @@ class AddDraftContentRequest(BaseModel):
     Request model for adding draft content to prompt history.
     """
     prompt_text: str = Field(..., min_length=1, description="The prompt text")
-    content_id: int = Field(..., gt=0, description="ID of the content")
-    prompt_session_id: str = Field(..., min_length=1, description="UUID of the prompt session")
+    content_id: Optional[int] = Field(None, description="ID of the content")
+    prompt_session_id: Optional[str] = Field(None, description="UUID of the prompt session")
 
 
 class SaveAsDraftRequest(BaseModel):

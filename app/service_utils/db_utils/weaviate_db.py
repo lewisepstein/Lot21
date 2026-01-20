@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import weaviate
-from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes.config import Property, DataType
 from weaviate.exceptions import WeaviateBaseError, WeaviateConnectionError
 
 from service_utils.db_utils.conf.weaviate_conf import WEAVIATE_URL
@@ -195,17 +195,14 @@ class WeaviateDB:
                         )
                     )
             
-            # Configure vectorizer
-            vectorizer_config = None
-            if vectorizer and vectorizer != "none":
-                vectorizer_config = Configure.Vectorizer.text2vec_transformers()
-            
-            # Create collection
+            # Configure for external vectors (no built-in vectorizer)
+            # Use named vectors with explicit configuration
             collection = self.client.collections.create(
                 name=name,
                 description=description,
                 properties=property_list,
-                vectorizer_config=vectorizer_config
+                vectorizer_config=None,  # No vectorizer - using external embeddings
+                vector_index_config=None  # Use default vector index settings
             )
             
             logger.info(f"Collection '{name}' created successfully")

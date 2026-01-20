@@ -10,6 +10,7 @@ from models.prompt_history import PromptHistory
 from models.content import Content
 from models.weaviate_data import WeaviateData
 from models.sessions import Session
+from models.weaviate_data_versions import WeaviateDataVersion
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "TaskProcess",
     "WeaviateData",
     "Session",
+    "WeaviateDataVersion"
 ]

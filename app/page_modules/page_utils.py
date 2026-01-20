@@ -194,7 +194,7 @@ def create_page_record(
             try:
                 logger.info(f"Scraping content from URL: {source_url}")
                 scraped_data = scrape_page(source_url)
-                scraped_html = convert_to_wysiwyg_html(scraped_data)
+                scraped_html = scraped_data['content']
 
                 logger.info(f"Scraped HTML Content length: {len(scraped_html)} characters")
                 
@@ -363,22 +363,16 @@ def get_page_statistics() -> Dict[str, Any]:
             
             if latest_weaviate and len(latest_weaviate) > 0:
                 status = latest_weaviate[0].get('status')
-                logger.info(f"Page {page_id}: Raw status = {status}, Type = {type(status)}")
-                
+
                 # Extract status value from enum (always get the string value)
                 if hasattr(status, 'value'):
                     status_value = status.value
-                    logger.info(f"Page {page_id}: Extracted enum value = {status_value}")
                     weaviate_status_map[int(page_id)] = status_value
                 elif isinstance(status, str):
-                    logger.info(f"Page {page_id}: Using string status = {status}")
                     weaviate_status_map[int(page_id)] = status
                 else:
                     status_str = str(status)
-                    logger.info(f"Page {page_id}: Converting to string = {status_str}")
                     weaviate_status_map[int(page_id)] = status_str
-        
-        logger.info(f"Weaviate status map: {weaviate_status_map}")
         
         # Calculate statistics
         assigned_pages = len(df[df['category_id'].notna()])
@@ -498,12 +492,12 @@ def update_page(
     content: Optional[str] = None,
     source_url: Optional[str] = None,
     description: Optional[str] = None,
-    updated_by: Optional[int] = None
+    updated_by: Optional[int] = None,
+    scrape_data: bool = False
 ) -> Dict[str, Any]:
     """
     Update an existing page record, content, and weaviate data.
     Follows the same pattern as create_page but updates existing records.
-    Note: Scraping is only available during page creation, not updates.
     
     Args:
         page_id: The ID of the page to update
@@ -511,10 +505,10 @@ def update_page(
         category_id: Optional new category ID
         is_active: Optional new active status
         content: Optional new content
-        source_url: Optional new source URL (informational only, not used for scraping)
+        source_url: Optional new source URL
         description: Optional new description
         updated_by: User ID who is updating the page
-        
+        scrape_data: Flag indicating if data should be scraped from URL
     Returns:
         Dictionary containing updated page details
         
@@ -524,6 +518,34 @@ def update_page(
     ENCODING = "cl100k_base"
     
     try:
+
+        print("Scrape data flag:", scrape_data)
+
+        if scrape_data:
+
+            print("Scrape data is enabled")
+
+            if not source_url:
+                raise ValueError("Source URL is required when scrape data is enabled")
+            
+            # Validate URL format
+            if not validate_url(source_url):
+                raise ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
+            
+            # Scrape content from URL
+            try:
+                logger.info(f"Scraping content from URL: {source_url}")
+                scraped_data = scrape_page(source_url)
+                scraped_html = scraped_data['content']
+
+                logger.info(f"Scraped HTML Content length: {len(scraped_html)} characters")
+                # Override content with scraped content
+                content = scraped_html
+                logger.info(f"Successfully scraped content from {source_url}")
+            except Exception as scrape_error:
+                logger.error(f"Failed to scrape content from {source_url}: {scrape_error}")
+                raise ValueError(f"Failed to scrape content from URL: {str(scrape_error)}")
+
         db = PostgresDB()
         
         # Check if page exists
@@ -550,8 +572,31 @@ def update_page(
             'weaviate_data',
             conditions={'page_id': page_id, 'deleted_at': None}
         )
-        old_weaviate_record = existing_weaviate[0] if existing_weaviate and len(existing_weaviate) > 0 else None
-        
+        old_weaviate_record = None
+
+        if existing_weaviate and len(existing_weaviate) > 0 :
+            logger.info(f"Found existing Weaviate data for page {page_id}")
+            old_weaviate_record = existing_weaviate[0]
+        else:
+            logger.info(f"No existing Weaviate data found for page {page_id}")
+            # logger.warning(f"No existing Weaviate data found for page {page_id}")
+            # Load Data to Weaviate if scraping was performed
+
+            try:
+                logger.info(f"Loading scraped content to Weaviate for page {page_id}")
+                weaviate_result = load_data_with_tracking(
+                    scraped_content=content,
+                    collection_name="training_data",
+                    source_url=source_url,
+                    user_id=updated_by,
+                    description=description,
+                    page_id=page_id
+                )
+                logger.info(f"Loaded {weaviate_result['chunks_created']} chunks to Weaviate (record ID: {weaviate_result['record_id']})")
+            except Exception as weaviate_error:
+                logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
+                # Don't fail page creation if Weaviate loading fails
+
         # Use provided content directly (no scraping in updates)
         final_content = content
         
@@ -616,7 +661,7 @@ def update_page(
                         action=ContentActionEnum.DRAFT,
                         generated_content=final_content,
                         page_id=page_id,
-                        created_by=updated_by
+                        user_id=updated_by
                     )
                     logger.info(f"Created content record {content_record.get('id')} for page {page_id}")
             
@@ -731,7 +776,7 @@ def update_page(
         updated_page = db.read(
             'pages',
             conditions={'id': page_id},
-            columns=['id', 'page_name', 'category_id', 'is_active',
+            columns=['id', 'page_name', 'category_id', 'is_active', 'scrape_data',
                     'source_url', 'description', 'created_on', 'updated_on']
         )[0]
         
@@ -750,6 +795,7 @@ def update_page(
             'page_name': updated_page['page_name'],
             'category_id': updated_page['category_id'],
             'is_active': updated_page['is_active'],
+            'scrape_data': updated_page['scrape_data'],
             'content': updated_content,
             'source_url': updated_page['source_url'],
             'description': updated_page['description'],
@@ -831,84 +877,3 @@ def delete_page(page_id: int) -> None:
         logger.error(f"Error details: {str(e)}")
         raise
 
-
-# def validate_page_name(page_name: str) -> bool:
-#     """
-#     Validate if the page name is unique (not already used).
-    
-#     Args:
-#         page_name: The page name to validate
-#     """
-#     if not page_name or not page_name.strip():
-#         return False
-
-# def __create_page(    
-#     page_name: str,
-#     category_id: Optional[int] = None,
-#     created_by: Optional[int] = None,
-#     is_active: bool = True,
-#     content: Optional[str] = None,
-#     source_url: Optional[str] = None,
-#     scrape_data: bool = False,
-#     description: Optional[str] = None
-# ) -> Dict[str, Any]:
-#     pass
-
-
-# def validate_category_id(category_id: Optional[int]) -> bool:
-#     """
-#     Validate if the category ID exists in the database.
-    
-#     Args:
-#         category_id: The category ID to validate
-#     """
-#     if category_id is None:
-#         return True  # No category specified is valid
-
-#     try:
-#         db = PostgresDB()
-#         categories = db.read(
-#             'categories',
-#             conditions={
-#                 'id': category_id,
-#                 'deleted_on': None
-#             }
-#         )
-        
-#         exists = categories is not None and len(categories) > 0
-#         logger.info(f"Category ID {category_id} exists: {exists}")
-#         return exists
-        
-#     except Exception as e:
-#         logger.error(f"Error validating category ID {category_id}: {e}")
-#         return False
-
-
-# def validate_source_url(source_url: str) -> Optional[bool]:
-#     if source_url:
-#         source_url = source_url.strip()
-#         valid_source_url = validate_url(source_url)
-#         if not valid_source_url:
-#             return ValueError("Invalid URL format. Please provide a valid HTTP or HTTPS URL")
-#         return True
-#     return False
-
-# def page_exists(page_name: str)-> Optional[bool]:
-#     try:
-#         db = PostgresDB()
-#         existing_pages = db.read(
-#             'pages',
-#             conditions={
-#                 'page_name': page_name.strip().lower,
-#                 'deleted_on': None
-#             }
-#         )
-        
-#         if existing_pages and len(existing_pages) > 0:
-#             raise ValueError("Page name already exists. Please choose a different name")
-
-#         return True
-#     except Exception as e:
-#         logger.error(f"Error validating page name: {e}")
-#         return False
-        

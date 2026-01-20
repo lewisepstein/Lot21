@@ -8,9 +8,8 @@ class ContentAddValidation(BaseModel):
     """
     Pydantic validation model for adding new content.
     """
-    category_id: int = Field(
-        ...,
-        gt=0,
+    category_id: Optional[int] = Field(
+        default=None,
         description="ID of the category for this content"
     )
     prompt_data: Optional[str] = Field(

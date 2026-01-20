@@ -1,2 +1,0 @@
-2025-12-31 14:49:59 - service_utils.db_utils.weaviate_db - INFO - Initializing Weaviate connection to http://localhost:8080
-2025-12-31 14:49:59 - service_utils.db_utils.weaviate_db - INFO - Weaviate connection established successfully
