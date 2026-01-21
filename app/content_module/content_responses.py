@@ -52,6 +52,7 @@ class AddDraftContentRequest(BaseModel):
     prompt_text: str = Field(..., min_length=1, description="The prompt text")
     content_id: Optional[int] = Field(None, description="ID of the content")
     prompt_session_id: Optional[str] = Field(None, description="UUID of the prompt session")
+    context_override: Optional[bool] = False
 
 
 class SaveAsDraftRequest(BaseModel):

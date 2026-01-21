@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 def create_prompt_history_record(
     content_id: int,
     prompt_data: Optional[str],
-    prompt_session_id: Optional[str] = None
+    prompt_session_id: Optional[str] = None,
+    user_id: Optional[int] = None,
+    context_override: Optional[bool] = False
 ) -> Tuple[Dict[str, Any], str, int]:
     """
     Create a new prompt_history record with a UUID session ID.
@@ -43,14 +45,35 @@ def create_prompt_history_record(
 
     if not prompt_history:
         raise Exception("Failed to create prompt history")
-        
-    return prompt_history, prompt_session_id, prompt_history["id"]
+    
+    # Retrieve context for the draft prompt (not used here but could be logged or processed)
+    rag = RagModule()
+    ai_response, _ = rag.generate_content(query=prompt_data, user_id=user_id, context_override=context_override) 
+
+    update_data = {
+        "user_prompt": prompt_data,
+        "prompt_action": "DRAFT",
+        "ai_response": ai_response
+    }
+
+    updated_records = db.update(
+        "prompt_history",
+        data=update_data,
+        conditions={"id": prompt_history["id"]}
+    )
+    
+    if not updated_records or len(updated_records) == 0:
+        raise Exception("Failed to update prompt history")
+    
+    return prompt_session_id
 
 
 def add_draft_to_prompt_history(
     prompt_text: str,
     prompt_session_id: Optional[str] = None,
     content_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    context_override: Optional[bool] = False
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -84,7 +107,7 @@ def add_draft_to_prompt_history(
 
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
-    ai_response, _ = rag.generate_content(query=prompt_text) 
+    ai_response, _ = rag.generate_content(query=prompt_text, user_id=user_id, context_override=context_override) 
 
     if existing_records and len(existing_records) > 0:
         # Update the existing record

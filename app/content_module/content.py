@@ -47,6 +47,56 @@ templates = Jinja2Templates(directory="templates")
 
 
 
+@router.get("/content", response_class=HTMLResponse)
+@router.get("/content/{page_id:int}", response_class=HTMLResponse)
+@require_session_auth(redirect_url="/")
+async def content_generation_page(
+    request: Request,
+    page_id: Optional[int] = None,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """
+    Render content generation page with empty textarea.
+    """
+    try:
+
+        result = None
+        is_page = False
+        category_id = None
+
+        if page_id:
+            result = get_page_by_id(page_id=page_id)
+            is_page = True
+            category_id = result['category_id'] if result else None
+
+        category_list, _ = get_categories_list()
+
+        return templates.TemplateResponse(
+            request=request,
+            name="content.htm",
+            context={
+                "category_id": category_id,
+                "latest_content": result,
+                "category_list": category_list,
+                "is_page": is_page
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
+        return templates.TemplateResponse(
+            request=request,
+            name="content.htm",
+            context={
+                "category_id": None,
+                "latest_content": None,
+                "category_list": None,
+                "is_page": False
+            }
+        )
+
+
+
 @router.post("/content", response_model=ContentCreateResponse)
 async def create_content(
     content_data: ContentCreateRequest,
@@ -98,7 +148,7 @@ async def create_content(
         
         # If action is NEW, create prompt_history record
         if validated_data.action == ContentActionEnum.NEW:
-            prompt_history, prompt_session_id, prompt_history_id = create_prompt_history_record(
+            prompt_session_id = create_prompt_history_record(
                 content_id=new_content["id"],
                 prompt_data=validated_data.prompt_data
             )
@@ -131,56 +181,6 @@ async def create_content(
         logger.error(f"Error creating content: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Unable to create content at this time")
 
-
-
-
-@router.get("/content", response_class=HTMLResponse)
-@router.get("/content/{page_id:int}", response_class=HTMLResponse)
-@require_session_auth(redirect_url="/")
-async def content_generation_page(
-    request: Request,
-    page_id: Optional[int] = None,
-    session_token: Optional[str] = Cookie(default=None),
-    authenticated_user: Optional[Dict] = None
-):
-    """
-    Render content generation page with empty textarea.
-    """
-    try:
-
-        result = None
-        is_page = False
-        category_id = None
-
-        if page_id:
-            result = get_page_by_id(page_id=page_id)
-            is_page = True
-            category_id = result['category_id'] if result else None
-
-        category_list, _ = get_categories_list()
-
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": category_id,
-                "latest_content": result,
-                "category_list": category_list,
-                "is_page": is_page
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error loading content generation page: {str(e)}", exc_info=True)
-        return templates.TemplateResponse(
-            request=request,
-            name="content.htm",
-            context={
-                "category_id": None,
-                "latest_content": None,
-                "category_list": None,
-                "is_page": False
-            }
-        )
 
 
 
@@ -218,7 +218,9 @@ async def add_draft_content(
         prompt_history = add_draft_to_prompt_history(
             prompt_session_id=draft_data.prompt_session_id,
             content_id=draft_data.content_id,
-            prompt_text=draft_data.prompt_text
+            prompt_text=draft_data.prompt_text,
+            user_id=payload.get("user_id"),
+            context_override=draft_data.context_override
         )
         
         logger.info(f"Draft content added successfully: session {draft_data.prompt_session_id}")

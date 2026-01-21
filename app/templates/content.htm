@@ -673,21 +673,6 @@
         </div>
     </div>
 
-    <!-- <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasApprove" aria-labelledby="offcanvasApproveLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
-        <div class="offcanvas-header">
-            <h5 id="offcanvasApproveLabel" style="color:#fff">Approve AI Response</h5>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body">
-            <p>Approving will mark this response as approved. This action may publish or mark content for review depending on workflow.</p>
-            <input type="hidden" id="offcanvasApprove_phId" value="" />
-            <div style="display:flex; gap:8px; margin-top:12px;">
-                <button id="confirmApproveBtn" class="btn btn-success">Approve</button>
-                <button class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
-            </div>
-        </div>
-    </div> -->
-
     <!-- Image Preview Modal -->
     <div id="imageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); cursor: pointer;" onclick="closeImageModal()">
         <span style="position: absolute; top: 20px; right: 40px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;" onclick="closeImageModal()">&times;</span>
@@ -1417,12 +1402,34 @@ async function handleFormSubmit(event) {
     
     const promptInput = document.getElementById('ai-prompt-input');
     const sendBtn = document.getElementById('ai-send-btn');
-    const promptText = promptInput.value.trim();
     const rawContent = document.getElementById('rawContent');
     const aiContentArea = document.getElementById('ai-content-area');
     const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
+    const formattedContent = document.getElementById('formattedContent');
 
     const updated_by_agent_set = localStorage.getItem('new_content');
+
+    let context_override = false;
+
+    if (!promptInput || !sendBtn || !aiContentArea || !rawContent || !formattedContent) {
+        alert('Required elements are missing on the page.');
+        return false;
+    }
+
+    if (rawContent.value.trim().length === 0 && formattedContent.innerHTML.trim().length === 0) {
+        alert('Please provide content in Raw Data before sending a prompt.');
+        return false;
+    }else{
+        context_override = true;
+    }
+
+    if (rawContent.value.trim().length !== 0) {
+        promptInput.value = rawContent.value.trim() + '\n\n' + promptInput.value.trim();
+    }else{
+        promptInput.value = formattedContent.innerHTML.trim() + '\n\n' + promptInput.value.trim();
+    }
+    
+    const promptText = promptInput.value.trim();
 
     if (!promptText) {
         return false;
@@ -1457,7 +1464,8 @@ async function handleFormSubmit(event) {
             const payload = {
                 prompt_text: promptText,
                 content_id: parseInt(content_id),
-                prompt_session_id: prompt_session_id
+                prompt_session_id: prompt_session_id,
+                context_override: context_override
             };
 
             const response = await fetch('/user/content/draft', {

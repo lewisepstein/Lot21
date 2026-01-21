@@ -40,8 +40,6 @@ def get_main_container(soup: BeautifulSoup):
         if el and el.get_text(strip=True):
             return el
         
-    
-
     # Largest text-heavy div
     candidates = [
         d for d in soup.find_all("div")

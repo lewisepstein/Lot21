@@ -1,14 +1,12 @@
 import os
 import base64
 import logging
-import time
-import io
-import re
-import argparse
-import sys
-from datetime import datetime
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional
 from dotenv import load_dotenv
+from service_utils.db_utils.weaviate_db import WeaviateDB
+from weaviate_module.weaviate_utils import (
+    load_data_with_tracking
+)
 
 # Load environment variables
 load_dotenv()
@@ -118,7 +116,6 @@ class RagModule:
         """Lazy initialization of Weaviate and Google SDKs."""
         # 1. Weaviate
         try:
-            from service_utils.db_utils.weaviate_db import WeaviateDB
             self.weaviate_client = WeaviateDB().client
             logger.info("Weaviate initialized.")
         except Exception as e:
@@ -152,14 +149,21 @@ class RagModule:
             return []
         try:
             collection = self.weaviate_client.collections.get("training_data")
-            response = collection.query.hybrid(query=query, limit=limit, return_properties=["text", "data_type", "image_path"])
+
+            response = collection.query.hybrid(
+                query=query, 
+                limit=limit, 
+                return_properties=["text", "source", "chunk_index", "doc_id"]
+            )
             
             results = []
             for obj in response.objects:
                 results.append({
                     "content": obj.properties.get("text", ""),
-                    "type": obj.properties.get("data_type", "text"),
-                    "image_path": obj.properties.get("image_path", "")
+                    "type": "text",  # Default to text since data_type is not in schema
+                    "source": obj.properties.get("source", ""),
+                    "chunk_index": obj.properties.get("chunk_index", 0),
+                    "doc_id": obj.properties.get("doc_id", "")
                 })
             logger.info(f"Retrieved {len(results)} chunks for query.")
             return results
@@ -168,22 +172,45 @@ class RagModule:
             return []
 
     # === TEXT GENERATION ===
-    def generate_content(self, query: str, category: int = 1, subpage: int = None) -> Tuple[str, str]:
+    def generate_content(
+        self, 
+        query: str, 
+        category: Optional[int] = 1, 
+        subpage: Optional[int] = None,
+        context_override: bool = False,
+        user_id: Optional[str] = None
+    ) -> Tuple[str, str]:
         """Main RAG entry point for text generation using integer-based routing."""
         contexts = self.retrieve_context(query)
+
+        if context_override:
+            
+            try:
+                logger.info("Loading scraped content to Weaviate for context override.")
+                weaviate_result = load_data_with_tracking(
+                    scraped_content=query,
+                    collection_name="training_data",
+                    source_url=None,
+                    user_id=user_id,
+                    description=None,
+                    page_id=None
+                )
+                logger.info(f"""
+                    Loaded {weaviate_result['chunks_created']} chunks to Weaviate "
+                    "(record ID: {weaviate_result['record_id']})"""
+                )
+                logger.info(f"Re-retrieving context after override load. {query}")
+
+            except Exception as weaviate_error:
+                logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
+
+        contexts = self.retrieve_context(query)
+
         prompt = self._build_prompt_logic(query, contexts, category, subpage)
         
-        # Prep multimodal parts
+        # Prep multimodal parts (image support removed as schema doesn't contain image_path)
         parts = [prompt]
-        for ctx in contexts:
-            if ctx["type"] == "image" and ctx["image_path"]:
-                path = os.path.join("extracted", "images", ctx["image_path"])
-                if os.path.exists(path):
-                    try:
-                        with open(path, "rb") as f:
-                            parts.append({"mime_type": "image/jpeg", "data": f.read()})
-                    except Exception: 
-                        continue
+        # Note: Image handling removed since training_data schema only contains text chunks
 
         if not self._genai_text_model:
             return "Generation unavailable.", "Service Init Error"
@@ -241,7 +268,8 @@ class RagModule:
                     config=types.GenerateContentConfig(response_modalities=["IMAGE"])
                 )
                 bts = self._extract_bytes(response)
-                if bts: return bts
+                if bts: 
+                    return bts
             except Exception as e:
                 logger.error(f"Img2Img refinement failed: {e}")
                 return None
@@ -300,7 +328,8 @@ class RagModule:
 
     def _extract_bytes(self, resp) -> Optional[str]:
         """Improved extraction logic to handle multimodal modalities."""
-        if resp is None: return None
+        if resp is None: 
+            return None
         try:
             if hasattr(resp, "generated_images") and resp.generated_images:
                 bts = resp.generated_images[0].image.image_bytes
@@ -438,7 +467,8 @@ class RagModule:
             You are an expert editor for Lottie content.
 
             Task: Refine or rewrite the '{target_section}' content based on the user query.
-            If '{target_section}' refers to a specific category (like 'Understanding' or 'Project'), refine the entire content piece.
+            If '{target_section}' refers to a specific category (like 'Understanding' or 'Project'), 
+            refine the entire content piece.
 
             Start directly with the refined content.
 
