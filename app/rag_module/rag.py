@@ -143,14 +143,15 @@ class RagModule:
 
     # === RETRIEVAL LOGIC ===
     def retrieve_context(self, query: str, limit: int = 8) -> List[Dict]:
-        """Performs multimodal hybrid search in Weaviate."""
+        """Performs BM25 keyword search in Weaviate."""
         if not self.weaviate_client:
             logger.error("Weaviate client missing.")
             return []
         try:
             collection = self.weaviate_client.collections.get("training_data")
 
-            response = collection.query.hybrid(
+            # Use BM25 keyword search since collection doesn't have a vectorizer configured
+            response = collection.query.bm25(
                 query=query, 
                 limit=limit, 
                 return_properties=["text", "source", "chunk_index", "doc_id"]
@@ -166,6 +167,9 @@ class RagModule:
                     "doc_id": obj.properties.get("doc_id", "")
                 })
             logger.info(f"Retrieved {len(results)} chunks for query.")
+
+            logger.info(f"results: {results}")
+
             return results
         except Exception as e:
             logger.error(f"Search failed: {e}")
@@ -205,6 +209,8 @@ class RagModule:
                 logger.warning(f"Failed to load scraped content to Weaviate: {weaviate_error}")
 
         contexts = self.retrieve_context(query)
+
+
 
         prompt = self._build_prompt_logic(query, contexts, category, subpage)
         
@@ -360,13 +366,14 @@ class RagModule:
         if is_refinement_request:
             # Map subpage integer to section name (1-6)
             target = self.SECTION_MAP.get(subpage, category_name)
-            
+
             # Find specific context snippet if target is a known section
             relevant_snippet = ""
             for ctx in contexts:
-                if target.lower() in ctx.get("content", "").lower():
-                    relevant_snippet = ctx.get("content", "")
-                    break
+                if ctx["content"]:
+                    if target.lower() in ctx.get("content", "").lower():
+                        relevant_snippet = ctx.get("content", "")
+                        break
             
             return self._build_focused_rewrite_prompt(query, target, relevant_snippet or context_str)
 
@@ -485,6 +492,35 @@ class RagModule:
             Brief note on changes made and contexts used.
             ---END EXPLANATION---
             """
+
+    def rag_entry_point(
+        self,
+        query: str,
+        category: Optional[int] = 1,
+        subpage: Optional[int] = None,
+        context_override: bool = False,
+        user_id: Optional[str] = None,
+        image_base_64: Optional[str] = None
+    ):
+        """Placeholder for potential future CLI or API entry point."""
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # def parse_args():
 #     """Defines command line arguments for the application."""
