@@ -64,7 +64,7 @@ def create_prompt_history_record(
         raise Exception("Failed to create prompt history")
     
     if image_base_64 and len(image_base_64) > 0:
-        for img in image_base_64.items(): 
+        for img in image_base_64: 
             print(f"Adding attachment to prompt history ID {prompt_history['id']}")
             add_attachments_to_prompt_history(db, prompt_history["id"], img)
             
