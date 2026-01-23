@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 
@@ -12,6 +12,10 @@ class ContentCreateRequest(BaseModel):
     action: Optional[str] = Field(default=None, description="Action to perform on the content")
     content_type: Optional[str] = Field(default=None, description="Type of content being created")
     generated_content: Optional[str] = Field(default=None, description="AI-generated content output")
+    image_base_64: Optional[list[str]] = Field(
+        default=None, 
+        description="List of base64-encoded images associated with the content"
+    )
 
 
 class ContentResponse(BaseModel):
@@ -53,6 +57,7 @@ class AddDraftContentRequest(BaseModel):
     content_id: Optional[int] = Field(None, description="ID of the content")
     prompt_session_id: Optional[str] = Field(None, description="UUID of the prompt session")
     context_override: Optional[bool] = False
+    image_base_64: Optional[List[str]] = Field(default=None, description="List of base64 encoded images")
 
 
 class SaveAsDraftRequest(BaseModel):
@@ -79,6 +84,7 @@ class PromptHistoryResponse(BaseModel):
     deleted_on: Optional[datetime]
     prompt_action: Optional[str]
     updated_on: Optional[datetime] = None
+    attachments: Optional[list] = []
 
     class Config:
         from_attributes = True

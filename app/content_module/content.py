@@ -150,7 +150,8 @@ async def create_content(
         if validated_data.action == ContentActionEnum.NEW:
             prompt_session_id = create_prompt_history_record(
                 content_id=new_content["id"],
-                prompt_data=validated_data.prompt_data
+                prompt_data=validated_data.prompt_data,
+                image_base_64=content_data.image_base_64
             )
         
         logger.info(f"Content created successfully: ID {new_content['id']}")
@@ -220,7 +221,8 @@ async def add_draft_content(
             content_id=draft_data.content_id,
             prompt_text=draft_data.prompt_text,
             user_id=payload.get("user_id"),
-            context_override=draft_data.context_override
+            context_override=draft_data.context_override,
+            image_base_64=draft_data.image_base_64,
         )
         
         logger.info(f"Draft content added successfully: session {draft_data.prompt_session_id}")

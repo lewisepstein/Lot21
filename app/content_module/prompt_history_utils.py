@@ -1,17 +1,34 @@
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from content_module.content_responses import PromptHistoryResponse
 from service_utils.db_utils.pg_db import PostgresDB
 import uuid
 from rag_module.rag import RagModule
 from datetime import datetime, timezone
+from service_utils.aws_services import safe_upload_image_to_s3
 
+
+def add_attachments_to_prompt_history(db: PostgresDB, prompt_history_id: int, img: str):
+
+    try:
+        file_path = safe_upload_image_to_s3(img, prefix="attachments")
+
+        add_attachments_data = {
+            "prompt_history_id": prompt_history_id,
+            "attachments_data": file_path,
+            "generated_images": None,
+            "status": "NEW"
+        }
+        db.create("prompt_attachments", add_attachments_data)
+    except Exception as e:
+        raise Exception(f"Failed to add attachments to prompt history: {e}")
 
 def create_prompt_history_record(
     content_id: int,
     prompt_data: Optional[str],
     prompt_session_id: Optional[str] = None,
     user_id: Optional[int] = None,
-    context_override: Optional[bool] = False
+    context_override: Optional[bool] = False,
+    image_base_64: Optional[List[str]] = None
 ) -> Tuple[Dict[str, Any], str, int]:
     """
     Create a new prompt_history record with a UUID session ID.
@@ -46,9 +63,22 @@ def create_prompt_history_record(
     if not prompt_history:
         raise Exception("Failed to create prompt history")
     
+    if image_base_64 and len(image_base_64) > 0:
+        for img in image_base_64.items(): 
+            print(f"Adding attachment to prompt history ID {prompt_history['id']}")
+            add_attachments_to_prompt_history(db, prompt_history["id"], img)
+            
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
-    ai_response, _ = rag.generate_content(query=prompt_data, user_id=user_id, context_override=context_override) 
+    rag_result = rag.rag_entry_point(
+        query=prompt_data, 
+        user_id=user_id, 
+        context_override=context_override,
+        image_base_64=image_base_64
+    )
+    
+    # Extract text response from the result dictionary
+    ai_response = rag_result.get("text", "") if isinstance(rag_result, dict) else str(rag_result)
 
     update_data = {
         "user_prompt": prompt_data,
@@ -61,7 +91,7 @@ def create_prompt_history_record(
         data=update_data,
         conditions={"id": prompt_history["id"]}
     )
-    
+
     if not updated_records or len(updated_records) == 0:
         raise Exception("Failed to update prompt history")
     
@@ -73,7 +103,8 @@ def add_draft_to_prompt_history(
     prompt_session_id: Optional[str] = None,
     content_id: Optional[int] = None,
     user_id: Optional[int] = None,
-    context_override: Optional[bool] = False
+    context_override: Optional[bool] = False,
+    image_base_64: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -107,11 +138,28 @@ def add_draft_to_prompt_history(
 
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
-    ai_response, _ = rag.generate_content(query=prompt_text, user_id=user_id, context_override=context_override) 
+    rag_result = rag.rag_entry_point(
+        query=prompt_text, 
+        user_id=user_id, 
+        context_override=context_override, 
+        image_base_64=image_base_64
+    ) 
+
+    # Extract text response from the result dictionary
+    ai_response = rag_result.get("text", "") if isinstance(rag_result, dict) else str(rag_result)
 
     if existing_records and len(existing_records) > 0:
+
         # Update the existing record
         existing_record = existing_records[0]
+
+        if image_base_64 and len(image_base_64) > 0:
+            for img in image_base_64: 
+                print(f"Adding attachment to prompt history ID {existing_record['id']}")
+                add_attachments_to_prompt_history(db, existing_record["id"], img)
+        else:
+            print("No attachments to add to prompt history")
+        
         update_data = {
             "user_prompt": prompt_text,
             "prompt_action": "DRAFT",
@@ -144,7 +192,15 @@ def add_draft_to_prompt_history(
         if not prompt_history:
             raise Exception("Failed to create prompt history")
         
+        if image_base_64 and len(image_base_64) > 0:
+            for img in image_base_64: 
+                print(f"Adding attachment to prompt history ID {prompt_history['id']}")
+                add_attachments_to_prompt_history(db, prompt_history["id"], img)
+        else:
+            print("No attachments to add to prompt history")
+        
         return prompt_history
+    
 
 def get_prompt_histories(
         prompt_session_id: str,
@@ -170,6 +226,13 @@ def get_prompt_histories(
     response_list = []
 
     for ph in prompt_histories:
+        attachments = db.read(
+            "prompt_attachments",
+            conditions={
+                "prompt_history_id": ph["id"]
+            }
+        )
+
         response_list.append(PromptHistoryResponse(
             id=ph["id"],
             prompt_session_id=ph["prompt_session_id"],
@@ -180,7 +243,8 @@ def get_prompt_histories(
             created_on=ph["created_on"],
             deleted_on=ph["deleted_on"],
             prompt_action=ph["prompt_action"],
-            updated_on=ph["updated_on"]
+            updated_on=ph["updated_on"],
+            attachments=attachments if attachments else [] 
         ))
     
     return response_list

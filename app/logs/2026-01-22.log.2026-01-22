@@ -1,0 +1,8 @@
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Created weaviate_data record with ID: 110
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Chunking scraped content...
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Created 5 chunks
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Loading 5 chunks into collection 'training_data'
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Inserting chunks into Weaviate...
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Successfully loaded 5 chunks into collection 'training_data'
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Successfully loaded 5 chunks into collection 'training_data'
+2026-01-23 10:33:18 - weaviate_module.weaviate_utils - INFO - Updated weaviate_data record 110 with COMPLETED status

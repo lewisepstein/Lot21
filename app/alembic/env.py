@@ -39,7 +39,8 @@ from models import (
     TaskProcess,
     WeaviateData,
     Session,
-    WeaviateDataVersion
+    WeaviateDataVersion,
+    PromptAttachments,
 )
 
 # -------------------------------------------------------

@@ -11,6 +11,7 @@ from models.content import Content
 from models.weaviate_data import WeaviateData
 from models.sessions import Session
 from models.weaviate_data_versions import WeaviateDataVersion
+from models.attachments import PromptAttachments
 
 __all__ = [
     "Base",
@@ -25,5 +26,6 @@ __all__ = [
     "TaskProcess",
     "WeaviateData",
     "Session",
-    "WeaviateDataVersion"
+    "WeaviateDataVersion",
+    "PromptAttachments",
 ]

@@ -696,6 +696,7 @@ function onDocumentLoad() {
     }
 }
 
+
 /* ==========================================================
    File Upload Handler
 ========================================================== */
@@ -704,6 +705,30 @@ function initFileUpload() {
     if (uploadInput) {
         uploadInput.addEventListener('change', handleFileUpload);
     }
+}
+
+
+function appendDataToLocalStorage(key, data) {
+  const existing = JSON.parse(localStorage.getItem(key)) || [];
+  existing.push(data);
+  localStorage.setItem(key, JSON.stringify(existing));
+}
+
+function elementIterDelete(key) {
+  const imageIds = JSON.parse(localStorage.getItem(key)) || [];
+  
+  // Iterate through each image ID and remove from DOM
+  imageIds.forEach(imgId => {
+    const element = document.getElementById(imgId);
+    if (element) {
+      element.remove();
+    }
+  });
+
+  // Clear the localStorage entries after removal
+  localStorage.removeItem(key);
+  localStorage.removeItem('attachedImages');
+//   localStorage.removeItem('lastUploadedImage');
 }
 
 function handleFileUpload(event) {
@@ -722,6 +747,8 @@ function handleFileUpload(event) {
     reader.onload = function(e) {
         const base64String = e.target.result;
         console.log('Image converted to base64:', base64String);
+
+        // localStorage.setItem('lastUploadedImage', base64String);
         
         // Store the base64 string in a global variable for access
         window.lastUploadedImage = base64String;
@@ -745,7 +772,10 @@ function handleFileUpload(event) {
             if (firstDiv) {
                 firstDiv.insertAdjacentHTML('beforeend', imgTag);
             }
-            
+
+            // appendDataToLocalStorage('attachedImages', base64String);
+            appendDataToLocalStorage('image_ids', imgId);
+ 
             // Check and enable prompt input if content is now available
             checkAndEnablePromptInput();
         }
@@ -790,15 +820,6 @@ function closeImageModal() {
         modal.style.display = 'none';
     }
 }
-
-/* DOM ready */
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onDocumentLoad);
-} else {
-    setTimeout(onDocumentLoad, 0);
-}
-
-window.onDocumentLoad = onDocumentLoad;
 
 /* ==========================================================
    Scrape Source Data from URL
@@ -1255,9 +1276,49 @@ async function loadPromptHistory() {
                     const isLatest = index === promptHistories.length - 1;
                     const promptDiv = document.createElement('p');
                     promptDiv.className = 'user-prompt success';
-                    promptDiv.innerHTML = ph.user_prompt + 
-                        (isLatest ? '<span class="latest-badge">Latest</span>' : '');
+                    promptDiv.innerHTML = ph.user_prompt
+
+                     // Add attachments if any
+
+                    if (ph.attachments && ph.attachments.length > 0) {
+                        promptDiv.appendChild(document.createElement('br'));
+
+                        const attachmentsDiv = document.createElement('div');
+                        attachmentsDiv.style.padding = '10px 0px';
+
+                        const attachmentsLabel = document.createElement('span');
+                        attachmentsLabel.style.fontSize = '13px';
+                        attachmentsLabel.style.color = '#ffffff';
+                        attachmentsLabel.style.fontWeight = '500';
+                        attachmentsLabel.textContent = 'Attachments: ';
+                        attachmentsLabel.style.display = 'block';
+                        attachmentsDiv.appendChild(attachmentsLabel);
+
+                        promptDiv.appendChild(attachmentsDiv);
+
+                        ph.attachments.forEach(att => {
+                            const imgId = 'attachment_' + att.id;
+                            const imgTag = `<img id="${imgId}" src="${att.attachments_data}" alt="Attached Image" 
+                                onclick="openImageModal('${imgId}')"
+                                style="max-width: 100px;
+                                height: auto;
+                                margin-right: 8px;
+                                border: 2px solid #eeeeee; 
+                                border-radius: 5px;
+                                cursor: pointer;" 
+                            />`;
+
+                            attachmentsDiv.insertAdjacentHTML('beforeend', imgTag);
+                        });
+                        promptDiv.appendChild(attachmentsDiv);
+                    }    
+                    
+                    promptDiv.innerHTML += (isLatest ? '<span class="latest-badge">Latest</span>' : '');
                     aiContentArea.appendChild(promptDiv);
+
+                    if(isLatest){
+                        localStorage.setItem('lastest_response', stripHtmlAndNewLines(ph.ai_response || ''));
+                    }
 
                     // Add timestamp
                     const timestamp = document.createElement('div');
@@ -1396,6 +1457,21 @@ async function loadPromptHistory() {
     }
 }
 
+function stripHtmlAndNewLines(input) {
+  const div = document.createElement('div');
+
+  // Decode escaped HTML first
+  div.innerHTML = input;
+  const decoded = div.textContent;
+
+  // Parse decoded HTML
+  div.innerHTML = decoded;
+
+  return div.textContent
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 
 async function handleFormSubmit(event) {
     event.preventDefault();
@@ -1411,24 +1487,30 @@ async function handleFormSubmit(event) {
 
     let context_override = false;
 
-    if (!promptInput || !sendBtn || !aiContentArea || !rawContent || !formattedContent) {
-        alert('Required elements are missing on the page.');
-        return false;
+    const latest_response = localStorage.getItem('lastest_response');
+
+    if (latest_response) {
+        promptInput.value = stripHtmlAndNewLines(latest_response + '\n\n' + promptInput.value.trim());
+    }else{
+        if (!promptInput || !sendBtn || !aiContentArea || !rawContent || !formattedContent) {
+            alert('Required elements are missing on the page.');
+            return false;
+        }
+
+        if (rawContent.value.trim().length === 0 && formattedContent.innerHTML.trim().length === 0) {
+            alert('Please provide content in Raw Data before sending a prompt.');
+            return false;
+        }else{
+            context_override = true;
+        }
+
+        if (rawContent.value.trim().length !== 0) {
+            promptInput.value = stripHtmlAndNewLines(rawContent.value.trim() + '\n\n' + promptInput.value.trim());
+        }else{
+            promptInput.value = stripHtmlAndNewLines(formattedContent.innerHTML.trim() + '\n\n' + promptInput.value.trim());
+        }
     }
 
-    if (rawContent.value.trim().length === 0 && formattedContent.innerHTML.trim().length === 0) {
-        alert('Please provide content in Raw Data before sending a prompt.');
-        return false;
-    }else{
-        context_override = true;
-    }
-
-    if (rawContent.value.trim().length !== 0) {
-        promptInput.value = rawContent.value.trim() + '\n\n' + promptInput.value.trim();
-    }else{
-        promptInput.value = formattedContent.innerHTML.trim() + '\n\n' + promptInput.value.trim();
-    }
-    
     const promptText = promptInput.value.trim();
 
     if (!promptText) {
@@ -1451,6 +1533,15 @@ async function handleFormSubmit(event) {
             return false;
         }
 
+        image_base_64 = JSON.parse(localStorage.getItem('image_ids') || '[]')
+
+        let image_list = []
+        for (const img of image_base_64) {
+            document.getElementById(img) && image_list.push(document.getElementById(img).src);
+        }
+
+        console.log('Sending images:', image_list);
+
         let prompt_session_id = null;
         let content_id = null;
         
@@ -1465,7 +1556,8 @@ async function handleFormSubmit(event) {
                 prompt_text: promptText,
                 content_id: parseInt(content_id),
                 prompt_session_id: prompt_session_id,
-                context_override: context_override
+                context_override: context_override,
+                image_base_64: image_list
             };
 
             const response = await fetch('/user/content/draft', {
@@ -1496,6 +1588,8 @@ async function handleFormSubmit(event) {
             }
             
             const result = await response.json();
+            
+            elementIterDelete('image_ids');
         }else{
             response = await fetch(`/user/content`, {
                 method: 'POST',
@@ -1507,7 +1601,8 @@ async function handleFormSubmit(event) {
                     generated_content: rawContent.value.trim(),
                     category_id: document.getElementById('contentType').value || null,
                     action: "NEW",
-                    prompt_data: promptText
+                    prompt_data: promptText,
+                    image_base_64: image_list
                 })
             });
             const content_data_json = await response.json();
@@ -1517,6 +1612,7 @@ async function handleFormSubmit(event) {
             localStorage.setItem('prompt_session_id', prompt_session_id);
             localStorage.setItem('content_id', content_id);
             localStorage.removeItem('new_content');
+            elementIterDelete('image_ids');
         }
 
         console.log('Using prompt_session_id:', prompt_session_id);
@@ -1528,8 +1624,6 @@ async function handleFormSubmit(event) {
             sendBtn.disabled = false;
             return false;
         }
-        
-        
         
         const previewParagraph = aiContentArea.querySelector('.user-prompt:not(.success)');
         if (previewParagraph) {
@@ -1733,13 +1827,16 @@ async function approveResponse(phId) {
 }
 
 
-/* ==========================================================
-   Regenerate Content
-   ========================================================== */
-function regenerateContent() {
-    // TODO: implement regenerate logic
+
+
+/* DOM ready */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onDocumentLoad);
+} else {
+    setTimeout(onDocumentLoad, 0);
 }
 
+window.onDocumentLoad = onDocumentLoad;
 
 </script>
 
