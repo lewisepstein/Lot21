@@ -140,7 +140,7 @@ async def create_content(
             action=validated_data.action,
             user_id=payload.get("user_id"),
             content_type=content_data.content_type,
-            generated_content=content_data.generated_content
+            generated_content=content_data.generated_content,
         )
         
         # Initialize prompt_session_id as None
@@ -151,7 +151,10 @@ async def create_content(
             prompt_session_id = create_prompt_history_record(
                 content_id=new_content["id"],
                 prompt_data=validated_data.prompt_data,
-                image_base_64=content_data.image_base_64
+                image_base_64=content_data.image_base_64,
+                image_attachment_mode=validated_data.image_attachment_mode,
+                user_id=payload.get("user_id"),
+                category_id=validated_data.category_id
             )
         
         logger.info(f"Content created successfully: ID {new_content['id']}")
@@ -223,6 +226,8 @@ async def add_draft_content(
             user_id=payload.get("user_id"),
             context_override=draft_data.context_override,
             image_base_64=draft_data.image_base_64,
+            image_attachment_mode=draft_data.image_attachment_mode,
+            category_id=draft_data.category_id
         )
         
         logger.info(f"Draft content added successfully: session {draft_data.prompt_session_id}")

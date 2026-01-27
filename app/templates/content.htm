@@ -597,6 +597,11 @@
                 
                 <div class="ai-input-area">
                     <div id="ai-actions-area" class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
+                        <select id="select_image_attachment_mode" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                            <option value="text_only">Text Only</option>
+                            <option value="image_only">Image Only</option>
+                            <option value="image_and_text">Image & Text</option>
+                        </select>
                         <div style="display: flex; gap: 8px;">
                             <input type="file" id="uploadInput" style="display: none;" accept="*/*">
                             <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;">
@@ -1365,9 +1370,12 @@ async function loadPromptHistory() {
                         if (ph.prompt_action === "SAVED_AS_DRAFT") {
                             aiResponseDiv.classList.add('ai-message-draft');
                         }
-                        aiResponseDiv.innerHTML = ph.ai_response.replace(/\n/g, '<br>');
 
-                        if (isRejected.includes(ph.ai_response)) {
+                        ai_response = JSON.parse(ph.ai_response);
+
+                        aiResponseDiv.innerHTML = ai_response.text.trim().replace(/\n/g, '<br>');
+
+                        if (isRejected.includes(ai_response.text.trim())) {
                             aiContentArea.appendChild(aiResponseDiv);
                             return; // skip adding buttons for this response
                         }else{
@@ -1380,39 +1388,62 @@ async function loadPromptHistory() {
                             if (ph.prompt_action === "SAVED_AS_DRAFT") {
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i> Reject
-                                    </button>
+                                        <i class="bi bi-x-circle"></i>                                     </button>
                                     <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i> Approve
+                                        <i class="bi bi-check-circle"></i> 
                                     </button>
                                 `;
                             }
                             else if (ph.prompt_action === "REJECTED") {
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i> Approve
+                                        <i class="bi bi-check-circle"></i> 
                                     </button>
                                 `;
                             }
                             else if (ph.prompt_action === "APPROVED") {
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i> Reject
+                                        <i class="bi bi-x-circle"></i>
                                     </button>
                                 `;
                             }else{
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-file-earmark"></i> Save Draft
+                                        <i class="bi bi-file-earmark"></i>
                                     </button>
                                     <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i> Reject
+                                        <i class="bi bi-x-circle"></i>
                                     </button>
                                     <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i> Approve
+                                        <i class="bi bi-check-circle"></i>
                                     </button>
                                 `;
                             }
+
+
+                            let images_container = document.createElement('div');
+                            images_container.style.marginTop = '8px';
+                            
+                            if (ai_response.images && ai_response.images.length > 0){
+                                ai_response.images.forEach(element => {
+                                    const imgId = 'response_image_' + Date.now() + Math.floor(Math.random() * 1000);
+                                    const imgTag = `<img id="${imgId}" src="${element}" alt="Response Image" 
+                                        onclick="openImageModal('${imgId}')"
+                                        style="max-width: 100px;
+                                        height: auto;
+                                        margin-right: 8px;
+                                        border: 2px solid #eeeeee; 
+                                        border-radius: 5px;
+                                        cursor: pointer;" 
+                                    />`;
+
+                                    images_container.insertAdjacentHTML('beforeend', imgTag);
+                                });
+                            }
+                            
+                            aiResponseDiv.appendChild(images_container);
+
                             aiResponseDiv.appendChild(actionsDiv);
                             aiContentArea.appendChild(aiResponseDiv);
                             // Show last action line if available
@@ -1482,34 +1513,14 @@ async function handleFormSubmit(event) {
     const aiContentArea = document.getElementById('ai-content-area');
     const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
     const formattedContent = document.getElementById('formattedContent');
+    const imageAttachmentMode = document.getElementById('select_image_attachment_mode');
+    const contentType = document.getElementById('contentType');
 
     const updated_by_agent_set = localStorage.getItem('new_content');
 
     let context_override = false;
 
     const latest_response = localStorage.getItem('lastest_response');
-
-    if (latest_response) {
-        promptInput.value = stripHtmlAndNewLines(latest_response + '\n\n' + promptInput.value.trim());
-    }else{
-        if (!promptInput || !sendBtn || !aiContentArea || !rawContent || !formattedContent) {
-            alert('Required elements are missing on the page.');
-            return false;
-        }
-
-        if (rawContent.value.trim().length === 0 && formattedContent.innerHTML.trim().length === 0) {
-            alert('Please provide content in Raw Data before sending a prompt.');
-            return false;
-        }else{
-            context_override = true;
-        }
-
-        if (rawContent.value.trim().length !== 0) {
-            promptInput.value = stripHtmlAndNewLines(rawContent.value.trim() + '\n\n' + promptInput.value.trim());
-        }else{
-            promptInput.value = stripHtmlAndNewLines(formattedContent.innerHTML.trim() + '\n\n' + promptInput.value.trim());
-        }
-    }
 
     const promptText = promptInput.value.trim();
 
@@ -1557,7 +1568,9 @@ async function handleFormSubmit(event) {
                 content_id: parseInt(content_id),
                 prompt_session_id: prompt_session_id,
                 context_override: context_override,
-                image_base_64: image_list
+                image_base_64: image_list,
+                image_attachment_mode: imageAttachmentMode ? imageAttachmentMode.value : 'NONE',
+                category_id: contentType ? contentType.value : null,
             };
 
             const response = await fetch('/user/content/draft', {
@@ -1602,7 +1615,8 @@ async function handleFormSubmit(event) {
                     category_id: document.getElementById('contentType').value || null,
                     action: "NEW",
                     prompt_data: promptText,
-                    image_base_64: image_list
+                    image_base_64: image_list,
+                    image_attachment_mode: imageAttachmentMode ? imageAttachmentMode.value : 'NONE',
                 })
             });
             const content_data_json = await response.json();

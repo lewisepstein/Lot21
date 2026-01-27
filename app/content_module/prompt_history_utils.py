@@ -4,7 +4,8 @@ from service_utils.db_utils.pg_db import PostgresDB
 import uuid
 from rag_module.rag import RagModule
 from datetime import datetime, timezone
-from service_utils.aws_services import safe_upload_image_to_s3
+from service_utils.aws_services import safe_upload_image_to_s3, upload_base64_image_to_s3
+import json
 
 
 def add_attachments_to_prompt_history(db: PostgresDB, prompt_history_id: int, img: str):
@@ -28,7 +29,9 @@ def create_prompt_history_record(
     prompt_session_id: Optional[str] = None,
     user_id: Optional[int] = None,
     context_override: Optional[bool] = False,
-    image_base_64: Optional[List[str]] = None
+    image_base_64: Optional[List[str]] = None,
+    image_attachment_mode: Optional[str] = None,
+    category_id: Optional[int] = None
 ) -> Tuple[Dict[str, Any], str, int]:
     """
     Create a new prompt_history record with a UUID session ID.
@@ -74,17 +77,33 @@ def create_prompt_history_record(
         query=prompt_data, 
         user_id=user_id, 
         context_override=context_override,
-        image_base_64=image_base_64
+        image_base_64=image_base_64,
+        prompt_session_id=prompt_session_id,
+        image_attachment_mode=image_attachment_mode,
+        category_id=category_id
     )
     
     # Extract text response from the result dictionary
     ai_response = rag_result.get("text", "") if isinstance(rag_result, dict) else str(rag_result)
 
+    images_generated = rag_result.get("images", []) if isinstance(rag_result, dict) else []
+    images = []
+
+    if images_generated and len(images_generated) > 0:
+        for img in images_generated:
+            print(f"Uploading generated image for prompt history ID {prompt_history['id']}")
+            img_s3_url = upload_base64_image_to_s3(img, prefix="generated/generated_images")
+            images.append(img_s3_url)
+
     update_data = {
         "user_prompt": prompt_data,
         "prompt_action": "DRAFT",
-        "ai_response": ai_response
+        "ai_response": json.dumps({
+            "text": ai_response,
+            "images": images if len(images) > 0 else None
+        })
     }
+
 
     updated_records = db.update(
         "prompt_history",
@@ -104,7 +123,9 @@ def add_draft_to_prompt_history(
     content_id: Optional[int] = None,
     user_id: Optional[int] = None,
     context_override: Optional[bool] = False,
-    image_base_64: Optional[List[str]] = None
+    image_base_64: Optional[List[str]] = None,
+    category_id: Optional[int] = None,
+    image_attachment_mode: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -142,11 +163,21 @@ def add_draft_to_prompt_history(
         query=prompt_text, 
         user_id=user_id, 
         context_override=context_override, 
-        image_base_64=image_base_64
+        image_base_64=image_base_64,
+        image_attachment_mode=image_attachment_mode,
+        category_id=category_id
     ) 
 
     # Extract text response from the result dictionary
     ai_response = rag_result.get("text", "") if isinstance(rag_result, dict) else str(rag_result)
+    images_generated = rag_result.get("images", []) if isinstance(rag_result, dict) else []
+    images = []
+
+    if images_generated and len(images_generated) > 0:
+        for img in images_generated:
+            print(f"Uploading generated image for prompt history session ID {prompt_session_id}")
+            img_s3_url = upload_base64_image_to_s3(img, prefix="generated/generated_images")
+            images.append(img_s3_url)
 
     if existing_records and len(existing_records) > 0:
 
@@ -163,7 +194,10 @@ def add_draft_to_prompt_history(
         update_data = {
             "user_prompt": prompt_text,
             "prompt_action": "DRAFT",
-            "ai_response": ai_response
+            "ai_response": json.dumps({
+                "text": ai_response,
+                "images": images if len(images) > 0 else None
+            })
         }
         
         updated_records = db.update(
@@ -182,7 +216,10 @@ def add_draft_to_prompt_history(
             "prompt_session_id": prompt_session_id,
             "content_id": content_id,
             "user_prompt": prompt_text,
-            "ai_response": ai_response,
+            "ai_response": json.dumps({
+                "text": ai_response,
+                "images": images if len(images) > 0 else None
+            }),
             "prompt_type": "TEXT",
             "prompt_action": "DRAFT"  # Default to DRAFT for drafts
         }

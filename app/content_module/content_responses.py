@@ -58,6 +58,14 @@ class AddDraftContentRequest(BaseModel):
     prompt_session_id: Optional[str] = Field(None, description="UUID of the prompt session")
     context_override: Optional[bool] = False
     image_base_64: Optional[List[str]] = Field(default=None, description="List of base64 encoded images")
+    image_attachment_mode: Optional[str] = Field(
+        default=None,
+        description="Mode of image attachment for the content"
+    )
+    category_id: Optional[int] = Field(
+        default=None,
+        description="ID of the category for this content"   
+    )
 
 
 class SaveAsDraftRequest(BaseModel):

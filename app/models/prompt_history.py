@@ -51,7 +51,7 @@ class PromptHistory(Base):
     deleted_on = Column(DateTime(timezone=True), nullable=True)
     prompt_name = Column(String(255), nullable=True)
     prompt_description = Column(Text, nullable=True)
-    updated_on = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    updated_on = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True) 
     
     # Relationships
     content = relationship("Content", backref="prompt_histories")

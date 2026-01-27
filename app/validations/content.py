@@ -21,6 +21,12 @@ class ContentAddValidation(BaseModel):
         description="Action to perform on the content"
     )
 
+    image_attachment_mode: Optional[str] = Field(
+        default=None,
+        description="Mode of image attachment for the content"
+    )
+
+
     @field_validator("prompt_data")
     @classmethod
     def validate_prompt_data(cls, v: Optional[str]) -> Optional[str]:

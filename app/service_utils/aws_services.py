@@ -70,7 +70,7 @@ def connect_s3():
 
 # Upload base64 image to S3 and return the S3 URL
 # -----------------------------------------------------------
-def create_img_from_bae64(image_base64, prefix="attachments") -> str:
+def create_img_from_base64(image_base64, prefix="attachments") -> str:
 
     print("Creating image from base64 data...", type(image_base64))
 
@@ -102,7 +102,7 @@ def create_img_from_bae64(image_base64, prefix="attachments") -> str:
 
 def upload_base64_image_to_s3(image_base64, prefix="attachments") -> str:
 
-    filename, buffer = create_img_from_bae64(image_base64, prefix=prefix)
+    filename, buffer = create_img_from_base64(image_base64, prefix=prefix)
 
     # ---- Upload to S3 ----
     try:
