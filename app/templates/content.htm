@@ -1441,7 +1441,7 @@ async function loadPromptHistory() {
                                     images_container.insertAdjacentHTML('beforeend', imgTag);
                                 });
                             }
-                            
+
                             aiResponseDiv.appendChild(images_container);
 
                             aiResponseDiv.appendChild(actionsDiv);
@@ -1520,7 +1520,17 @@ async function handleFormSubmit(event) {
 
     let context_override = false;
 
-    const latest_response = localStorage.getItem('lastest_response');
+    const latest_response = JSON.parse(localStorage.getItem('latest_response'));
+
+    // alert(latest_response)
+
+    if (latest_response){
+        context = latest_response.text.trim();
+    }else{
+        context = rawContent.value.trim() ? rawContent.value.trim() : formattedContent.innerHTML.trim();
+    }
+
+    alert(context)
 
     const promptText = promptInput.value.trim();
 
@@ -1567,7 +1577,7 @@ async function handleFormSubmit(event) {
                 prompt_text: promptText,
                 content_id: parseInt(content_id),
                 prompt_session_id: prompt_session_id,
-                context_override: context_override,
+                context: context,
                 image_base_64: image_list,
                 image_attachment_mode: imageAttachmentMode ? imageAttachmentMode.value : 'NONE',
                 category_id: contentType ? contentType.value : null,

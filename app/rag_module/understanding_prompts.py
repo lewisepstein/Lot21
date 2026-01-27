@@ -1,7 +1,19 @@
 from rag_module.prompt_rules import LottiePrompts
 
 
-def build_full_understanding_prompt(query, context_str, topic):
+def build_full_understanding_prompt(
+        query = None, 
+        context_str = None, 
+        topic = None
+) -> str:
+        
+        if not context_str:
+            context_str = "No additional context provided."
+        if not topic:
+            topic = "General Topic"
+        if not query:
+             query = "Provide summary on the given topic."
+
         return f"""{LottiePrompts.GUARDRAIL_RULES}
 
 {LottiePrompts.PLAIN_TEXT_RULES}

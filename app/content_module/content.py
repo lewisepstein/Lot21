@@ -152,9 +152,10 @@ async def create_content(
                 content_id=new_content["id"],
                 prompt_data=validated_data.prompt_data,
                 image_base_64=content_data.image_base_64,
-                image_attachment_mode=validated_data.image_attachment_mode,
+                image_attachment_mode=content_data.image_attachment_mode,
                 user_id=payload.get("user_id"),
-                category_id=validated_data.category_id
+                category_id=validated_data.category_id,
+                context=content_data.generated_content
             )
         
         logger.info(f"Content created successfully: ID {new_content['id']}")
@@ -227,7 +228,8 @@ async def add_draft_content(
             context_override=draft_data.context_override,
             image_base_64=draft_data.image_base_64,
             image_attachment_mode=draft_data.image_attachment_mode,
-            category_id=draft_data.category_id
+            category_id=draft_data.category_id,
+            context=draft_data.context
         )
         
         logger.info(f"Draft content added successfully: session {draft_data.prompt_session_id}")

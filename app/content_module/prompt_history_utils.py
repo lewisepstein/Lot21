@@ -31,7 +31,8 @@ def create_prompt_history_record(
     context_override: Optional[bool] = False,
     image_base_64: Optional[List[str]] = None,
     image_attachment_mode: Optional[str] = None,
-    category_id: Optional[int] = None
+    category_id: Optional[int] = None,
+    context: Optional[str] = None
 ) -> Tuple[Dict[str, Any], str, int]:
     """
     Create a new prompt_history record with a UUID session ID.
@@ -60,6 +61,11 @@ def create_prompt_history_record(
         "prompt_type": "TEXT",  # Default to TEXT
         "prompt_action": "NEW"  # Default to NEW
     }
+
+
+    print(f"Creating new prompt history record for session ID {prompt_session_id}")
+    print(f"Prompt Data: {prompt_data}")
+    print(f"Context Override: {context}")
     
     prompt_history = db.create("prompt_history", prompt_history_dict)
 
@@ -80,7 +86,8 @@ def create_prompt_history_record(
         image_base_64=image_base_64,
         prompt_session_id=prompt_session_id,
         image_attachment_mode=image_attachment_mode,
-        category_id=category_id
+        category_id=category_id,
+        context=context
     )
     
     # Extract text response from the result dictionary
@@ -122,10 +129,11 @@ def add_draft_to_prompt_history(
     prompt_session_id: Optional[str] = None,
     content_id: Optional[int] = None,
     user_id: Optional[int] = None,
-    context_override: Optional[bool] = False,
+    context_override: Optional[str] = None,
     image_base_64: Optional[List[str]] = None,
     category_id: Optional[int] = None,
-    image_attachment_mode: Optional[str] = None
+    image_attachment_mode: Optional[str] = None,
+    context: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Add a draft prompt to an existing prompt history session.
@@ -157,6 +165,8 @@ def add_draft_to_prompt_history(
         }
     )
 
+    context = context
+
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
     rag_result = rag.rag_entry_point(
@@ -165,7 +175,8 @@ def add_draft_to_prompt_history(
         context_override=context_override, 
         image_base_64=image_base_64,
         image_attachment_mode=image_attachment_mode,
-        category_id=category_id
+        category_id=category_id,
+        context=context
     ) 
 
     # Extract text response from the result dictionary

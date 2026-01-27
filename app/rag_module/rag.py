@@ -60,22 +60,31 @@ class RagModule:
         return "\n\n".join(f"Context: {c['content']}" for c in contexts)
 
     # ---------------- TEXT ----------------
-    def generate_content(self, query, category, subpage, context_override, user_id):
+    def generate_content(
+            self, 
+            query = None, 
+            category_id=None, 
+            subpage=None, 
+            context=None, 
+            user_id=None
+    ):
         telemetry = Telemetry()
 
         telemetry.mark("weaviate_ms")
 
-        context_str = self._context_str(self.retrieve_context(query))
+        # context_str = self._context_str(self.retrieve_context(query))
+
+        context_str = context if context is not None else ""  # Bypass context for now
 
         # Routing preserved
-        if category == 1:
+        if category_id == 1:
             topic = subpage
             prompt = build_full_understanding_prompt(query, context_str, topic)
-        elif category == 2:
+        elif category_id == 2:
             prompt = build_project_case_study_prompt(query, context_str, {})
-        elif category == 3:
+        elif category_id == 3:
             prompt = build_resource_prompt(query, context_str, "", "")
-        elif category == 4:
+        elif category_id == 4:
             prompt = build_policy_prompt(query, context_str, "", "")
         else:
             prompt = build_quarterly_newsletter_prompt(query, context_str, season="Winter", year="2026")
@@ -86,7 +95,7 @@ class RagModule:
 
         if resp:
             load_data_with_tracking(
-                scraped_content=query, 
+                scraped_content=context_str, 
                 collection_name="training_data", 
                 user_id=user_id,
                 source_url="RAG_GENERATION"
@@ -142,22 +151,28 @@ class RagModule:
 
     # ---------------- ENTRY POINT ----------------
     def rag_entry_point(self, 
-        query, category=1, 
+        query,  
         subpage=None,
         context_override=False, 
         user_id=None,
         image_base_64=None,
         image_attachment_mode="text_only",
-        category_id=None
+        category_id=None,
+        context=None,
+        prompt_session_id=None
     ):
         
         print(f"RAG Entry Point - Mode: {image_attachment_mode}")
+
+        print("Context Override:", context)
+
+        data = {}
         
         if image_attachment_mode == "text_only":
             # For text-only modes, skip RAG text generation
 
             text, telemetry = self.generate_content(
-                query, category_id, subpage, context_override, user_id
+                query=query, category_id=category_id, subpage=subpage, context=context, user_id=user_id
             )
 
             data = {
@@ -180,7 +195,7 @@ class RagModule:
         elif image_attachment_mode == "image_and_text":
 
             text, telemetry = self.generate_content(
-                query, category_id, subpage, context_override, user_id
+                query=query, category_id=category_id, subpage=subpage, context=context, user_id=user_id
             )
 
             image = self.generate_visual(query)

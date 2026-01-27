@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -15,6 +15,14 @@ class ContentCreateRequest(BaseModel):
     image_base_64: Optional[list[str]] = Field(
         default=None, 
         description="List of base64-encoded images associated with the content"
+    )
+    image_attachment_mode: Optional[str] = Field(
+        default=None,
+        description="Mode of image attachment for the content"
+    )
+    context: Optional[str] = Field(
+        default=None,
+        description="Override context for RAG retrieval"   
     )
 
 
@@ -36,8 +44,7 @@ class ContentResponse(BaseModel):
     quarter: Optional[str]
     content_type: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ContentCreateResponse(BaseModel):
@@ -65,6 +72,10 @@ class AddDraftContentRequest(BaseModel):
     category_id: Optional[int] = Field(
         default=None,
         description="ID of the category for this content"   
+    )
+    context: Optional[str] = Field(
+        default=None,
+        description="Override context for RAG retrieval"   
     )
 
 
@@ -94,8 +105,7 @@ class PromptHistoryResponse(BaseModel):
     updated_on: Optional[datetime] = None
     attachments: Optional[list] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AddDraftContentResponse(BaseModel):
