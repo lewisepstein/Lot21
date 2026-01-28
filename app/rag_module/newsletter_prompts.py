@@ -13,7 +13,4 @@ def build_quarterly_newsletter_prompt(query, context_str, season, year):
 KNOWLEDGE CONTEXT:
 {context_str}
 
----BEGIN EXPLANATION---
-Briefly explain how the generated examples were aligned to '{query}'.
----END EXPLANATION---
 """

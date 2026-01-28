@@ -24,9 +24,6 @@ KNOWLEDGE CONTEXT:
 AUTHORITATIVE SOURCES:
 {sources}
 
----BEGIN EXPLANATION---
-Briefly explain how the chosen material/tool aligns with decarbonization.
----END EXPLANATION---
 """
 
     

@@ -18,9 +18,6 @@ SOURCES:
 INTERNAL RESEARCH:
 {context_str}
 
----BEGIN EXPLANATION---
-Briefly explain how the policy data was sourced and how it supports decarbonization.
----END EXPLANATION---
 """
 
     

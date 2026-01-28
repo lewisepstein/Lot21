@@ -1,54 +1,94 @@
 from rag_module.prompt_rules import LottiePrompts
 
-
 def build_full_understanding_prompt(
-        query = None, 
-        context_str = None, 
-        topic = None
+        query=None,
+        context_str=None,
+        topic=None,
+        max_lines=None
 ) -> str:
-        
-        if not context_str:
-            context_str = "No additional context provided."
-        if not topic:
-            topic = "General Topic"
-        if not query:
-             query = "Provide summary on the given topic."
 
+    if not context_str:
+        context_str = "No additional context provided."
+    if not topic:
+        topic = "General Topic"
+    if not query:
+        query = "Provide summary on the given topic."
+
+    # -------- CONTEXT-BOUND SUMMARY MODE --------
+    if max_lines is not None:
         return f"""{LottiePrompts.GUARDRAIL_RULES}
 
 {LottiePrompts.PLAIN_TEXT_RULES}
 
-You are an expert content writer for Lottie — a human welfare and climate justice platform.
+CRITICAL CONTEXT RULE (MANDATORY):
+
+You must answer using ONLY the information present in the CONTEXT section below.
+
+If the user question is NOT related to the CONTEXT, or cannot be answered
+directly from it, you MUST NOT generate an answer.
+
+Instead, respond with EXACTLY this sentence and nothing else:
+
+"This question is outside the scope of the provided context."
+
+TASK:
+Provide a concise summary based strictly on the context.
+
+STRICT OUTPUT RULES:
+- Write EXACTLY {max_lines} lines.
+- Each line must be one complete sentence.
+- Do NOT add information not present in the context.
+- Do NOT use headings, labels, or section titles.
+
+USER QUESTION:
+{query}
+
+CONTEXT:
+{context_str}
+"""
+
+    # -------- CONTEXT-BOUND FULL MODE --------
+    return f"""{LottiePrompts.GUARDRAIL_RULES}
+
+{LottiePrompts.PLAIN_TEXT_RULES}
+
+CRITICAL CONTEXT RULE (MANDATORY):
+
+You must answer using ONLY the information present in the CONTEXT section below.
+
+If the user question is NOT related to the CONTEXT, or cannot be answered
+directly from it, you MUST NOT generate an answer.
+
+Instead, respond with EXACTLY this sentence and nothing else:
+
+"This question is outside the scope of the provided context."
+
+You are an expert content writer for Lottie.
 Current Topic Area: {topic}
 
-TOPIC: {query}
+USER QUESTION:
+{query}
 
 STRUCTURE:
 
 HOW IT WORKS
-Explain the core mechanism in clear, accessible language.
+Explain using ONLY the provided context.
 
 DURABILITY
-Discuss long-term stability and permanence of carbon storage.
+Discuss ONLY what is supported by the context.
 
 FINANCEABILITY
-Analyze current costs, expected decline, investments, and policy support.
+If not mentioned in context, do not infer.
 
 SCALABILITY
-Evaluate technical, energy, geographic, and logistical potential and barriers.
+Base analysis strictly on context.
 
 EQUITY
-Address community impacts, job creation, benefit sharing, and inclusive deployment.
+Address ONLY if present in context.
 
 CONCLUSION
-End with optimism, innovation opportunities, and collective action.
+Summarize without adding new facts.
 
-KNOWLEDGE:
+CONTEXT:
 {context_str}
-
 """
-
-# TITLE: {query}
-# ---BEGIN EXPLANATION---
-# Briefly explain which contexts were most useful and any assumptions.
-# ---END EXPLANATION---

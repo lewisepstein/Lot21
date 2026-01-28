@@ -38,7 +38,4 @@ Task: Refine or rewrite the '{target_section}' content.
 Original context:
 {relevant_context}
 
----BEGIN EXPLANATION---
-Brief note on changes made and contexts used.
----END EXPLANATION---
 """

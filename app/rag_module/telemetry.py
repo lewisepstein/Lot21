@@ -25,3 +25,26 @@ class Telemetry:
             "latency": self.latency,
             "cost": self.cost
         }
+
+    def start_image(self):
+        self._image_start = time.time()
+        self.latency["image_attempts"] = 0
+        self.latency["image_success"] = False
+
+    def mark_image_attempt(self):
+        self.latency["image_attempts"] += 1
+
+    def end_image_success(self):
+        self.latency["image_latency_ms"] = int(
+            (time.time() - self._image_start) * 1000
+        )
+        self.latency["image_success"] = True
+        self.cost["image_usd"] = IMAGE_COST_USD
+
+    def end_image_failure(self, reason=None):
+        self.latency["image_latency_ms"] = int(
+            (time.time() - self._image_start) * 1000
+        )
+        self.latency["image_success"] = False
+        if reason:
+            self.latency["image_fail_reason"] = reason

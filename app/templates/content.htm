@@ -1231,6 +1231,179 @@ function hideSpinner() {
     }
 }
 
+function stripHtmlAndNewLines(input) {
+  const div = document.createElement('div');
+
+  // Decode escaped HTML first
+  div.innerHTML = input;
+  const decoded = div.textContent;
+
+  // Parse decoded HTML
+  div.innerHTML = decoded;
+
+  return div.textContent
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+
+function saveDraftFromResponse(phId) {
+    if (!phId) { alert('Invalid prompt history id'); return; }
+    const input = document.getElementById('offcanvasSaveDraft_phId');
+    if (input) input.value = phId;
+        // Try to locate the AI response HTML for this prompt id and populate the draft content
+    try {
+        const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
+        const sourceBtn = document.querySelector(btnSelector);
+            let aiHtml = '';
+        if (sourceBtn) {
+            const aiMsg = sourceBtn.closest('.ai-message');
+            if (aiMsg) {
+                // Clone the node and remove action buttons so button labels are excluded
+                const clone = aiMsg.cloneNode(true);
+                const actions = clone.querySelector('.message-actions');
+                if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
+                    // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
+                    aiHtml = (clone.innerHTML || '').trim();
+                    // If innerHTML is empty for some reason, fall back to text with <br> replacement
+                    if (!aiHtml) {
+                        const fallbackText = (clone.textContent || '').trim();
+                        aiHtml = fallbackText.replace(/\n/g, '<br>');
+                    }
+            }
+        }
+        const draftContentEl = document.getElementById('draftContent');
+        const draftNotesEl = document.getElementById('draftNotes');
+        const draftNameEl = document.getElementById('draftName');
+        if (draftContentEl) {
+            // Insert HTML so any <br> or markup is preserved and existing content remains.
+            if (aiHtml) {
+                draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
+            }
+        }
+        if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
+        if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
+    } catch (e) {
+        console.debug('Could not prefill draft content', e);
+    }
+    const el = document.getElementById('offcanvasSaveDraft');
+    if (el && window.bootstrap && bootstrap.Offcanvas) {
+        const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
+        // show on next frame to avoid layout thrash
+        requestAnimationFrame(() => off.show());
+    }
+}
+
+
+
+
+/* ==========================================================
+   Offcanvas Actions (Draft / Approve)
+   ========================================================== */
+function openSaveDraftOffcanvas(promptHistoryId) {
+    // TODO: populate & open save draft offcanvas
+}
+
+async function setPromptAction(
+    phId, 
+    prompt_action = 'SAVED_AS_DRAFT',
+    prompt_name = null,
+    prompt_description = null
+) {
+    showSpinner();
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        hideSpinner();
+        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+        return false;
+    }
+
+    payload = {
+        prompt_history_id: parseInt(phId),
+        prompt_action: prompt_action,
+        prompt_name: prompt_name,
+        prompt_description: prompt_description,
+    };
+
+    const response = await fetch(`/user/prompt_history/set_action`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+        hideSpinner();
+
+        if (handleTokenExpiration(response)) {
+            return false;
+        }
+    }
+    
+    const result = await response.json();
+    loadPromptHistory();
+}
+
+async function confirmSaveDraft(event) {
+    event.preventDefault();
+
+    const phIdInput = document.getElementById('offcanvasSaveDraft_phId');
+    if (!phIdInput || !phIdInput.value) {
+        alert('Invalid prompt history id');
+        return;
+    }
+
+    const phId = phIdInput.value;
+    alert('Save draft for prompt history id: ' + phId);
+
+    await setPromptAction(
+        phId, 
+        'SAVED_AS_DRAFT',
+        prompt_name = document.getElementById('draftName').value.trim(),
+        prompt_description = document.getElementById('draftNotes').value.trim(),
+    );
+}
+
+async function rejectResponse(phId) {
+
+    confirm = confirm('Are you sure you want to reject this AI response? This action cannot be undone.');
+    if (!confirm) return;
+    else{
+        await setPromptAction(
+            phId, 
+            'REJECTED',
+            prompt_name = null,
+            prompt_description = null,
+        );
+    }
+}
+
+async function approveResponse(phId) {
+    confirm = confirm('Are you sure you want to approve this AI response?');
+    if (!confirm) return;
+    else{
+        await setPromptAction(
+            phId, 
+            'APPROVED',
+            prompt_name = null,
+            prompt_description = null,
+        );
+    }
+}
+
+
+const stop_text = "This question is outside the scope of the provided context.";
+
+const isRejected = [
+    "I am sorry, but as a Lot21 specialist, I only provide information and content related to climate justice and environmental solutions.",
+    "Generation unavailable.",
+    "This question is outside the scope of the provided context.",
+    "We're having trouble reaching the AI agent right now. Your request wasn't lost. Please try again in a moment."
+]; 
+
 async function loadPromptHistory() {
     const prompt_session_id = localStorage.getItem('prompt_session_id');
     const content_id = localStorage.getItem('content_id');
@@ -1283,7 +1456,7 @@ async function loadPromptHistory() {
                     promptDiv.className = 'user-prompt success';
                     promptDiv.innerHTML = ph.user_prompt
 
-                     // Add attachments if any
+                    // Add attachments if any
 
                     if (ph.attachments && ph.attachments.length > 0) {
                         promptDiv.appendChild(document.createElement('br'));
@@ -1322,7 +1495,7 @@ async function loadPromptHistory() {
                     aiContentArea.appendChild(promptDiv);
 
                     if(isLatest){
-                        localStorage.setItem('lastest_response', stripHtmlAndNewLines(ph.ai_response || ''));
+                        localStorage.setItem('latest_response', ph.ai_response || '');
                     }
 
                     // Add timestamp
@@ -1356,13 +1529,6 @@ async function loadPromptHistory() {
                         }
                     }
 
-                    // Do not add buttons if rejected prompts
-
-                    const isRejected =  [
-                        "I am sorry, but as a Lot21 specialist, I only provide information and content related to climate justice and environmental solutions.",
-                        "Generation unavailable."
-                    ]
-
                     // Add Response from the server if any (optional)
                     if (ph.ai_response) {
                         const aiResponseDiv = document.createElement('div');
@@ -1371,107 +1537,129 @@ async function loadPromptHistory() {
                             aiResponseDiv.classList.add('ai-message-draft');
                         }
 
-                        ai_response = JSON.parse(ph.ai_response);
+                        const ai_response = JSON.parse(ph.ai_response);
 
-                        aiResponseDiv.innerHTML = ai_response.text.trim().replace(/\n/g, '<br>');
+                        const ai_response_text = ai_response.text.trim().replace(/\n/g, '<br>');
+                        
+                        aiResponseDiv.innerHTML = ai_response_text;
 
-                        if (isRejected.includes(ai_response.text.trim())) {
+                        let empty_response = false;
+                        console.log("Length of AI response text:", ai_response_text.length);
+                        console.log("AI response:", ai_response_text);
+
+                        let images_container = document.createElement('div');
+                        images_container.style.marginTop = '8px';
+                        
+                        let img_counts = 0;
+                        if (ai_response.images && ai_response.images.length > 0){
+                            ai_response.images.forEach(element => {
+                                const imgId = 'response_image_' + Date.now() + Math.floor(Math.random() * 1000);
+                                const imgTag = `<img id="${imgId}" src="${element}" alt="Response Image" 
+                                    onclick="openImageModal('${imgId}')"
+                                    style="max-width: 100px;
+                                    height: auto;
+                                    margin-right: 8px;
+                                    border: 2px solid #eeeeee; 
+                                    border-radius: 5px;
+                                    cursor: pointer;" 
+                                />`;
+
+                                img_counts = img_counts + 1;
+
+                                images_container.insertAdjacentHTML('beforeend', imgTag);
+                            });
+                        }
+
+                        if(img_counts === 0 && ai_response_text.length === 0){
+                            empty_response = true;
+                            aiResponseDiv.innerHTML = 'No response generated.';
+                        } 
+                        
+                        if(stop_text === ai_response_text || empty_response === true || isRejected.includes(ai_response_text)){
+                            aiResponseDiv.style.backgroundColor = '#ff2c2c80';
+                            aiResponseDiv.style.fontStyle = 'italic';
+                        }
+
+                        if (isRejected.includes(ai_response_text)) {
                             aiContentArea.appendChild(aiResponseDiv);
                             return; // skip adding buttons for this response
                         }else{
-
                             // Append action buttons inside ai-message at its bottom
                             const actionsDiv = document.createElement('div');
                             actionsDiv.className = 'message-actions';
 
-                            // Render action buttons
-                            if (ph.prompt_action === "SAVED_AS_DRAFT") {
-                                actionsDiv.innerHTML = `
-                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i>                                     </button>
-                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i> 
-                                    </button>
-                                `;
-                            }
-                            else if (ph.prompt_action === "REJECTED") {
-                                actionsDiv.innerHTML = `
-                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i> 
-                                    </button>
-                                `;
-                            }
-                            else if (ph.prompt_action === "APPROVED") {
-                                actionsDiv.innerHTML = `
-                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
-                                `;
-                            }else{
-                                actionsDiv.innerHTML = `
-                                    <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-file-earmark"></i>
-                                    </button>
-                                    <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
-                                    <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle"></i>
-                                    </button>
-                                `;
-                            }
-
-
-                            let images_container = document.createElement('div');
-                            images_container.style.marginTop = '8px';
-                            
-                            if (ai_response.images && ai_response.images.length > 0){
-                                ai_response.images.forEach(element => {
-                                    const imgId = 'response_image_' + Date.now() + Math.floor(Math.random() * 1000);
-                                    const imgTag = `<img id="${imgId}" src="${element}" alt="Response Image" 
-                                        onclick="openImageModal('${imgId}')"
-                                        style="max-width: 100px;
-                                        height: auto;
-                                        margin-right: 8px;
-                                        border: 2px solid #eeeeee; 
-                                        border-radius: 5px;
-                                        cursor: pointer;" 
-                                    />`;
-
-                                    images_container.insertAdjacentHTML('beforeend', imgTag);
-                                });
-                            }
-
-                            aiResponseDiv.appendChild(images_container);
-
-                            aiResponseDiv.appendChild(actionsDiv);
-                            aiContentArea.appendChild(aiResponseDiv);
-                            // Show last action line if available
-                            if (lastActionDate && lastActionLabel) {
-                                const statusLine = document.createElement('div');
-                                statusLine.className = 'prompt-action-status';
-                                
-                                if(lastAction == "APPROVED"){
-                                    statusLine.style.color = '#28a745';
-                                } else if(lastAction == "REJECTED"){
-                                    statusLine.style.color = '#ff0000';
-                                } else {
-                                    statusLine.style.color = 'var(--text-secondary)';
+                            if(stop_text !== ai_response_text && empty_response !== true){
+                                // Render action buttons
+                                if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                                    actionsDiv.innerHTML = `
+                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle"></i>                                     </button>
+                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle"></i> 
+                                        </button>
+                                    `;
                                 }
+                                else if (ph.prompt_action === "REJECTED") {
+                                    actionsDiv.innerHTML = `
+                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle"></i> 
+                                        </button>
+                                    `;
+                                }
+                                else if (ph.prompt_action === "APPROVED") {
+                                    actionsDiv.innerHTML = `
+                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    `;
+                                }else{
+                                    actionsDiv.innerHTML = `
+                                        <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-file-earmark"></i>
+                                        </button>
+                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                    `;
+                                }
+
+                                // Show last action line if available
+                                if (lastActionDate && lastActionLabel) {
+                                    const statusLine = document.createElement('div');
+                                    statusLine.className = 'prompt-action-status';
+                                    
+                                    if(lastAction == "APPROVED"){
+                                        statusLine.style.color = '#28a745';
+                                    } else if(lastAction == "REJECTED"){
+                                        statusLine.style.color = '#ff0000';
+                                    } else {
+                                        statusLine.style.color = 'var(--text-secondary)';
+                                    }
+                                    
+                                    // Format date as Dec 31, 2025, 05:53 PM
+                                    const d = new Date(lastActionDate);
+                                    const dateStr = d.toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true
+                                    });
+                                    statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
+                                    aiContentArea.appendChild(statusLine);
+                                }
+
                                 
-                                // Format date as Dec 31, 2025, 05:53 PM
-                                const d = new Date(lastActionDate);
-                                const dateStr = d.toLocaleString('en-US', {
-                                    month: 'short',
-                                    day: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true
-                                });
-                                statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
-                                aiContentArea.appendChild(statusLine);
+
+                                aiResponseDiv.appendChild(images_container);
+                                aiResponseDiv.appendChild(actionsDiv);
                             }
+                            
+                            aiContentArea.appendChild(aiResponseDiv);
                         }
                     }   
                 }
@@ -1487,22 +1675,6 @@ async function loadPromptHistory() {
         console.error('Error loading prompt history:', error);
     }
 }
-
-function stripHtmlAndNewLines(input) {
-  const div = document.createElement('div');
-
-  // Decode escaped HTML first
-  div.innerHTML = input;
-  const decoded = div.textContent;
-
-  // Parse decoded HTML
-  div.innerHTML = decoded;
-
-  return div.textContent
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 
 async function handleFormSubmit(event) {
     event.preventDefault();
@@ -1520,17 +1692,34 @@ async function handleFormSubmit(event) {
 
     let context_override = false;
 
-    const latest_response = JSON.parse(localStorage.getItem('latest_response'));
+    const latest_response = localStorage.getItem('latest_response');
 
     // alert(latest_response)
 
     if (latest_response){
-        context = latest_response.text.trim();
+        try {
+            const parsedResponse = JSON.parse(latest_response);
+            context = parsedResponse.text ? parsedResponse.text.trim() : '';
+            console.log('Using context from latest_response:', context);
+        } catch (e) {
+            console.error('Error parsing latest_response:', e);
+            context = rawContent.value.trim() ? rawContent.value.trim() : formattedContent.innerHTML.trim();
+        }
     }else{
         context = rawContent.value.trim() ? rawContent.value.trim() : formattedContent.innerHTML.trim();
     }
 
-    alert(context)
+    console.log('Using context:', context);
+
+    if (!context || context === stop_text || isRejected.includes(context)) {
+        context = rawContent.value.trim() ? rawContent.value.trim() : formattedContent.innerHTML.trim();
+        localStorage.removeItem('latest_response');
+        console.log('Fallback to raw/formatted content for context:', context);
+    }
+
+    context = stripHtmlAndNewLines(context);
+
+    // alert(context)
 
     const promptText = promptInput.value.trim();
 
@@ -1702,154 +1891,6 @@ async function handleFormSubmit(event) {
 
     return false;
 }
-
-function saveDraftFromResponse(phId) {
-    if (!phId) { alert('Invalid prompt history id'); return; }
-    const input = document.getElementById('offcanvasSaveDraft_phId');
-    if (input) input.value = phId;
-        // Try to locate the AI response HTML for this prompt id and populate the draft content
-    try {
-        const btnSelector = `button[onclick="saveDraftFromResponse(${phId})"]`;
-        const sourceBtn = document.querySelector(btnSelector);
-            let aiHtml = '';
-        if (sourceBtn) {
-            const aiMsg = sourceBtn.closest('.ai-message');
-            if (aiMsg) {
-                // Clone the node and remove action buttons so button labels are excluded
-                const clone = aiMsg.cloneNode(true);
-                const actions = clone.querySelector('.message-actions');
-                if (actions && actions.parentNode) actions.parentNode.removeChild(actions);
-                    // Prefer the cleaned innerHTML so any <br> or markup from the response is preserved
-                    aiHtml = (clone.innerHTML || '').trim();
-                    // If innerHTML is empty for some reason, fall back to text with <br> replacement
-                    if (!aiHtml) {
-                        const fallbackText = (clone.textContent || '').trim();
-                        aiHtml = fallbackText.replace(/\n/g, '<br>');
-                    }
-            }
-        }
-        const draftContentEl = document.getElementById('draftContent');
-        const draftNotesEl = document.getElementById('draftNotes');
-        const draftNameEl = document.getElementById('draftName');
-        if (draftContentEl) {
-            // Insert HTML so any <br> or markup is preserved and existing content remains.
-            if (aiHtml) {
-                draftContentEl.insertAdjacentHTML('beforeend', aiHtml);
-            }
-        }
-        if (draftNotesEl) draftNotesEl.value = `Saved from prompt ${phId}`;
-        if (draftNameEl && !draftNameEl.value) draftNameEl.value = `Draft ${phId}`;
-    } catch (e) {
-        console.debug('Could not prefill draft content', e);
-    }
-    const el = document.getElementById('offcanvasSaveDraft');
-    if (el && window.bootstrap && bootstrap.Offcanvas) {
-        const off = bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false });
-        // show on next frame to avoid layout thrash
-        requestAnimationFrame(() => off.show());
-    }
-}
-
-
-
-
-/* ==========================================================
-   Offcanvas Actions (Draft / Approve)
-   ========================================================== */
-function openSaveDraftOffcanvas(promptHistoryId) {
-    // TODO: populate & open save draft offcanvas
-}
-
-async function setPromptAction(
-    phId, 
-    prompt_action = 'SAVED_AS_DRAFT',
-    prompt_name = null,
-    prompt_description = null
-) {
-    showSpinner();
-
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        hideSpinner();
-        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
-        return false;
-    }
-
-    payload = {
-        prompt_history_id: parseInt(phId),
-        prompt_action: prompt_action,
-        prompt_name: prompt_name,
-        prompt_description: prompt_description,
-    };
-
-    const response = await fetch(`/user/prompt_history/set_action`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-        hideSpinner();
-
-        if (handleTokenExpiration(response)) {
-            return false;
-        }
-    }
-    
-    const result = await response.json();
-    loadPromptHistory();
-}
-
-async function confirmSaveDraft(event) {
-    event.preventDefault();
-
-    const phIdInput = document.getElementById('offcanvasSaveDraft_phId');
-    if (!phIdInput || !phIdInput.value) {
-        alert('Invalid prompt history id');
-        return;
-    }
-
-    const phId = phIdInput.value;
-    alert('Save draft for prompt history id: ' + phId);
-
-    await setPromptAction(
-        phId, 
-        'SAVED_AS_DRAFT',
-        prompt_name = document.getElementById('draftName').value.trim(),
-        prompt_description = document.getElementById('draftNotes').value.trim(),
-    );
-}
-
-async function rejectResponse(phId) {
-
-    confirm = confirm('Are you sure you want to reject this AI response? This action cannot be undone.');
-    if (!confirm) return;
-    else{
-        await setPromptAction(
-            phId, 
-            'REJECTED',
-            prompt_name = null,
-            prompt_description = null,
-        );
-    }
-}
-
-async function approveResponse(phId) {
-    confirm = confirm('Are you sure you want to approve this AI response?');
-    if (!confirm) return;
-    else{
-        await setPromptAction(
-            phId, 
-            'APPROVED',
-            prompt_name = null,
-            prompt_description = null,
-        );
-    }
-}
-
 
 
 
