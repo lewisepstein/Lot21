@@ -1,4 +1,3 @@
-# prompts.py
 import re
 
 ALPHA_REGEX = re.compile(r'alphabetical order|starting with ([a-zA-Z])', re.I)
@@ -26,16 +25,30 @@ class LottiePrompts:
     """
 
     @staticmethod
-    def build_focused_rewrite_prompt(query, target_section, relevant_context):
+    def build_focused_rewrite_prompt(
+        query,
+        target_section,
+        relevant_context,
+        paragraph_constraint=""
+    ):
         return f"""{LottiePrompts.GUARDRAIL_RULES}
 
 {LottiePrompts.PLAIN_TEXT_RULES}
 
 You are an expert editor for Lottie content.
 
-Task: Refine or rewrite the '{target_section}' content.
+Task: Refine or rewrite the provided content.
+
+{paragraph_constraint}
+
+STRICT RULES:
+- Preserve the original meaning.
+- Do NOT add new facts.
+- Do NOT explain your reasoning.
+- Output ONLY the rewritten content.
+- Do NOT introduce section titles or headings.
 
 Original context:
 {relevant_context}
-
 """
+

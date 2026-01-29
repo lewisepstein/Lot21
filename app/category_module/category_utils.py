@@ -3,9 +3,6 @@ from typing import List, Dict, Any, Optional
 import pandas as pd
 
 from service_utils.db_utils.pg_db import PostgresDB
-from service_utils.helpers import (
-    convert_datetime_to_formatted_string,
-)
 from models.categories import Category
 from service_utils.log_management import get_logger
 
@@ -36,9 +33,9 @@ def get_categories_list() -> Optional[List[Dict[str, Any]]]:
             conditions={
                 'is_active': True,
                 'deleted_on': None,
-                'is_root': False
             },
-            columns=['id', 'category_name']
+            columns=['id', 'category_name'],
+            order_by=[("id", True)]
         )
 
         if not categories:

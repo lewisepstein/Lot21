@@ -13,13 +13,18 @@ from google import genai as genai_new
 from google.genai import types
 
 from rag_module.telemetry import Telemetry
+from rag_module.sentence_rules import detect_sentence_limit
+from rag_module.prompt_rules import LottiePrompts
 from rag_module.understanding_prompts import build_full_understanding_prompt
 from rag_module.case_study_prompts import build_project_case_study_prompt
 from rag_module.resource_prompts import build_resource_prompt
 from rag_module.policy_prompts import build_policy_prompt
 from rag_module.newsletter_prompts import build_quarterly_newsletter_prompt
 from rag_module.image_prompts import build_image_prompt, detect_visual_mode
-from rag_module.max_line_detector import detect_max_lines_from_query
+from rag_module.max_line_detector import detect_max_lines_from_query, line_rule
+from rag_module.intent_redirects import is_rewrite_intent
+from rag_module.paragraph_rules import extract_paragraph_count, build_paragraph_constraint
+from rag_module.definition_prompt import build_definition_prompt
 
 load_dotenv()
 
@@ -44,7 +49,6 @@ NETWORK_ERROR_TEXT = (
 OUT_OF_SCOPE_TEXT = (
     "This question is outside the scope of the provided context."
 )
-
 
 class RagModule:
 
@@ -116,6 +120,9 @@ class RagModule:
 
         context_str = context or self.retrieve_context(query)
         max_lines = detect_max_lines_from_query(query)
+        line_rule_str = line_rule(max_lines)
+
+        is_rewrite = is_rewrite_intent(query)
 
         print("generate_content called with:")
         print(f"  - category_id: {category_id}")
@@ -125,46 +132,111 @@ class RagModule:
 
         prompt = None
 
+        paragraphs = extract_paragraph_count(query)
+        paragraph_rule = build_paragraph_constraint(paragraphs)
+
+        has_line_constraint = max_lines is not None
+        sentence_limit = detect_sentence_limit(query)
+        has_sentence_constraint = sentence_limit is not None
 
         # ---- ROUTING (UNCHANGED) ----
         if category_id == 2:
-            prompt = build_full_understanding_prompt(
-                query=query,
-                context_str=context_str,
-                topic=subpage,
-                max_lines=max_lines
-            )
+            if has_sentence_constraint:
+                prompt = build_definition_prompt(
+                    query=query,
+                    context_str=context_str,
+                    sentence_limit=sentence_limit
+                )
+
+            elif has_line_constraint:
+                prompt = build_full_understanding_prompt(
+                    query=query,
+                    context_str=context_str,
+                    topic=subpage,
+                    max_lines=max_lines,
+                    line_rule=line_rule_str
+                )
+
+            elif is_rewrite:
+                prompt = build_full_understanding_prompt(
+                    query=query,
+                    context_str=context_str,
+                    topic=subpage,
+                    max_lines=None,
+                    line_rule=None
+                )
+
+            else:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+                
         elif category_id == 3:
-            prompt = build_project_case_study_prompt(
-                query=query,
-                context_str=context_str,
-                project_sources={},
-                max_lines=max_lines
-            )
+            if is_rewrite:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+            else:
+                prompt = build_project_case_study_prompt(
+                    query=query,
+                    context_str=context_str,
+                    project_sources={},
+                    max_lines=max_lines
+                )
         elif category_id == 4:
-            prompt = build_resource_prompt(
-                query=query,
-                context_str=context_str,
-                resource_type="",
-                sources="",
-                max_lines=max_lines
-            )
+            if is_rewrite:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+            else:
+                prompt = build_resource_prompt(
+                    query=query,
+                    context_str=context_str,
+                    resource_type="",
+                    sources="",
+                    max_lines=max_lines
+                )
         elif category_id == 5:
-            prompt = build_policy_prompt(
-                query=query,
-                context_str=context_str,
-                param1="",
-                param2="",
-                max_lines=max_lines
-            )
+            if is_rewrite:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+            else:
+                prompt = build_policy_prompt(
+                    query=query,
+                    context_str=context_str,
+                    param1="",
+                    param2="",
+                    max_lines=max_lines
+                )
         elif category_id == 7:
-            prompt = build_quarterly_newsletter_prompt(
-                query=query,
-                context_str=context_str,
-                season="Winter",
-                year="2026",
-                max_lines=max_lines
-            )
+            if is_rewrite:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+            else:
+                prompt = build_quarterly_newsletter_prompt(
+                    query=query,
+                    context_str=context_str,
+                    season="Winter",
+                    year="2026",
+                    max_lines=max_lines
+                )
 
         telemetry.add_text_cost(prompt)
         

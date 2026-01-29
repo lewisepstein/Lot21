@@ -77,6 +77,7 @@ async def pages_page(
         results, msg = get_pages_list(category_id=category_id)
 
         nav_dict = {
+            1: "nav_free_form",
             2: "nav_understanding",
             3: "nav_projects",
             4: "nav_resources",

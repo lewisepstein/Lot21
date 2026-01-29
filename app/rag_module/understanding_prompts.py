@@ -4,7 +4,8 @@ def build_full_understanding_prompt(
         query=None,
         context_str=None,
         topic=None,
-        max_lines=None
+        max_lines=None,
+        line_rule=None
 ) -> str:
 
     if not context_str:
@@ -35,10 +36,12 @@ TASK:
 Provide a concise summary based strictly on the context.
 
 STRICT OUTPUT RULES:
-- Write EXACTLY {max_lines} lines.
+{line_rule}
 - Each line must be one complete sentence.
 - Do NOT add information not present in the context.
 - Do NOT use headings, labels, or section titles.
+- Do NOT explain your reasoning or rule checks.
+- Output ONLY the final answer.
 
 USER QUESTION:
 {query}

@@ -5,6 +5,7 @@
 {# Macro to centralize active nav logic. Uses `nav_settings` from view context. #}
 {% macro nav_active(name) %}{{ 'active' if (nav_settings|default('') == name) else '' }}{% endmacro %}
 
+{% block nav_free_form %}{{ nav_active('nav_free_form') }}{% endblock %}
 {% block nav_understanding %}{{ nav_active('nav_understanding') }}{% endblock %}
 {% block nav_projects %}{{ nav_active('nav_projects') }}{% endblock %}
 {% block nav_resources %}{{ nav_active('nav_resources') }}{% endblock %}

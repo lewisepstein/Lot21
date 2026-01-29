@@ -483,6 +483,11 @@
         text-align: left;
     }
 
+    .btn-ai-response{
+        --bs-btn-padding-x: 0.2rem;
+        --bs-btn-padding-y: 0.1rem;
+    }
+
 </style>
 
         <!-- Top Actions Bar -->
@@ -602,7 +607,7 @@
                             <option value="image_only">Image Only</option>
                             <option value="image_and_text">Image & Text</option>
                         </select>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: none; gap: 8px;" id="imageUploadContainer">
                             <input type="file" id="uploadInput" style="display: none;" accept="*/*">
                             <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;">
                                 <i class="bi bi-paperclip"></i> Attach
@@ -1592,36 +1597,37 @@ async function loadPromptHistory() {
                                 // Render action buttons
                                 if (ph.prompt_action === "SAVED_AS_DRAFT") {
                                     actionsDiv.innerHTML = `
-                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle"></i>                                     </button>
-                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle"></i> 
+                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>                                     
+                                        </button>
+                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle" style="color:#21ff21"></i> 
                                         </button>
                                     `;
                                 }
                                 else if (ph.prompt_action === "REJECTED") {
                                     actionsDiv.innerHTML = `
-                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle"></i> 
+                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle" style="color:#21ff21"></i> 
                                         </button>
                                     `;
                                 }
                                 else if (ph.prompt_action === "APPROVED") {
                                     actionsDiv.innerHTML = `
-                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle"></i>
+                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                         </button>
                                     `;
                                 }else{
                                     actionsDiv.innerHTML = `
-                                        <button class="btn btn-warning" onclick="saveDraftFromResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-file-earmark"></i>
+                                        <button class="btn btn-ai-response" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-file-earmark" style="color:#ffd639"></i>
                                         </button>
-                                        <button class="btn btn-danger" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle"></i>
+                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                         </button>
-                                        <button class="btn btn-success" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle"></i>
+                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                            <i class="bi bi-check-circle" style="color:#21ff21"></i>
                                         </button>
                                     `;
                                 }
@@ -1676,6 +1682,8 @@ async function loadPromptHistory() {
     }
 }
 
+const imageAttachmentMode = document.getElementById('select_image_attachment_mode');
+
 async function handleFormSubmit(event) {
     event.preventDefault();
     
@@ -1685,7 +1693,6 @@ async function handleFormSubmit(event) {
     const aiContentArea = document.getElementById('ai-content-area');
     const userPromptParagraph = aiContentArea.querySelector('.user-prompt');
     const formattedContent = document.getElementById('formattedContent');
-    const imageAttachmentMode = document.getElementById('select_image_attachment_mode');
     const contentType = document.getElementById('contentType');
 
     const updated_by_agent_set = localStorage.getItem('new_content');
@@ -1693,6 +1700,10 @@ async function handleFormSubmit(event) {
     let context_override = false;
 
     const latest_response = localStorage.getItem('latest_response');
+
+    if (!validatePromptAgainstMode(promptInput.value, imageAttachmentMode ? imageAttachmentMode.value : 'NONE')) {
+        return; // stop execution
+    }
 
     // alert(latest_response)
 
@@ -1892,6 +1903,52 @@ async function handleFormSubmit(event) {
     return false;
 }
 
+const IMAGE_KEYWORDS = [
+  "image",
+  "picture",
+  "photo",
+  "illustration",
+  "diagram",
+  "visual",
+  "draw",
+  "generate image",
+  "create image",
+  "reference image"
+];
+
+function promptRequestsImage(prompt = "") {
+  const normalizedPrompt = prompt.toLowerCase();
+  return IMAGE_KEYWORDS.some(keyword =>
+    normalizedPrompt.includes(keyword)
+  );
+}
+
+function validatePromptAgainstMode(prompt, select_image_attachment_mode) {
+  if (
+    select_image_attachment_mode === "text_only" &&
+    promptRequestsImage(prompt)
+  ) {
+    alert(
+      "Image generation is not allowed in Text Only mode. " +
+      "Please switch to Image or Image + Text mode."
+    );
+    return false;
+  }
+
+  return true;
+}
+
+
+imageAttachmentMode.addEventListener('change', function() {
+    const promptInput = document.getElementById('ai-prompt-input');
+    if (this.value === 'text_only') {
+        const imageUploadContainer = document.getElementById('imageUploadContainer');
+        imageUploadContainer.style.display = 'none';
+    } else {
+        const imageUploadContainer = document.getElementById('imageUploadContainer');
+        imageUploadContainer.style.display = 'flex';
+    }
+});
 
 
 /* DOM ready */
