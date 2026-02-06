@@ -33,22 +33,22 @@ class LottiePrompts:
     ):
         return f"""{LottiePrompts.GUARDRAIL_RULES}
 
-{LottiePrompts.PLAIN_TEXT_RULES}
+            {LottiePrompts.PLAIN_TEXT_RULES}
 
-You are an expert editor for Lottie content.
+            You are an expert editor for Lottie content.
 
-Task: Refine or rewrite the provided content.
+            Task: Refine or rewrite or explain the provided content.
 
-{paragraph_constraint}
+            {paragraph_constraint}
 
-STRICT RULES:
-- Preserve the original meaning.
-- Do NOT add new facts.
-- Do NOT explain your reasoning.
-- Output ONLY the rewritten content.
-- Do NOT introduce section titles or headings.
+            STRICT RULES:
+            - Preserve the original meaning.
+            - Do NOT add new facts.
+            - Do NOT explain your reasoning.
+            - Output ONLY the rewritten content.
+            - Do NOT introduce section titles or headings.
 
-Original context:
-{relevant_context}
-"""
+            Original context:
+            {relevant_context}
+            """
 

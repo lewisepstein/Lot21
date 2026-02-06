@@ -12,6 +12,8 @@ from models.weaviate_data import WeaviateData
 from models.sessions import Session
 from models.weaviate_data_versions import WeaviateDataVersion
 from models.attachments import PromptAttachments
+from models.freeform_projects import FreeFormProject
+from models.freeform_chat import FreeFormChat
 
 __all__ = [
     "Base",
@@ -28,4 +30,6 @@ __all__ = [
     "Session",
     "WeaviateDataVersion",
     "PromptAttachments",
+    "FreeFormProject",
+    "FreeFormChat",
 ]

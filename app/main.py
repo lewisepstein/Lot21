@@ -65,12 +65,9 @@ async def prime_sperm_authtest(request: Request):
         app_ssuid = request["app_ssuid"]
     )
 
-     
-
-
 
 if __name__ == "__main__":
     import uvicorn
     # Temporarily disable reload to avoid file watch limit error
     # To permanently fix, increase system inotify limit: sudo sysctl fs.inotify.max_user_watches=524288
-    uvicorn.run("main:app", host="192.168.9.229", port=9090, reload=False)
+    uvicorn.run("main:app", host="192.168.9.250", port=9090, reload=False)

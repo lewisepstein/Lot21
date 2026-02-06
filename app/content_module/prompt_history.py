@@ -1,13 +1,16 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends, Cookie
+from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import List
+from typing import Dict, List, Optional
+from fastapi.templating import Jinja2Templates
 
 from content_module.content_responses import PromptHistoryResponse
 from auth_module.auth_utils import verify_token
 from service_utils.log_management import get_logger
 from content_module.prompt_history_utils import (
     get_prompt_histories, 
-    update_prompt_action
+    update_prompt_action,
+    get_all_prompts
 )
 
 from content_module.content_responses import (
@@ -23,6 +26,9 @@ router = APIRouter(prefix="/user", tags=["user"])
 
 # Security
 security = HTTPBearer()
+
+# Templates
+templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/prompt_history/{prompt_session_id}/{content_id}", response_model=List[PromptHistoryResponse])
@@ -123,3 +129,36 @@ async def set_action_prompt_history(
     except Exception as e:
         logger.error(f"Error retrieving prompt history: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Unable to retrieve prompt history at this time")
+    
+
+@router.get("/prompt_history_data",response_class=HTMLResponse)
+@router.get("/prompt_history_data/{prompt_session_id:str}", response_class=HTMLResponse)
+async def get_all_prompt_history(
+    request: Request,
+    prompt_session_id: Optional[str] = None,
+    content_id: Optional[int] = None,
+    session_token: Optional[str] = Cookie(default=None),
+    authenticated_user: Optional[Dict] = None
+):
+    """
+    Get all prompt history records for a given session and content.
+    
+    Args:
+        prompt_session_id: UUID of the prompt session
+        content_id: ID of the content record
+        credentials: Bearer token from Authorization header
+    """
+
+    data = get_all_prompts(
+        prompt_session_id=prompt_session_id,
+        content_id=content_id
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="prompt_history.htm",
+        context={
+            "data": data,
+        }
+    )
+    

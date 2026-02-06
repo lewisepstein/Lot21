@@ -160,9 +160,9 @@
         flex: 1;
         overflow-y: auto;
         padding: 15px;
-        background-color: rgba(0, 0, 0, 0.2);
+        background-color: #f5f5f5;
         border-radius: 8px;
-        color: var(--text-primary);
+        color: #1a1a1a;
         line-height: 1.8;
         font-size: 14px;
     }
@@ -221,13 +221,42 @@
         font-size: 14px;
         line-height: 1.6;
         color: var(--text-primary);
-        width:90%;
-        display: flex;
-        flex-direction: column;
+        width: 100%;
+        max-width: 100%;
+        display: block;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+    }
+    
+    .ai-message div {
+        margin-bottom: 12px;
+        line-height: 1.6;
+        color: inherit;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .ai-message p {
+        margin: 12px 0;
+        color: inherit;
+        line-height: inherit;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .ai-message br {
+        display: block;
+        content: "";
+        margin: 2px 0;
     }
     .ai-message-draft {
         background-color: #e8ebeb !important;
-        color: #000;
+        color: #000000 !important;
+    }
+    
+    .ai-message-draft div {
+        color: #000000 !important;
     }
 
     .ai-message .message-actions {
@@ -330,7 +359,24 @@
     .ai-action-btn:hover {
         background-color: rgba(0, 217, 181, 0.1);
     }
-    
+
+    /* Custom arrow styling for image/text mode dropdown */
+    #select_image_attachment_mode {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-color: var(--bg-primary);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b92a7' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        cursor: pointer;
+    }
+
+    #select_image_attachment_mode option {
+        background-color: var(--bg-card);
+        color: var(--text-primary);
+    }
+
     .ai-input-area {
         margin-top: auto;
         padding-top: 15px;
@@ -458,6 +504,8 @@
        and avoiding style recalculation on large containers */
     #ai-content-area {
         will-change: scroll-position, transform;
+        background-color: rgba(26, 35, 50, 0.8) !important;
+        color: var(--text-primary) !important;
     }
 
     /* Keep confirm buttons from causing layout shift when spinner appears */
@@ -488,6 +536,47 @@
         --bs-btn-padding-y: 0.1rem;
     }
 
+    /* Source data form layout: keep input and fetch button on one row */
+    .source-form-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .source-form-row .form-input {
+        flex: 1 1 auto;
+        margin-bottom: 0 !important;
+    }
+
+    .source-form-row .ai-action-btn {
+        flex: 0 0 auto;
+        margin-top: 6px;
+        float: none !important;
+    }
+
+    /* Alerts below the form should clear floats and not wrap next to the button */
+    #pageSuccessAlert, #pageErrorAlert {
+        display: none;
+        clear: both;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-top: 10px;
+    }
+
+    #pageSuccessAlert {
+        background-color: rgba(0, 208, 132, 0.12);
+        border: 1px solid var(--accent-green);
+        color: var(--accent-green);
+    }
+
+    #pageErrorAlert {
+        background-color: rgba(255, 81, 47, 0.12);
+        border: 1px solid #ff512f;
+        color: #ff512f;
+    }
+
 </style>
 
         <!-- Top Actions Bar -->
@@ -495,12 +584,6 @@
             <div style="margin-left: auto; display: flex; gap: 15px;">
                 <button class="action-icon-btn" onclick="addNewContent()">
                     <i class="bi bi-plus-circle"></i> Add New
-                </button>
-                <a class="action-icon-btn" href="/user/content/unattached" style="text-decoration: none;">
-                    <i class="bi bi-eye"></i> Show Unattached
-                </a>
-                <button class="action-icon-btn">
-                    <i class="bi bi-clock-history"></i> Version History
                 </button>
             </div>
         </div>
@@ -511,7 +594,22 @@
             <!-- Left Panel - Current Content -->
             <div class="editor-panel">
                 <div class="panel-header">
-                    <h2 class="panel-title">Please provide a context</h2>
+                    <div>
+                        <h2 class="panel-title">
+                            {% if is_page and latest_content and latest_content.page_name %}
+                                {{ latest_content.page_name }}
+                            {% else %}
+                                Please provide a context
+                            {% endif %}
+                        </h2>
+                        {% if is_page and latest_content and latest_content.category_id and category_list %}
+                            {% for cat in category_list %}
+                                {% if cat.id == latest_content.category_id %}
+                                    <div class="meta-label" style="margin-top:6px; font-size:12px; text-transform:none; color:var(--text-secondary);">Category: {{ cat.category_name }}</div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
                 
                 <div class="meta-info">
@@ -557,23 +655,23 @@
 
                 <div id="sourceContent" style="display:none;">
                     
-                    <form id="getDataSourceForm" style="margin-top:12px;">                    
+                    <form id="getDataSourceForm" style="margin-top:12px;">
                         <label for="source_data_url" class="form-label">Source URL</label>
-                        <input type="text" id="source_data_url" class="form-input form-class" 
-                        style="width:100%; margin-bottom:12px;"
-                            {% if latest_content and latest_content.source_url %}
-                                value="{{ latest_content.source_url }}"
-                            {% endif %}
-                        >
-                        <button type="button" class="ai-action-btn" onclick="fetchSourceData()" 
-                            style="margin-top:6px; float:right;">
-                            <i class="bi bi-cloud-download"></i> Fetch Source Data
-                        </button>
+                        <div class="source-form-row">
+                            <input type="text" id="source_data_url" class="form-input form-class" 
+                                {% if latest_content and latest_content.source_url %}
+                                    value="{{ latest_content.source_url }}"
+                                {% endif %}
+                            >
+                            <button type="button" class="ai-action-btn" onclick="fetchSourceData()">
+                                <i class="bi bi-cloud-download"></i> Fetch Source Data
+                            </button>
+                        </div>
                     </form>
 
                     <div style="margin-top: 10px;">
-                        <div id="pageSuccessAlert" class="alert-success"></div>
-                        <div id="pageErrorAlert" class="alert-danger"></div>
+                        <div id="pageSuccessAlert"></div>
+                        <div id="pageErrorAlert"></div>
                     </div>
                 </div>  
             </div>
@@ -602,17 +700,17 @@
                 
                 <div class="ai-input-area">
                     <div id="ai-actions-area" class="ai-actions" style="display: flex; justify-content: space-between; align-items: center;">
-                        <select id="select_image_attachment_mode" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                        <select id="select_image_attachment_mode" style="padding: 8px 32px 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; min-width: 150px;">
                             <option value="text_only">Text Only</option>
                             <option value="image_only">Image Only</option>
                             <option value="image_and_text">Image & Text</option>
                         </select>
-                        <div style="display: none; gap: 8px;" id="imageUploadContainer">
+                        <!-- <div style="display: none; gap: 8px;" id="imageUploadContainer">
                             <input type="file" id="uploadInput" style="display: none;" accept="*/*">
                             <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;">
                                 <i class="bi bi-paperclip"></i> Attach
                             </label>
-                        </div>
+                        </div> -->
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
                             <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
@@ -630,7 +728,7 @@
                             <textarea 
                                 id="ai-prompt-input"
                                 class="ai-input" 
-                                placeholder="Ask AI to refine, expand, or modify the content..."
+                                placeholder="Ask AI to refine, explain, expand, or modify the content..."
                                 rows="1"
                                 oninput="toggleSendButton(); updateAIPreview();"
                             ></textarea>
@@ -696,6 +794,14 @@
 -------------------------- */
 function onDocumentLoad() {
     try {
+        // Extract content_id from URL (e.g., /user/content/9)
+        const urlParts = window.location.pathname.split('/');
+        const pageContentId = urlParts[urlParts.length - 1];
+        if (pageContentId && !isNaN(pageContentId)) {
+            localStorage.setItem('content_id', pageContentId);
+            console.log('Set content_id from URL:', pageContentId);
+        }
+
         initViewTabs();
         initAIInput();
         showEmptyContextMessage();
@@ -1131,6 +1237,7 @@ function initAIInput() {
     // Enable/disable AI prompt input based on rawContent
     const rawContent = document.getElementById('rawContent');
     const aiPromptInput = document.getElementById('ai-prompt-input');
+    const promptForm = document.getElementById('prompt-form');
     
     if (rawContent && aiPromptInput) {
         // Check initial state
@@ -1138,6 +1245,29 @@ function initAIInput() {
         
         // Add listener for content changes
         rawContent.addEventListener('input', checkAndEnablePromptInput);
+        
+        // Add Enter key listener to submit form (Shift+Enter for newline)
+        // Using a named function for better debugging and to avoid duplicate listeners
+        const handleEnterKey = function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                console.log('✓ Enter key detected - attempting form submission');
+                if (promptForm) {
+                    console.log('✓ promptForm found, dispatching submit event');
+                    promptForm.dispatchEvent(new Event('submit', { bubbles: true }));
+                } else {
+                    console.error('✗ promptForm not found in DOM');
+                }
+            }
+        };
+        
+        // Remove any existing listeners to prevent duplicates
+        aiPromptInput.removeEventListener('keydown', handleEnterKey);
+        // Add the listener
+        aiPromptInput.addEventListener('keydown', handleEnterKey);
+        console.log('✓ Enter key listener attached to ai-prompt-input');
+    } else {
+        console.warn('⚠ Missing elements - rawContent:', !!rawContent, 'aiPromptInput:', !!aiPromptInput);
     }
 }
 
@@ -1496,7 +1626,13 @@ async function loadPromptHistory() {
                         promptDiv.appendChild(attachmentsDiv);
                     }    
                     
-                    promptDiv.innerHTML += (isLatest ? '<span class="latest-badge">Latest</span>' : '');
+                    // Add latest badge without overwriting innerHTML
+                    if (isLatest) {
+                        const latestBadge = document.createElement('span');
+                        latestBadge.className = 'latest-badge';
+                        latestBadge.textContent = 'Latest';
+                        promptDiv.appendChild(latestBadge);
+                    }
                     aiContentArea.appendChild(promptDiv);
 
                     if(isLatest){
@@ -1535,22 +1671,94 @@ async function loadPromptHistory() {
                     }
 
                     // Add Response from the server if any (optional)
+                    console.log("🔍 Checking ph.ai_response...");
+                    console.log("🔍 ph.id:", ph.id);
+                    console.log("🔍 ph.prompt_action:", ph.prompt_action);
+                    console.log("🔍 ph.ai_response exists?", !!ph.ai_response);
+                    console.log("🔍 ph.ai_response type:", typeof ph.ai_response);
+                    console.log("🔍 ph.ai_response length:", ph.ai_response ? ph.ai_response.length : 0);
+                    
                     if (ph.ai_response) {
-                        const aiResponseDiv = document.createElement('div');
-                        aiResponseDiv.className = 'ai-message';
-                        if (ph.prompt_action === "SAVED_AS_DRAFT") {
-                            aiResponseDiv.classList.add('ai-message-draft');
+                        console.log("========= PROCESSING AI RESPONSE =========");
+                        console.log("Raw ph.ai_response:", ph.ai_response.substring(0, 500));
+                        console.log("Type:", typeof ph.ai_response, "Length:", ph.ai_response ? ph.ai_response.length : 0);
+                        
+                        let ai_response;
+                        let ai_response_text = '';
+                        
+                        // Parse the JSON response
+                        try {
+                            ai_response = JSON.parse(ph.ai_response);
+                            console.log("✓ Parsed JSON successfully");
+                            ai_response_text = (ai_response.text || '').trim();
+
+                            hasText = ai_response_text.length > 0;
+
+                            hasImages = Array.isArray(ai_response.images) && ai_response.images.length > 0;
+                            
+                            console.log("✓ Text length:", ai_response_text.length);
+                            console.log("✓ First 100 chars:", ai_response_text.substring(0, 100));
+                        } catch (e) {
+                            console.error("⚠ JSON parse failed:", e.message);
+                            ai_response_text = (ph.ai_response || '').trim();
+                            ai_response = { text: ai_response_text };
+                            console.log("⚠ Using raw text, length:", ai_response_text.length);
                         }
 
-                        const ai_response = JSON.parse(ph.ai_response);
-
-                        const ai_response_text = ai_response.text.trim().replace(/\n/g, '<br>');
+                        // Create the response div with explicit visibility
+                        const aiResponseDiv = document.createElement('div');
+                        aiResponseDiv.className = 'ai-message';
                         
-                        aiResponseDiv.innerHTML = ai_response_text;
+                        // Force visibility with inline styles
+                        aiResponseDiv.style.display = 'block';
+                        aiResponseDiv.style.visibility = 'visible';
+                        aiResponseDiv.style.opacity = '1';
+                        aiResponseDiv.style.color = '#ffffff';
+                        aiResponseDiv.style.fontSize = '14px';
+                        aiResponseDiv.style.lineHeight = '1.6';
+                        aiResponseDiv.style.width = '100%';
+                        aiResponseDiv.style.maxWidth = '100%';
+                        aiResponseDiv.style.wordWrap = 'break-word';
+                        aiResponseDiv.style.overflowWrap = 'break-word';
+                        
+                        if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                            aiResponseDiv.classList.add('ai-message-draft');
+                            aiResponseDiv.style.color = '#000000'; // Override for draft
+                        }
+
+                        // Format text with line breaks and paragraphs
+                        // Split by double newlines first to preserve paragraph structure
+                        const paragraphs = ai_response_text.split(/\n\n+/);
+                        let formatted_text = '';
+                        
+                        paragraphs.forEach((para, idx) => {
+                            // Replace single newlines with <br> within paragraphs
+                            const formattedPara = para.trim().replace(/\n/g, '<br>');
+                            if (formattedPara) {
+                                formatted_text += `<div style="margin-bottom: 12px; line-height: 1.6;">${formattedPara}</div>`;
+                            }
+                        });
+                        
+                        console.log("📊 Text stats - Original:", ai_response_text.length, "Formatted:", formatted_text.length);
+                        
+                        // Set the content
+                        /*if (formatted_text && formatted_text.length > 0) {
+                            aiResponseDiv.innerHTML = formatted_text;
+                            console.log("✅ Set innerHTML successfully. Preview:", aiResponseDiv.innerHTML.substring(0, 150));
+                            console.log("✅ aiResponseDiv.style.color:", aiResponseDiv.style.color);
+                            console.log("✅ aiResponseDiv.style.display:", aiResponseDiv.style.display);
+                            console.log("✅ aiResponseDiv full content length:", aiResponseDiv.innerHTML.length);
+                        } else {
+                            aiResponseDiv.innerHTML = '<p style="color: #ff6b6b;"><strong>⚠️ NO CONTENT - Response was empty</strong></p>';
+                            console.error("❌ Response text was empty!");
+                        }*/
+                        if (hasText) {
+
+                            aiResponseDiv.innerHTML = formatted_text;
+
+                        }
 
                         let empty_response = false;
-                        console.log("Length of AI response text:", ai_response_text.length);
-                        console.log("AI response:", ai_response_text);
 
                         let images_container = document.createElement('div');
                         images_container.style.marginTop = '8px';
@@ -1575,97 +1783,117 @@ async function loadPromptHistory() {
                             });
                         }
 
-                        if(img_counts === 0 && ai_response_text.length === 0){
+                         if (!hasText && !hasImages) {
                             empty_response = true;
-                            aiResponseDiv.innerHTML = 'No response generated.';
-                        } 
+                            aiResponseDiv.innerHTML = '<p style="color:#ff6b6b;"><strong>⚠️ NO CONTENT – Response was empty</strong></p>';
+
+                        }
                         
                         if(stop_text === ai_response_text || empty_response === true || isRejected.includes(ai_response_text)){
                             aiResponseDiv.style.backgroundColor = '#ff2c2c80';
                             aiResponseDiv.style.fontStyle = 'italic';
                         }
 
-                        if (isRejected.includes(ai_response_text)) {
+                        // ✅ APPEND THE DIV IMMEDIATELY - This makes it visible
+                        console.log("🔵 About to append aiResponseDiv...");
+                        console.log("🔵 aiResponseDiv classes:", aiResponseDiv.className);
+                        console.log("🔵 aiResponseDiv innerHTML length:", aiResponseDiv.innerHTML.length);
+                        console.log("🔵 aiResponseDiv first 200 chars:", aiResponseDiv.innerHTML.substring(0, 200));
+                        console.log("🔵 aiContentArea exists?", !!aiContentArea);
+                        console.log("🔵 aiContentArea children before:", aiContentArea ? aiContentArea.children.length : 'N/A');
+                        
+                        if (aiContentArea) {
                             aiContentArea.appendChild(aiResponseDiv);
-                            return; // skip adding buttons for this response
-                        }else{
-                            // Append action buttons inside ai-message at its bottom
-                            const actionsDiv = document.createElement('div');
-                            actionsDiv.className = 'message-actions';
+                            console.log("✅✅✅ APPENDED! Response div added to DOM");
+                            console.log("✅ Total children in aiContentArea:", aiContentArea.children.length);
+                            console.log("✅ Last child tag:", aiContentArea.lastElementChild ? aiContentArea.lastElementChild.tagName : 'none');
+                            console.log("✅ Last child classes:", aiContentArea.lastElementChild ? aiContentArea.lastElementChild.className : 'none');
+                            console.log("✅ Last child HTML:", aiContentArea.lastElementChild ? aiContentArea.lastElementChild.innerHTML.substring(0, 100) : 'none');
+                        } else {
+                            console.error("❌❌❌ aiContentArea is NULL or UNDEFINED!");
+                        }
+                        
+                        // Force scroll to show new content
+                        scrollAIContentToBottom(false);
+                        
+                        // Then append images if they exist
+                        if (img_counts > 0) {
+                            aiResponseDiv.appendChild(images_container);
+                            console.log("✅ Appended", img_counts, "images to response");
+                        }
+                        
+                        // Append action buttons inside ai-message at its bottom
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'message-actions';
 
-                            if(stop_text !== ai_response_text && empty_response !== true){
-                                // Render action buttons
-                                if (ph.prompt_action === "SAVED_AS_DRAFT") {
-                                    actionsDiv.innerHTML = `
-                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>                                     
-                                        </button>
-                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle" style="color:#21ff21"></i> 
-                                        </button>
-                                    `;
-                                }
-                                else if (ph.prompt_action === "REJECTED") {
-                                    actionsDiv.innerHTML = `
-                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle" style="color:#21ff21"></i> 
-                                        </button>
-                                    `;
-                                }
-                                else if (ph.prompt_action === "APPROVED") {
-                                    actionsDiv.innerHTML = `
-                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>
-                                        </button>
-                                    `;
-                                }else{
-                                    actionsDiv.innerHTML = `
-                                        <button class="btn btn-ai-response" onclick="saveDraftFromResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-file-earmark" style="color:#ffd639"></i>
-                                        </button>
-                                        <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-x-circle" style="color:#ff7171"></i>
-                                        </button>
-                                        <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
-                                            <i class="bi bi-check-circle" style="color:#21ff21"></i>
-                                        </button>
-                                    `;
-                                }
-
-                                // Show last action line if available
-                                if (lastActionDate && lastActionLabel) {
-                                    const statusLine = document.createElement('div');
-                                    statusLine.className = 'prompt-action-status';
-                                    
-                                    if(lastAction == "APPROVED"){
-                                        statusLine.style.color = '#28a745';
-                                    } else if(lastAction == "REJECTED"){
-                                        statusLine.style.color = '#ff0000';
-                                    } else {
-                                        statusLine.style.color = 'var(--text-secondary)';
-                                    }
-                                    
-                                    // Format date as Dec 31, 2025, 05:53 PM
-                                    const d = new Date(lastActionDate);
-                                    const dateStr = d.toLocaleString('en-US', {
-                                        month: 'short',
-                                        day: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true
-                                    });
-                                    statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
-                                    aiContentArea.appendChild(statusLine);
-                                }
-
-                                
-
-                                aiResponseDiv.appendChild(images_container);
-                                aiResponseDiv.appendChild(actionsDiv);
+                        if(stop_text !== ai_response_text && empty_response !== true && !isRejected.includes(ai_response_text)){
+                            // Render action buttons
+                            if (ph.prompt_action === "SAVED_AS_DRAFT") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle" style="color:#ff7171"></i>                                     
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle" style="color:#21ff21"></i> 
+                                    </button>
+                                `;
+                            }
+                            else if (ph.prompt_action === "REJECTED") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle" style="color:#21ff21"></i> 
+                                    </button>
+                                `;
+                            }
+                            else if (ph.prompt_action === "APPROVED") {
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle" style="color:#ff7171"></i>
+                                    </button>
+                                `;
+                            }else{
+                                actionsDiv.innerHTML = `
+                                    <button class="btn btn-ai-response" onclick="saveDraftFromResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-file-earmark" style="color:#ffd639"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-x-circle" style="color:#ff7171"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
+                                        <i class="bi bi-check-circle" style="color:#21ff21"></i>
+                                    </button>
+                                `;
                             }
                             
-                            aiContentArea.appendChild(aiResponseDiv);
+                            // Append action buttons to the response div
+                            aiResponseDiv.appendChild(actionsDiv);
+
+                            // Show last action line if available
+                            if (lastActionDate && lastActionLabel) {
+                                const statusLine = document.createElement('div');
+                                statusLine.className = 'prompt-action-status';
+                                
+                                if(lastAction == "APPROVED"){
+                                    statusLine.style.color = '#28a745';
+                                } else if(lastAction == "REJECTED"){
+                                    statusLine.style.color = '#ff0000';
+                                } else {
+                                    statusLine.style.color = 'var(--text-secondary)';
+                                }
+                                
+                                // Format date as Dec 31, 2025, 05:53 PM
+                                const d = new Date(lastActionDate);
+                                const dateStr = d.toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true
+                                });
+                                statusLine.textContent = `${lastActionLabel} on ${dateStr}`;
+                                aiContentArea.appendChild(statusLine);
+                            }
                         }
                     }   
                 }
@@ -1939,16 +2167,28 @@ function validatePromptAgainstMode(prompt, select_image_attachment_mode) {
 }
 
 
-imageAttachmentMode.addEventListener('change', function() {
-    const promptInput = document.getElementById('ai-prompt-input');
-    if (this.value === 'text_only') {
-        const imageUploadContainer = document.getElementById('imageUploadContainer');
-        imageUploadContainer.style.display = 'none';
-    } else {
-        const imageUploadContainer = document.getElementById('imageUploadContainer');
-        imageUploadContainer.style.display = 'flex';
+imageAttachmentMode.addEventListener('change', function () {
+    const imageUploadContainer = document.getElementById('imageUploadContainer');
+
+    switch (this.value) {
+        case 'image_only':
+            // Allow manual image attachment
+            imageUploadContainer.style.display = 'flex';
+            break;
+
+        case 'image_and_text':
+        case 'text_only':
+        default:
+            // No manual image uploads allowed
+            imageUploadContainer.style.display = 'none';
+
+            // Optional hard reset (recommended)
+            elementIterDelete('image_ids');
+            window.lastUploadedImage = null;
+            break;
     }
 });
+
 
 
 /* DOM ready */

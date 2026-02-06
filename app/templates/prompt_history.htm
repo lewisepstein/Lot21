@@ -1,0 +1,89 @@
+{% extends "base.htm" %}
+
+{% block title %}Prompt History{% endblock %}
+
+{% block page_title %}Prompt History{% endblock %}
+
+{% block nav_prompt_history %}active{% endblock %}
+
+
+{% block content %}
+
+<style>
+    .card-title{
+        color: #fff;
+    }
+
+    .card{
+        padding: 10px;
+    }
+
+    .card-body{
+        height: 750px;
+        overflow-y: auto;
+        padding-top: 0px;
+    }
+
+    .card-body::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .card-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .card-body::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 3px;
+    }
+
+    .prompt-session-link{
+        text-decoration: none;
+        color: #ffffff;
+        cursor: pointer;
+    }
+
+    .list-unstyled li{
+        padding: 5px 0;
+        border-bottom: 1px solid #444;
+    }
+</style>
+
+<div class="container-fluid" style="margin: auto; width:100%;">
+    <div class="row">
+        <div class="col-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Prompt History Sessions</h5>
+                </div>
+                <div class="card-body" id="prompt-history-sessions-container">
+                    <ul class="list-unstyled">
+                        {% for session in data %}
+                            <li onclick="fetchPromptHistory('{{ session }}')">
+                                <a href="#" class="prompt-session-link">
+                                    {{ session}}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-9" id="prompt-history-table-container">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Prompt History Table</h5>
+                </div>
+                <div class="card-body" id="prompt-history-table-container">
+                    <!-- Prompt history table will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+</script>
+
+{% endblock %}

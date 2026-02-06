@@ -6,6 +6,7 @@ REWRITE_KEYWORDS = [
     "rephrase",
     "edit",
     "revise",
+    "explain"
 
     # Conciseness & clarity
     "condense",
@@ -71,6 +72,11 @@ def is_rewrite_intent(query: str) -> bool:
         "streamline",
         "clean up",
         "make it",
+        "improve",
+        "enhance",
+        "clarity",
+        "readability",
+        "explain",
     ]
 
     return any(q.startswith(p) or f" {p} " in q for p in rewrite_phrases)

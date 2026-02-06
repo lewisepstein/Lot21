@@ -216,8 +216,12 @@ async def add_draft_content(
         
         # Add draft to existing prompt history session
 
-        if not draft_data.content_id or not draft_data.prompt_session_id:
-            logger.warning("Content ID or Prompt Session ID missing in add_draft_content")
+        if not draft_data.content_id:
+            logger.warning("Content ID missing in add_draft_content request")
+            raise HTTPException(status_code=400, detail="Content ID is required")
+        
+        if not draft_data.prompt_session_id:
+            logger.info("Prompt Session ID missing - will be auto-generated")
         
         if not draft_data.prompt_text or draft_data.prompt_text.strip() == "":
             logger.warning("Prompt text is empty. Cannot add draft content in add_draft_content.")

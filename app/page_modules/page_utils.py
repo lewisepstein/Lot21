@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import pandas as pd
 import uuid
 import tiktoken
@@ -305,11 +306,12 @@ def get_page_statistics() -> Dict[str, Any]:
     try:
         db = PostgresDB()
         
-        # Get all pages (including inactive)
+        # Get all pages (including inactive), ordered by created_on descending (newest first)
         all_pages = db.read(
             'pages',
             conditions={'deleted_on': None},
-            columns=['id', 'page_name', 'category_id', 'is_active', 'created_on', 'updated_on']
+            columns=['id', 'page_name', 'category_id', 'is_active', 'created_on', 'updated_on'],
+            order_by=[('created_on', False)]  # False = descending order
         )
         
         if not all_pages:
@@ -387,7 +389,7 @@ def get_page_statistics() -> Dict[str, Any]:
             page_dict = {
                 'id': row['id'],
                 'page_name': row['page_name'],
-                'category_id': row['category_id'] if pd.notna(row['category_id']) else None,
+                'category_id': int(row['category_id']) if pd.notna(row['category_id']) else None,
                 'category_name': category_map.get(int(row['category_id'])) if pd.notna(row['category_id']) else None,
                 'is_active': row['is_active'],
                 'has_content': row['id'] in pages_with_content_ids,
@@ -624,7 +626,10 @@ def update_page(
         
         if description is not None:
             page_update_data['description'] = description.strip() if description.strip() else None
-        
+
+        # Always set updated_on timestamp when updating
+        page_update_data['updated_on'] = datetime.now()
+
         # Update page record
         if page_update_data:
             db.update(
@@ -712,7 +717,6 @@ def update_page(
                     no_of_tokens = None
                 
                 # Load new chunks to Weaviate
-                from datetime import datetime
                 start_time = datetime.now(datetime.now().astimezone().tzinfo)
                 
                 load_chunks_to_weaviate(

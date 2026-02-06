@@ -305,32 +305,68 @@
         border: 1px solid #ffc107;
     }
     
-    .action-btn {
-        padding: 6px 12px;
-        background-color: transparent;
-        border: 1px solid var(--accent-teal);
-        color: var(--accent-teal);
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-        transition: all 0.3s;
-        margin: 0 2px;
+    /* Action buttons inside the actions column: stacked, fixed size, and spaced */
+    .pages-table td:last-child {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 8px 12px;
     }
-    
-    .action-btn:hover {
-        background-color: var(--accent-teal);
+
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-width: 92px;
+        height: 36px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.18s ease;
+        box-sizing: border-box;
+    }
+
+    .action-btn i {
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    /* Edit / primary variant */
+    .action-btn[title*="Edit"],
+    .action-btn.btn-edit {
+        color: var(--accent-teal);
+        border-color: var(--accent-teal);
+    }
+
+    .action-btn[title*="Edit"]:hover,
+    .action-btn.btn-edit:hover {
+        background-color: rgba(0,217,181,0.08);
         color: var(--bg-primary);
     }
-    
+
+    /* Delete / error variant */
     .action-btn.btn-error {
-        border-color: #ff512f;
         color: #ff512f;
+        border-color: #ff512f;
     }
-    
+
     .action-btn.btn-error:hover {
         background-color: #ff512f;
         color: white;
+    }
+
+    /* On very wide screens, lay buttons horizontally */
+    @media (min-width: 1400px) {
+        .pages-table td:last-child { flex-direction: row; }
+        .action-btn { min-width: 100px; }
     }
     
     /* Offcanvas styling */
@@ -445,6 +481,25 @@
         background-color: var(--bg-card);
         color: var(--text-primary);
         padding: 10px;
+    }
+
+    /* Add extra right padding for select dropdowns to prevent arrow sticking to border */
+    select.form-input {
+        padding-right: 35px;
+    }
+
+    /* Custom arrow styling for all select dropdowns */
+    #categorySelect,
+    #categoryId,
+    #editCategoryId {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b92a7' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-color: var(--bg-primary);
+        cursor: pointer;
     }
     
     .save-btn {
@@ -577,17 +632,16 @@
         <!-- Category Filter -->
         <div class="filter-group">
             <label class="filter-label">Category</label>
-            <div class="filter-option">
-                <input type="radio" name="category" value="all" checked onchange="filterByCategory('all')">
-                <span>All Categories</span>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="category" value="assigned" onchange="filterByCategory('assigned')">
-                <span>Assigned Only</span>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="category" value="unassigned" onchange="filterByCategory('unassigned')">
-                <span>Unassigned Only</span>
+            <!-- Category select for direct category filtering -->
+            <div style="margin-top:10px; margin-bottom:8px;">
+                <select id="categorySelect" class="form-input" style="width:100%; padding:10px 40px 10px 12px; border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary);" onchange="filterByCategory(this.value)">
+                    <option value="all" selected>All Categories</option>
+                    <option value="assigned">Assigned Only</option>
+                    <option value="unassigned">Unassigned Only</option>
+                    {% for c in categories %}
+                        <option value="cat:{{ c.id }}">{{ c.category_name }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </div>
         
@@ -618,9 +672,6 @@
         </div>
         
         <!-- Action Buttons -->
-        <button class="filter-btn" onclick="applyFilters()">
-            <i class="bi bi-funnel"></i> Apply Filters
-        </button>
         <button class="filter-btn clear-filter-btn" onclick="clearFilters()">
             <i class="bi bi-x-circle"></i> Clear Filters
         </button>
@@ -651,8 +702,8 @@
                     <th>Assignment</th>
                     <th>Content</th>
                     <th>Weaviate Status</th>
-                    <th>Created</th>
-                    <th>Updated</th>
+                    <th style="min-width: 155px; white-space: nowrap;">Created (EST)</th>
+                    <th style="min-width: 155px; white-space: nowrap;">Updated (EST)</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -661,6 +712,8 @@
                     {% for page in pages %}
                     <tr class="page-row" 
                         data-category="{{ 'assigned' if page.category_id else 'unassigned' }}"
+                        data-cat-id="{{ page.category_id if page.category_id else '' }}"
+                        data-cat-name="{{ page.category_name if page.category_name else '' }}"
                         data-status="{{ 'active' if page.is_active else 'inactive' }}"
                         data-content="{{ 'with-content' if page.has_content else 'without-content' }}"
                         data-page-id="{{ page.id }}">
@@ -710,8 +763,8 @@
                                 <span class="status-badge badge-pending">Pending</span>
                             {% endif %}
                         </td>
-                        <td>{{ page.created_on|safe if page.created_on else '' }}</td>
-                        <td>{{ page.updated_on|safe if page.updated_on else '' }}</td>
+                        <td style="white-space: nowrap;">{{ page.created_on|safe if page.created_on else '' }}</td>
+                        <td style="white-space: nowrap;">{{ page.updated_on|safe if page.updated_on else '' }}</td>
                         <td>
                             <button class="action-btn" onclick="editPage({{ page.id }})" title="Edit Page">
                                 <i class="bi bi-pencil"></i> Edit
@@ -795,7 +848,7 @@
             <!-- Category -->
             <div class="form-group">
                 <label class="form-label">Category</label>
-                <select class="form-input" id="categoryId">
+                <select class="form-input" id="categoryId" style="padding-right: 35px;">
                     <option value="0">None</option>
                     {% if categories %}
                         {% for category in categories %}
@@ -900,7 +953,7 @@
             <!-- Category -->
             <div class="form-group">
                 <label class="form-label">Category</label>
-                <select class="form-input" id="editCategoryId">
+                <select class="form-input" id="editCategoryId" style="padding-right: 35px;">
                     <option value="0">None</option>
                     {% if categories %}
                         {% for category in categories %}
@@ -1016,19 +1069,25 @@
         status: ['active', 'inactive'],
         content: ['with-content', 'without-content']
     };
+
+    // Set initial active styles on filter options
+    document.addEventListener('DOMContentLoaded', function() {
+        updateFilterOptionStyles();
+    });
     
-    // Filter by category
+    // Filter by category (supports 'all', 'assigned', 'unassigned', and 'cat:<id>')
     function filterByCategory(category) {
         filters.category = category;
-        document.querySelectorAll('input[name="category"]').forEach(radio => {
-            radio.checked = radio.value === category;
-        });
+        // if there's a select, keep radios in sync if present
+        const select = document.getElementById('categorySelect');
+        if (select && select.value !== category) select.value = category;
+        applyFilters();
     }
-    
+
     // Toggle status filter
     function toggleStatusFilter(status) {
         const checkbox = document.getElementById('filter-' + status);
-        
+
         if (checkbox.checked) {
             if (!filters.status.includes(status)) {
                 filters.status.push(status);
@@ -1036,12 +1095,14 @@
         } else {
             filters.status = filters.status.filter(s => s !== status);
         }
+        updateFilterOptionStyles();
+        applyFilters();
     }
-    
+
     // Toggle content filter
     function toggleContentFilter(content) {
         const checkbox = document.getElementById('filter-' + content);
-        
+
         if (checkbox.checked) {
             if (!filters.content.includes(content)) {
                 filters.content.push(content);
@@ -1049,6 +1110,22 @@
         } else {
             filters.content = filters.content.filter(c => c !== content);
         }
+        updateFilterOptionStyles();
+        applyFilters();
+    }
+
+    // Update visual active state on filter options
+    function updateFilterOptionStyles() {
+        document.querySelectorAll('.filter-option').forEach(option => {
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                if (checkbox.checked) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            }
+        });
     }
     
     // Apply filters
@@ -1058,11 +1135,22 @@
         
         rows.forEach(row => {
             const rowCategory = row.dataset.category;
+            const rowCatId = row.dataset.catId || '';
             const rowStatus = row.dataset.status;
             const rowContent = row.dataset.content;
             
             // Check category filter
-            let categoryMatch = filters.category === 'all' || rowCategory === filters.category;
+            let categoryMatch = false;
+            if (filters.category === 'all') {
+                categoryMatch = true;
+            } else if (filters.category === 'assigned' || filters.category === 'unassigned') {
+                categoryMatch = rowCategory === filters.category;
+            } else if (filters.category && filters.category.startsWith('cat:')) {
+                const catId = filters.category.split(':')[1];
+                categoryMatch = rowCatId === String(catId);
+            } else {
+                categoryMatch = true;
+            }
             
             // Check status filter
             let statusMatch = filters.status.includes(rowStatus);
@@ -1102,6 +1190,9 @@
         };
         
         // Reset checkboxes and radios
+        // Reset category select if present
+        const select = document.getElementById('categorySelect');
+        if (select) select.value = 'all';
         document.querySelectorAll('input[name="category"]').forEach(radio => {
             radio.checked = radio.value === 'all';
         });
@@ -1110,42 +1201,22 @@
         document.getElementById('filter-inactive').checked = true;
         document.getElementById('filter-with-content').checked = true;
         document.getElementById('filter-without-content').checked = true;
-        
+
         // Show all rows
         document.querySelectorAll('.page-row').forEach(row => {
             row.style.display = '';
         });
-        
+
         // Remove no results message
         const noResultsRow = document.querySelector('.no-results-row');
         if (noResultsRow) {
             noResultsRow.remove();
         }
+
+        // Update visual styles
+        updateFilterOptionStyles();
     }
     
-    // Toggle select all checkboxes
-    function toggleSelectAll() {
-        const selectAll = document.getElementById('selectAll');
-        const checkboxes = document.querySelectorAll('.page-checkbox');
-        checkboxes.forEach(cb => {
-            if (cb.closest('tr').style.display !== 'none') {
-                cb.checked = selectAll.checked;
-            }
-        });
-        updateDeleteButton();
-    }
-    
-    // Update delete button visibility
-    function updateDeleteButton() {
-        const checkedBoxes = document.querySelectorAll('.page-checkbox:checked');
-        const deleteBtn = document.getElementById('deleteBtn');
-        
-        if (checkedBoxes.length > 0) {
-            deleteBtn.style.display = 'block';
-        } else {
-            deleteBtn.style.display = 'none';
-        }
-    }
     
     // Add new page
     window.addNewPage = function() {
@@ -1575,15 +1646,17 @@
         }
     }
     
-    // Toggle select all checkboxes
+    // Toggle select all checkboxes (only visible/filtered rows)
     window.toggleSelectAll = function() {
         const selectAllCheckbox = document.getElementById('selectAll');
         const checkboxes = document.querySelectorAll('.page-checkbox');
-        
+
         checkboxes.forEach(checkbox => {
-            checkbox.checked = selectAllCheckbox.checked;
+            if (checkbox.closest('tr').style.display !== 'none') {
+                checkbox.checked = selectAllCheckbox.checked;
+            }
         });
-        
+
         updateDeleteButton();
     }
     

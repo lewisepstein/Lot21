@@ -95,7 +95,7 @@ class PromptHistoryResponse(BaseModel):
     """
     id: int
     prompt_session_id: str
-    content_id: int
+    content_id: Optional[int]
     user_prompt: Optional[str]
     ai_response: Optional[str]
     prompt_type: str

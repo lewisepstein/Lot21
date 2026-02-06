@@ -14,7 +14,15 @@ class Telemetry:
         self.latency[name] = int((time.time() - self.start) * 1000)
 
     def add_text_cost(self, prompt):
-        tokens = max(1, len(prompt) // 4)
+        try:
+            if not prompt:
+                tokens = 1
+            else:
+                tokens = max(1, len(prompt) // 4)
+        except Exception:
+            # Fallback for unexpected types
+            tokens = 1
+
         self.cost["text_usd"] = round(tokens / 1000 * TEXT_COST_PER_1K_TOKENS, 6)
 
     def add_image_cost(self):

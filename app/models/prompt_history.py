@@ -41,7 +41,7 @@ class PromptHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     prompt_session_id = Column(String(255), nullable=False, index=True)
-    content_id = Column(Integer, ForeignKey("content.id"), nullable=False)
+    content_id = Column(Integer, ForeignKey("content.id"), nullable=True)
     user_prompt = Column(Text, nullable=True)
     ai_response = Column(Text, nullable=True)
     prompt_type = Column(SQLAlchemyEnum(PromptTypeEnum), nullable=True, default=PromptTypeEnum.TEXT)

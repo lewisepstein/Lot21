@@ -25,6 +25,7 @@ from rag_module.max_line_detector import detect_max_lines_from_query, line_rule
 from rag_module.intent_redirects import is_rewrite_intent
 from rag_module.paragraph_rules import extract_paragraph_count, build_paragraph_constraint
 from rag_module.definition_prompt import build_definition_prompt
+from rag_module.lots_prompts import build_lots_prompt
 
 load_dotenv()
 
@@ -102,7 +103,7 @@ class RagModule:
         """Generate text content without caching - each request gets a fresh response"""
         generation_config = genai.types.GenerationConfig(
             temperature=0.7,
-            max_output_tokens=2048,
+            max_output_tokens=8096,
             candidate_count=1
         )
         return self.text_model.generate_content(prompt, generation_config=generation_config)
@@ -238,6 +239,24 @@ class RagModule:
                     max_lines=max_lines
                 )
 
+        # LOTS (new initiatives / projects / cards)
+        elif category_id == 6:
+            if is_rewrite:
+                prompt = LottiePrompts.build_focused_rewrite_prompt(
+                    query=query,
+                    target_section="CONTENT",
+                    relevant_context=context_str,
+                    paragraph_constraint=paragraph_rule
+                )
+            else:
+                prompt = build_lots_prompt(
+                    query=query,
+                    context_str=context_str,
+                    topic=subpage,
+                    max_lines=max_lines,
+                    line_rule=line_rule_str
+                )
+
         telemetry.add_text_cost(prompt)
         
         print(f"Starting text generation for query: {query[:100]}...")  # Log first 100 chars
@@ -261,9 +280,17 @@ class RagModule:
             )
 
         telemetry.mark("llm_ms")
-        print(f"Generated text response length: {resp.text} chars")
+        
+        # Log full response length and content
+        response_text = resp.text if resp else ""
+        response_length = len(response_text)
+        print(f"\n{'='*80}")
+        print(f"RESPONSE GENERATED - Length: {response_length} chars")
+        print(f"{'='*80}")
+        print(f"FULL RESPONSE TEXT:\n{response_text}")
+        print(f"{'='*80}\n")
 
-        return resp.text, telemetry.export()
+        return response_text, telemetry.export()
 
     # ---------------- IMAGE ----------------
     def _generate_image_content(self, final_prompt):
@@ -351,8 +378,6 @@ class RagModule:
             print(f"Image generation error: {type(e).__name__}: {str(e)}")
             return None
 
-        telemetry.mark("image_ms")
-        return None
 
     # ---------------- ENTRY POINT ----------------
     def rag_entry_point(
@@ -426,7 +451,7 @@ class RagModule:
                 print(f"Error during image generation in image_and_text mode: {str(e)}")
 
             print("Completed image_and_text generation")
-            print(f"  - Generated text length: {text} ")
+            print(f"  - Generated text length: {len(text) if text else 0} chars")
             print(f"  - Generated image present: {'Yes' if image else 'No'} ")
 
             return {

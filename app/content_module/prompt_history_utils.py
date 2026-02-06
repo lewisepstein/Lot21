@@ -129,7 +129,7 @@ def add_draft_to_prompt_history(
     prompt_session_id: Optional[str] = None,
     content_id: Optional[int] = None,
     user_id: Optional[int] = None,
-    context_override: Optional[str] = None,
+    context_override: Optional[bool] = False,
     image_base_64: Optional[List[str]] = None,
     category_id: Optional[int] = None,
     image_attachment_mode: Optional[str] = None,
@@ -152,6 +152,12 @@ def add_draft_to_prompt_history(
         Exception: If database operation fails
     """
     db = PostgresDB()
+    
+    # Generate prompt_session_id if not provided
+    if not prompt_session_id:
+        prompt_session_id = str(uuid.uuid4())
+    
+    # content_id can be None - no need to set a default
     
     # Check for existing record with prompt_action='NEW' and null user_prompt
     existing_records = db.read(
@@ -264,7 +270,7 @@ def get_prompt_histories(
             "content_id": content_id,
             "deleted_on": None
         },
-        order_by=[("created_on", True)]  # Ascending order (oldest first)
+        order_by=[("created_on", True)]  
     )
     
     if not prompt_histories:
@@ -330,3 +336,64 @@ def update_prompt_action(
     return dict(updated_records[0]._mapping)
 
 
+def get_all_prompts(
+    prompt_session_id: Optional[str] = None,
+    content_id: Optional[int] = None
+):
+    """
+    Retrieve all prompt history records for a given session and content.
+    
+    Args:
+        prompt_session_id: UUID of the prompt session
+        content_id: ID of the content record           
+    """
+
+    db = PostgresDB()
+
+    data = {}
+    params = []
+
+
+    query = """
+        select prompt_session_id, id, content_id, user_prompt, ai_response, created_on, deleted_on
+        from prompt_history
+    """
+
+    if prompt_session_id or content_id:
+        query += " where "
+        conditions = []
+
+        if prompt_session_id:
+            conditions.append("prompt_session_id = %s")
+            params.append(prompt_session_id)
+        if content_id:
+            conditions.append("content_id = %s")
+            params.append(content_id)
+
+        query += " AND ".join(conditions)
+        query += " AND deleted_on IS NULL"
+    query += " ORDER BY id DESC"
+    prompt_histories = db.execute_raw_sql(query, tuple(params))
+
+    for ph in prompt_histories:
+
+        session_id = (''.join(ph[0].split("-")[:4])).replace(" - ", "")
+
+        if session_id not in data:
+            data[session_id] = {}
+        
+        data[session_id].update({
+            "id": ph[1],
+            "content_id": ph[2],
+            "user_prompt": ph[3],
+            "created_on": ph[5],
+            "deleted_on": ph[6]
+        })
+
+        if ph[4]:
+            try:
+                data[session_id]["ai_response"] = json.loads(ph[4]) if ph[4] else None
+            except Exception as e:
+                data[session_id]["ai_response"] = ph[4]
+
+    return data
