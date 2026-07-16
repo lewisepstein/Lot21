@@ -262,7 +262,7 @@ async def add_draft_content(
         raise
     except Exception as e:
         logger.error(f"Error adding draft content: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Unable to add draft content at this time")
+        raise HTTPException(status_code=500, detail="Please provide allowed prompts")
 
 
 @router.get("/content/unattached", response_class=HTMLResponse)
@@ -347,4 +347,4 @@ async def user_save_as_draft(
         raise
     except Exception as e:
         logger.error(f"Error adding draft content: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Unable to add draft content at this time")
+        raise HTTPException(status_code=500, detail="Please provide allowed prompts")

@@ -2,9 +2,17 @@
 
 {% block title %}Content Editor{% endblock %}
 
-{% block page_title %}Current Content{% endblock %}
+{% block page_title %}Lot21 AI{% endblock %}
 
 {% block nav_content_generation %}active{% endblock %}
+
+{% block generate_footer %}
+<div class="generate-footer-bar">
+    <a href="/user/content" class="active">Lot21 AI</a>
+    <a href="/user/freeform/">Free Form AI</a>
+    <a href="/user/page-settings">Page Settings</a>
+</div>
+{% endblock %}
 
 
 {% block content %}
@@ -187,6 +195,31 @@
         gap: 10px;
         margin-bottom: 15px;
     }
+
+    /* Draft History */
+    .history-version {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background: var(--bg-primary);
+    }
+    .history-version .hv-top { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .history-version .hv-time { font-size:12px; color:var(--text-secondary); }
+    .history-version .hv-prompt { font-size:13px; color:var(--text-primary); margin:4px 0; }
+    .history-version .hv-preview { font-size:12px; color:var(--text-secondary); line-height:1.5; }
+    .hv-badge { font-size:10px; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:.3px; }
+    .hv-badge.draft { background:rgba(74,158,218,.18); color:#4a9eda; }
+    .hv-badge.approved { background:rgba(74,218,186,.18); color:#4adaba; }
+    .hv-badge.rejected { background:rgba(255,120,120,.18); color:#ff7878; }
+    .hv-badge.restore { background:rgba(197,139,255,.18); color:#c58bff; }
+    .compare-pane {
+        border:1px solid var(--border-color); border-radius:8px; padding:12px;
+        max-height:60vh; overflow:auto; white-space:pre-wrap; word-wrap:break-word;
+        font-size:13px; line-height:1.6; background:var(--bg-primary);
+    }
+    .cmp-add { background:rgba(74,218,186,.28); border-radius:3px; }
+    .cmp-del { background:rgba(255,120,120,.28); border-radius:3px; text-decoration:line-through; }
     
     .ai-icon {
         color: var(--accent-teal);
@@ -254,7 +287,7 @@
         background-color: #e8ebeb !important;
         color: #000000 !important;
     }
-    
+
     .ai-message-draft div {
         color: #000000 !important;
     }
@@ -581,9 +614,10 @@
 
         <!-- Top Actions Bar -->
         <div class="top-actions">
-            <div style="margin-left: auto; display: flex; gap: 15px;">
+            <div style="margin-left: auto; display: flex; gap: 15px; align-items: center;">
+                <span style="color: #00d9b5; font-size: 13px;">Click on it to generate proper content if not generated properly!</span>
                 <button class="action-icon-btn" onclick="addNewContent()">
-                    <i class="bi bi-plus-circle"></i> Add New
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
             </div>
         </div>
@@ -681,6 +715,9 @@
                 <div class="ai-header">
                     <i class="bi bi-stars ai-icon"></i>
                     <h2 class="panel-title">AI Generation Assistant</h2>
+                    <button type="button" class="regenerate-btn" style="margin-left:auto;" onclick="openHistoryPanel()" title="View and restore previous versions">
+                        <i class="bi bi-clock-history"></i> History
+                    </button>
                 </div>
                 
                 <div id="ai-content-area" class="content-area">
@@ -713,13 +750,14 @@
                         </div> -->
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
-                            <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;">
+                            <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;"
+                                {% if category_id %}data-server-selected="true"{% endif %}>
                                 <option value="">--Select Category--</option>
                                 {% for category in category_list %}
                                     <option value="{{ category.id }}" {% if category_id == category.id %}selected{% endif %}>
                                         {{ category.category_name }}
                                     </option>
-                                {% endfor %}                                
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -781,10 +819,74 @@
         </div>
     </div>
 
+    <!-- Toast notifications -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 11000;"></div>
+
+    <!-- Confirm Action Modal (approve / reject) -->
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="border-color: var(--border-color);">
+                    <h5 class="modal-title" id="confirmActionTitle">Please confirm</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmActionMessage"></div>
+                <div class="modal-footer" style="border-color: var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmActionOk">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Preview Modal -->
     <div id="imageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); cursor: pointer;" onclick="closeImageModal()">
         <span style="position: absolute; top: 20px; right: 40px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;" onclick="closeImageModal()">&times;</span>
         <img id="modalImage" style="margin: auto; display: block; max-width: 90%; max-height: 90%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+    </div>
+
+    <!-- Draft History offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasHistory" aria-labelledby="offcanvasHistoryLabel" data-bs-backdrop="true" data-bs-scroll="false" data-bs-keyboard="true">
+        <div class="offcanvas-header">
+            <h5 id="offcanvasHistoryLabel" style="color:#fff"><i class="bi bi-clock-history"></i> Draft History</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p style="font-size:13px;color:var(--text-secondary);">Every saved version is kept. Select two to compare, or restore any one.</p>
+            <div style="margin-bottom:10px;">
+                <button class="btn btn-sm btn-primary" id="historyCompareBtn" onclick="compareSelectedVersions()" disabled>
+                    <i class="bi bi-layout-split"></i> Compare selected (0)
+                </button>
+            </div>
+            <div id="historyVersionList"><div style="color:var(--text-secondary);">Loading…</div></div>
+        </div>
+    </div>
+
+    <!-- Version Compare Modal -->
+    <div class="modal fade" id="compareModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content" style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="border-color: var(--border-color);">
+                    <h5 class="modal-title"><i class="bi bi-layout-split"></i> Compare Versions</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:flex;gap:14px;align-items:stretch;">
+                        <div style="flex:1;min-width:0;">
+                            <div id="compareLeftLabel" style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--text-secondary);"></div>
+                            <div id="compareLeft" class="compare-pane"></div>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div id="compareRightLabel" style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--text-secondary);"></div>
+                            <div id="compareRight" class="compare-pane"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;font-size:12px;color:var(--text-secondary);">
+                        <span class="cmp-del">removed</span> &nbsp; <span class="cmp-add">added</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 <script>
@@ -794,12 +896,27 @@
 -------------------------- */
 function onDocumentLoad() {
     try {
-        // Extract content_id from URL (e.g., /user/content/9)
+        // The URL carries a PAGE id (/user/content/{page_id}); the real content id
+        // comes from the server, since page and content ids are different tables.
+        const serverContentId = "{{ latest_content.content_id if latest_content and latest_content.content_id else '' }}";
         const urlParts = window.location.pathname.split('/');
         const pageContentId = urlParts[urlParts.length - 1];
-        if (pageContentId && !isNaN(pageContentId)) {
-            localStorage.setItem('content_id', pageContentId);
-            console.log('Set content_id from URL:', pageContentId);
+
+        if (serverContentId) {
+            if (localStorage.getItem('content_id') !== serverContentId) {
+                // Switched to a different content — old chat session no longer applies
+                localStorage.removeItem('prompt_session_id');
+                localStorage.removeItem('latest_response');
+            }
+            localStorage.setItem('content_id', serverContentId);
+            console.log('Set content_id from server:', serverContentId);
+        } else if (pageContentId && !isNaN(pageContentId)) {
+            // Page exists but has no content row yet — a stale id would attach
+            // prompts to someone else's content
+            localStorage.removeItem('content_id');
+            localStorage.removeItem('prompt_session_id');
+            localStorage.removeItem('latest_response');
+            console.log('Page has no content record; cleared stored content_id');
         }
 
         initViewTabs();
@@ -807,8 +924,66 @@ function onDocumentLoad() {
         showEmptyContextMessage();
         loadPromptHistory();
         initFileUpload();
+        restoreSessionState();
+        initSessionStateSavers();
     } catch (e) {
         console.debug('onDocumentLoad error', e);
+    }
+}
+
+/* ==========================================================
+   Session State Persistence (survive timeout/re-login)
+========================================================== */
+function restoreSessionState() {
+    try {
+        const savedUrl = localStorage.getItem('saved_source_url');
+        const savedContentType = localStorage.getItem('saved_content_type');
+        const savedPrompt = localStorage.getItem('saved_prompt_text');
+
+        const urlInput = document.getElementById('source_data_url');
+        const contentTypeEl = document.getElementById('contentType');
+        const promptInput = document.getElementById('ai-prompt-input');
+
+        if (savedUrl && urlInput && !urlInput.value.trim()) {
+            urlInput.value = savedUrl;
+            console.log('Restored source URL from session state');
+        }
+        if (savedContentType && contentTypeEl && !contentTypeEl.dataset.serverSelected) {
+            contentTypeEl.value = savedContentType;
+            console.log('Restored content type from session state:', savedContentType);
+        }
+        if (savedPrompt && promptInput) {
+            promptInput.value = savedPrompt;
+            console.log('Restored prompt text from session state');
+        }
+    } catch (e) {
+        console.debug('restoreSessionState error', e);
+    }
+}
+
+function initSessionStateSavers() {
+    try {
+        const urlInput = document.getElementById('source_data_url');
+        const contentTypeEl = document.getElementById('contentType');
+        const promptInput = document.getElementById('ai-prompt-input');
+
+        if (urlInput) {
+            urlInput.addEventListener('input', function() {
+                localStorage.setItem('saved_source_url', urlInput.value.trim());
+            });
+        }
+        if (contentTypeEl) {
+            contentTypeEl.addEventListener('change', function() {
+                localStorage.setItem('saved_content_type', contentTypeEl.value);
+            });
+        }
+        if (promptInput) {
+            promptInput.addEventListener('input', function() {
+                localStorage.setItem('saved_prompt_text', promptInput.value);
+            });
+        }
+    } catch (e) {
+        console.debug('initSessionStateSavers error', e);
     }
 }
 
@@ -942,20 +1117,6 @@ function closeImageModal() {
 ========================================================== */
 
 async function fetchSourceData() {
-    const formData = {
-        source_url: document.getElementById('source_data_url').value.trim(),
-        page_name: `New page from URL ${document.getElementById('source_data_url').value.trim()}`,
-        category_id: document.getElementById('contentType').value || null,
-        scrape_data: true,
-        is_active: true
-    };
-
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        showAlert('Please login first', 'danger');
-        return;
-    }
-    
     const sourceUrlInput = document.getElementById('source_data_url');
 
     if (!sourceUrlInput) return;
@@ -966,8 +1127,23 @@ async function fetchSourceData() {
         return;
     }
 
+    const formData = {
+        source_url: url,
+        page_name: `New page from URL ${url}`,
+        category_id: document.getElementById('contentType').value || null,
+        scrape_data: true,
+        is_active: true
+    };
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        showAlert('Please login first', 'danger');
+        return;
+    }
+
     try {
-        
+        showAISpinner();
+
         const response = await fetch('/user/create_page', {
             method: 'POST',
             headers: {
@@ -977,18 +1153,72 @@ async function fetchSourceData() {
             body: JSON.stringify(formData)
         });
 
-        showAISpinner();
-
         const result = await response.json();
+
+        if (!response.ok) {
+            hideAISpinner();
+            showAlert(result.detail || 'Failed to create page', 'danger');
+            return;
+        }
+
+        if (!(result.page && result.page.id)) {
+            hideAISpinner();
+            showAlert(result.message || 'Page created successfully!', 'success');
+            return;
+        }
+
+        // Fetch the full page content so we can display it in-place
+        const pageRes = await fetch(`/user/get_page/${result.page.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
 
         hideAISpinner();
 
-        if (response.ok) {
-            showAlert(result.message || 'Page created successfully!', 'success');
-        } else {
-            showAlert(result.detail || 'Failed to create page', 'danger');
-        }
+        const pageData = pageRes.ok ? await pageRes.json() : null;
+        const scrapedContent = pageData && pageData.content ? pageData.content : '';
+
+        // Populate Raw and Formatted views with scraped content
+        const rawEl       = document.getElementById('rawContent');
+        const formattedEl = document.getElementById('formattedContent');
+        if (rawEl)       rawEl.value       = scrapedContent;
+        if (formattedEl) formattedEl.innerHTML = scrapedContent;
+
+        // Update source URL input with confirmed URL
+        sourceUrlInput.value = result.page.source_url || url;
+
+        // Update page title in the panel header
+        const panelTitle = document.querySelector('.panel-title');
+        if (panelTitle) panelTitle.textContent = result.page.page_name || panelTitle.textContent;
+
+        // Re-enable all tabs that were locked by showEmptyContextMessage strict mode
+        const allTabs = document.querySelectorAll('.view-tab');
+        allTabs.forEach(tab => {
+            tab.disabled = false;
+            tab.style.pointerEvents = '';
+            tab.removeAttribute('aria-disabled');
+            tab.classList.remove('disabled-tab');
+        });
+
+        // Enable AI prompt input
+        const aiPromptInput = document.getElementById('ai-prompt-input');
+        if (aiPromptInput) aiPromptInput.disabled = false;
+
+        // Hide "provide context" message in AI panel
+        const aiPanelMessage = document.getElementById('aiPanelMessage');
+        if (aiPanelMessage) aiPanelMessage.style.display = 'none';
+
+        // Prepare localStorage so AI assistant works for this new page
+        localStorage.removeItem('prompt_session_id');
+        localStorage.removeItem('latest_response');
+        localStorage.setItem('new_content', true);
+
+        showAlert('Content scraped successfully! You can now use the Formatted and Raw Data tabs.', 'success');
+
+        // Switch to formatted view so user immediately sees the content
+        switchView('formatted');
+
     } catch (error) {
+        hideAISpinner();
         console.error('Error creating page:', error);
         showAlert('An error occurred while creating the page', 'danger');
     }
@@ -1153,77 +1383,16 @@ function switchView(view, strict = false) {
    Top Actions
    ========================================================== */
 function addNewContent() {
-    
-    const ai_content_area = document.getElementById('ai-content-area');
-    const updated_by_agent = document.getElementById('updated_by_agent');
-
-    updated_by_agent.textContent = 'User Initiated';
-
+    // Clear all previous session/context state
     localStorage.removeItem('content_id');
     localStorage.removeItem('prompt_session_id');
+    localStorage.removeItem('latest_response');
     localStorage.setItem('new_content', true);
 
-    if (!ai_content_area) {
-        return;
-    }    
-
-    // Clear content areas
-    ai_content_area.innerHTML = '';
-    const formattedEl = document.getElementById('formattedContent');
-    const rawEl = document.getElementById('rawContent');
-
-    if (formattedEl) {
-        formattedEl.innerHTML = '';
-    }
-    if (rawEl) {
-        rawEl.value = '';
-    }
-    
-    // Enable rawTab and sourceTab, disable formattedTab
-    const formattedTab = document.getElementById('formattedTab');
-    const rawTab = document.getElementById('rawTab');
-    const sourceTab = document.getElementById('sourceTab');
-    
-    if (formattedTab) {
-        formattedTab.disabled = true;
-        formattedTab.style.pointerEvents = 'none';
-        formattedTab.style.opacity = '0.5';
-        formattedTab.classList.remove('active');
-    }
-    
-    if (rawTab) {
-        rawTab.disabled = false;
-        rawTab.style.pointerEvents = 'auto';
-        rawTab.style.opacity = '1';
-        rawTab.classList.add('active');
-    }
-    
-    if (sourceTab) {
-        sourceTab.disabled = false;
-        sourceTab.style.pointerEvents = 'auto';
-        sourceTab.style.opacity = '1';
-        sourceTab.classList.remove('active');
-    }
-    
-    // Show raw view by default
-    switchView('raw');
-    
-    // Update AI panel message
-    const aiPanelMessage = document.getElementById('aiPanelMessage');
-    if (aiPanelMessage) {
-        aiPanelMessage.textContent = 'Please add content in Raw HTML or fetch from Source Data to use the AI assistant.';
-        aiPanelMessage.style.display = '';
-    }
-    
-    // Disable AI prompt input until content is added
-    const aiPromptInput = document.getElementById('ai-prompt-input');
-    if (aiPromptInput) {
-        aiPromptInput.disabled = true;
-    }
-
-    initAIInput();
-
-
+    // Reload the current page so the server re-renders everything fresh
+    // This preserves the current URL (e.g. /user/content/9) so the page
+    // content stays, while the cleared localStorage gives a fresh AI session.
+    window.location.reload();
 }
 
 
@@ -1477,9 +1646,10 @@ async function setPromptAction(
             return false;
         }
     }
-    
+
     const result = await response.json();
     loadPromptHistory();
+    return response.ok;
 }
 
 async function confirmSaveDraft(event) {
@@ -1492,40 +1662,307 @@ async function confirmSaveDraft(event) {
     }
 
     const phId = phIdInput.value;
-    alert('Save draft for prompt history id: ' + phId);
 
-    await setPromptAction(
-        phId, 
+    const ok = await setPromptAction(
+        phId,
         'SAVED_AS_DRAFT',
         prompt_name = document.getElementById('draftName').value.trim(),
         prompt_description = document.getElementById('draftNotes').value.trim(),
     );
-}
 
-async function rejectResponse(phId) {
-
-    confirm = confirm('Are you sure you want to reject this AI response? This action cannot be undone.');
-    if (!confirm) return;
-    else{
-        await setPromptAction(
-            phId, 
-            'REJECTED',
-            prompt_name = null,
-            prompt_description = null,
-        );
+    // close the panel and confirm with a toast
+    const el = document.getElementById('offcanvasSaveDraft');
+    if (el && window.bootstrap && bootstrap.Offcanvas) {
+        const off = bootstrap.Offcanvas.getInstance(el);
+        if (off) off.hide();
+    }
+    if (ok) {
+        showToast('Draft saved successfully');
+    } else if (ok === false) {
+        showToast('Failed to save draft. Please try again.', 'error');
     }
 }
 
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container || !window.bootstrap || !bootstrap.Toast) {
+        showAlert(message, type);
+        return;
+    }
+    const bg = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center ${bg} border-0`;
+    toastEl.setAttribute('role', 'status');
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>`;
+    container.appendChild(toastEl);
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    new bootstrap.Toast(toastEl, { delay: 3500 }).show();
+}
+
+function showConfirmModal(message, onConfirm, okLabel = 'Confirm', okClass = 'btn-primary') {
+    const el = document.getElementById('confirmActionModal');
+    if (!el || !window.bootstrap || !bootstrap.Modal) {
+        // fallback if bootstrap failed to load
+        if (window.confirm(message)) onConfirm();
+        return;
+    }
+    document.getElementById('confirmActionMessage').textContent = message;
+    const okBtn = document.getElementById('confirmActionOk');
+    okBtn.textContent = okLabel;
+    okBtn.className = 'btn ' + okClass;
+    const modal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+    okBtn.onclick = () => {
+        modal.hide();
+        onConfirm();
+    };
+    modal.show();
+}
+
+/* ==========================================================
+   Draft History — list, restore, compare
+========================================================== */
+let historyVersions = [];       // full version objects from the server
+let historyCompareIds = [];     // up to 2 selected version ids
+
+function historyEscape(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+async function openHistoryPanel() {
+    const content_id = localStorage.getItem('content_id');
+    const token = localStorage.getItem('access_token');
+    if (!content_id) { showToast('Open a content page first.', 'error'); return; }
+    if (!token) { window.location.replace('/'); return; }
+
+    historyCompareIds = [];
+    const listEl = document.getElementById('historyVersionList');
+    listEl.innerHTML = '<div style="color:var(--text-secondary);">Loading…</div>';
+
+    const el = document.getElementById('offcanvasHistory');
+    if (el && window.bootstrap && bootstrap.Offcanvas) {
+        (bootstrap.Offcanvas.getInstance(el) || new bootstrap.Offcanvas(el, { backdrop: true, scroll: false })).show();
+    }
+
+    try {
+        const res = await fetch(`/user/content/${content_id}/history`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) throw new Error('history fetch failed');
+        const data = await res.json();
+        historyVersions = data.versions || [];
+        renderHistoryVersions();
+    } catch (e) {
+        console.error('Draft history error:', e);
+        listEl.innerHTML = '<div style="color:#ff7878;">Could not load history.</div>';
+    }
+    updateCompareButton();
+}
+
+function renderHistoryVersions() {
+    const listEl = document.getElementById('historyVersionList');
+    if (!historyVersions.length) {
+        listEl.innerHTML = '<div style="color:var(--text-secondary);">No versions yet. Generate content to start the history.</div>';
+        return;
+    }
+    const badgeClass = (a) => ({
+        'APPROVED': 'approved', 'REJECTED': 'rejected', 'RESTORE': 'restore'
+    }[a] || 'draft');
+    const badgeLabel = (a) => ({
+        'APPROVED': 'Approved', 'REJECTED': 'Rejected', 'RESTORE': 'Restored',
+        'SAVED_AS_DRAFT': 'Draft', 'DRAFT': 'Draft', 'NEW': 'Draft'
+    }[a] || 'Draft');
+
+    listEl.innerHTML = historyVersions.map((v, idx) => {
+        const when = v.created_on ? new Date(v.created_on).toLocaleString() : '';
+        const isLatest = idx === 0;
+        return `
+        <div class="history-version">
+            <div class="hv-top">
+                <input type="checkbox" onchange="toggleCompareVersion(${v.id}, this)" title="Select to compare">
+                <span class="hv-badge ${badgeClass(v.prompt_action)}">${badgeLabel(v.prompt_action)}</span>
+                ${isLatest ? '<span class="hv-badge approved">Latest</span>' : ''}
+                <span class="hv-time" style="margin-left:auto;">${historyEscape(when)}</span>
+            </div>
+            ${v.user_prompt ? `<div class="hv-prompt"><i class="bi bi-chat-left-text"></i> ${historyEscape(v.user_prompt)}</div>` : ''}
+            <div class="hv-preview">${historyEscape(v.preview)}${v.text && v.text.length > 120 ? '…' : ''}</div>
+            <div style="margin-top:8px;">
+                <button class="btn btn-sm btn-outline-light" onclick="restoreVersion(${v.id})" ${isLatest ? 'disabled title="Already the latest version"' : ''}>
+                    <i class="bi bi-arrow-counterclockwise"></i> Restore
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleCompareVersion(id, cb) {
+    if (cb.checked) {
+        if (historyCompareIds.length >= 2) {
+            cb.checked = false;
+            showToast('Pick exactly two versions to compare.', 'error');
+            return;
+        }
+        historyCompareIds.push(id);
+    } else {
+        historyCompareIds = historyCompareIds.filter(x => x !== id);
+    }
+    updateCompareButton();
+}
+
+function updateCompareButton() {
+    const btn = document.getElementById('historyCompareBtn');
+    if (!btn) return;
+    btn.innerHTML = `<i class="bi bi-layout-split"></i> Compare selected (${historyCompareIds.length})`;
+    btn.disabled = historyCompareIds.length !== 2;
+}
+
+async function restoreVersion(versionId) {
+    const content_id = localStorage.getItem('content_id');
+    const token = localStorage.getItem('access_token');
+    if (!content_id || !token) return;
+    showConfirmModal('Restore this version? It will be added as the new latest version — nothing is deleted.', async () => {
+        try {
+            const res = await fetch(`/user/content/${content_id}/restore/${versionId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            if (!res.ok) throw new Error('restore failed');
+            const data = await res.json();
+            if (data.prompt_session_id) localStorage.setItem('prompt_session_id', data.prompt_session_id);
+            // Close panel and refresh the thread so the restored version shows as latest
+            const el = document.getElementById('offcanvasHistory');
+            if (el && window.bootstrap && bootstrap.Offcanvas) {
+                const off = bootstrap.Offcanvas.getInstance(el);
+                if (off) off.hide();
+            }
+            localStorage.removeItem('latest_response');
+            await loadPromptHistory();
+            showToast('Version restored');
+        } catch (e) {
+            console.error('Restore error:', e);
+            showToast('Could not restore this version.', 'error');
+        }
+    }, 'Restore', 'btn-primary');
+}
+
+// Word-level diff (LCS) — highlights added tokens on the right, removed on the left
+function diffWords(oldText, newText) {
+    const a = (oldText || '').split(/(\s+)/);
+    const b = (newText || '').split(/(\s+)/);
+    const n = a.length, m = b.length;
+    const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--)
+        for (let j = m - 1; j >= 0; j--)
+            dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    let i = 0, j = 0, left = '', right = '';
+    while (i < n && j < m) {
+        if (a[i] === b[j]) {
+            left += historyEscape(a[i]); right += historyEscape(b[j]); i++; j++;
+        } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+            if (a[i].trim()) left += `<span class="cmp-del">${historyEscape(a[i])}</span>`; else left += historyEscape(a[i]);
+            i++;
+        } else {
+            if (b[j].trim()) right += `<span class="cmp-add">${historyEscape(b[j])}</span>`; else right += historyEscape(b[j]);
+            j++;
+        }
+    }
+    while (i < n) { if (a[i].trim()) left += `<span class="cmp-del">${historyEscape(a[i])}</span>`; else left += historyEscape(a[i]); i++; }
+    while (j < m) { if (b[j].trim()) right += `<span class="cmp-add">${historyEscape(b[j])}</span>`; else right += historyEscape(b[j]); j++; }
+    return { left, right };
+}
+
+function compareSelectedVersions() {
+    if (historyCompareIds.length !== 2) return;
+    // order chronologically: older on the left, newer on the right
+    const picked = historyVersions.filter(v => historyCompareIds.includes(v.id));
+    picked.sort((x, y) => new Date(x.created_on) - new Date(y.created_on));
+    const [older, newer] = picked;
+    const { left, right } = diffWords(older.text, newer.text);
+    document.getElementById('compareLeftLabel').textContent = 'Older — ' + (older.created_on ? new Date(older.created_on).toLocaleString() : '');
+    document.getElementById('compareRightLabel').textContent = 'Newer — ' + (newer.created_on ? new Date(newer.created_on).toLocaleString() : '');
+    document.getElementById('compareLeft').innerHTML = left;
+    document.getElementById('compareRight').innerHTML = right;
+    const el = document.getElementById('compareModal');
+    if (el && window.bootstrap && bootstrap.Modal) {
+        (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+    }
+}
+
+async function rejectResponse(phId) {
+    showConfirmModal(
+        'Are you sure you want to reject this AI response? This action cannot be undone.',
+        async () => {
+            const ok = await setPromptAction(phId, 'REJECTED');
+            if (ok) showToast('Response rejected');
+        },
+        'Reject', 'btn-danger'
+    );
+}
+
 async function approveResponse(phId) {
-    confirm = confirm('Are you sure you want to approve this AI response?');
-    if (!confirm) return;
-    else{
-        await setPromptAction(
-            phId, 
-            'APPROVED',
-            prompt_name = null,
-            prompt_description = null,
-        );
+    showConfirmModal(
+        'Are you sure you want to approve this AI response?',
+        async () => {
+            const ok = await setPromptAction(phId, 'APPROVED');
+            if (ok) showToast('Response approved');
+        },
+        'Approve', 'btn-success'
+    );
+}
+
+async function downloadApprovedContent(fileFormat, btn, promptId = null) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+        return;
+    }
+
+    const contentId = localStorage.getItem('content_id');
+    if (!contentId) {
+        alert('No content selected to download');
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+        const promptParam = promptId ? `&prompt_id=${promptId}` : '';
+        const response = await fetch(`/user/download/content/${contentId}?file_format=${fileFormat}${promptParam}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            if (handleTokenExpiration(response)) return;
+            let message = 'Download failed';
+            try {
+                const err = await response.json();
+                if (err && err.detail) message = err.detail;
+            } catch (e) { /* non-JSON error body */ }
+            alert(message);
+            return;
+        }
+
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        const filename = match ? match[1] : `lottie_content_${contentId}.${fileFormat}`;
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Download failed. Please try again.');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -1536,13 +1973,19 @@ const isRejected = [
     "I am sorry, but as a Lot21 specialist, I only provide information and content related to climate justice and environmental solutions.",
     "Generation unavailable.",
     "This question is outside the scope of the provided context.",
-    "We're having trouble reaching the AI agent right now. Your request wasn't lost. Please try again in a moment."
-]; 
+    "We're having trouble reaching the AI agent right now. Your request wasn't lost. Please try again in a moment.",
+    "There's no content to refine yet. Please generate content first (describe what you'd like me to create), then use commands like \"refine it\" or \"make it shorter\" to improve it."
+];
 
 async function loadPromptHistory() {
     const prompt_session_id = localStorage.getItem('prompt_session_id');
     const content_id = localStorage.getItem('content_id');
-    
+
+    // Drop any stale refine-context from a previous visit; it is repopulated
+    // below from the session's current latest draft. Without this, a deleted
+    // or replaced draft could linger and get refined again.
+    localStorage.removeItem('latest_response');
+
     // Only load if we have both values
     if (!prompt_session_id || !content_id) {
         console.log('No prompt session found in localStorage');
@@ -1821,7 +2264,34 @@ async function loadPromptHistory() {
                             aiResponseDiv.appendChild(images_container);
                             console.log("✅ Appended", img_counts, "images to response");
                         }
-                        
+
+                        // Source citations: which training data / web pages fed this generation
+                        if (Array.isArray(ai_response.sources) && ai_response.sources.length > 0) {
+                            const sourcesDiv = document.createElement('div');
+                            sourcesDiv.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:12px;color:var(--text-secondary);line-height:1.7;';
+                            let sourcesHtml = '<strong>Sources:</strong><br>';
+                            ai_response.sources.forEach(s => {
+                                const title = (s && (s.title || s.url)) || String(s);
+                                const url = s && s.url;
+                                if (url && /^https?:/i.test(url)) {
+                                    sourcesHtml += `&bull; <a href="${url}" target="_blank" rel="noopener" style="color:#4a9eda;">${title}</a><br>`;
+                                } else {
+                                    sourcesHtml += `&bull; ${title}<br>`;
+                                }
+                            });
+                            sourcesDiv.innerHTML = sourcesHtml;
+                            aiResponseDiv.appendChild(sourcesDiv);
+                        }
+
+                        // Freshness indicator: how many previously generated projects were excluded
+                        if (ai_response.excluded_seen > 0) {
+                            const dedupDiv = document.createElement('div');
+                            dedupDiv.style.cssText = 'margin-top:8px;font-size:12px;color:var(--text-secondary);opacity:0.85;';
+                            const n = ai_response.excluded_seen;
+                            dedupDiv.innerHTML = `<i class="bi bi-stars" style="color:#4adaba"></i> Fresh content — ${n} previously generated project${n === 1 ? '' : 's'} excluded`;
+                            aiResponseDiv.appendChild(dedupDiv);
+                        }
+
                         // Append action buttons inside ai-message at its bottom
                         const actionsDiv = document.createElement('div');
                         actionsDiv.className = 'message-actions';
@@ -1830,11 +2300,23 @@ async function loadPromptHistory() {
                             // Render action buttons
                             if (ph.prompt_action === "SAVED_AS_DRAFT") {
                                 actionsDiv.innerHTML = `
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this, ${ph.id || 'null'})" title="Download as Word">
+                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this, ${ph.id || 'null'})" title="Download as PDF">
+                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this, ${ph.id || 'null'})" title="Download as PNG">
+                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this, ${ph.id || 'null'})" title="Download as JPG">
+                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
+                                    </button>
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-x-circle" style="color:#ff7171"></i>                                     
+                                        <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                     </button>
                                     <button class="btn btn-ai-response" onclick="approveResponse(${ph.id || 'null'})">
-                                        <i class="bi bi-check-circle" style="color:#21ff21"></i> 
+                                        <i class="bi bi-check-circle" style="color:#21ff21"></i>
                                     </button>
                                 `;
                             }
@@ -1850,11 +2332,35 @@ async function loadPromptHistory() {
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
                                         <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                     </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this)" title="Download as Word">
+                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this)" title="Download as PDF">
+                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this)" title="Download as PNG">
+                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this)" title="Download as JPG">
+                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
+                                    </button>
                                 `;
                             }else{
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-ai-response" onclick="saveDraftFromResponse(${ph.id || 'null'})">
                                         <i class="bi bi-file-earmark" style="color:#ffd639"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this, ${ph.id || 'null'})" title="Download as Word">
+                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this, ${ph.id || 'null'})" title="Download as PDF">
+                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this, ${ph.id || 'null'})" title="Download as PNG">
+                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
+                                    </button>
+                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this, ${ph.id || 'null'})" title="Download as JPG">
+                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
                                     </button>
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
                                         <i class="bi bi-x-circle" style="color:#ff7171"></i>
@@ -1864,7 +2370,7 @@ async function loadPromptHistory() {
                                     </button>
                                 `;
                             }
-                            
+
                             // Append action buttons to the response div
                             aiResponseDiv.appendChild(actionsDiv);
 
@@ -1903,8 +2409,9 @@ async function loadPromptHistory() {
 
             // after everything is rendered, scroll to bottom so latest items are visible
             scrollAIContentToBottom(false);
+
         }
-        
+
     } catch (error) {
         console.error('Error loading prompt history:', error);
     }
@@ -1926,6 +2433,7 @@ async function handleFormSubmit(event) {
     const updated_by_agent_set = localStorage.getItem('new_content');
 
     let context_override = false;
+    let context = '';
 
     const latest_response = localStorage.getItem('latest_response');
 
@@ -2039,7 +2547,11 @@ async function handleFormSubmit(event) {
             }
             
             const result = await response.json();
-            
+
+            if (result.prompt_history && result.prompt_history.prompt_session_id) {
+                localStorage.setItem('prompt_session_id', result.prompt_history.prompt_session_id);
+            }
+
             elementIterDelete('image_ids');
         }else{
             response = await fetch(`/user/content`, {

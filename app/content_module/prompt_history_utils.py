@@ -1,11 +1,244 @@
 from typing import Optional, Dict, Any, Tuple, List
 from content_module.content_responses import PromptHistoryResponse
 from service_utils.db_utils.pg_db import PostgresDB
+import re
 import uuid
 from rag_module.rag import RagModule
 from datetime import datetime, timezone
 from service_utils.aws_services import safe_upload_image_to_s3, upload_base64_image_to_s3
 import json
+
+from service_utils.log_management import get_logger
+from weaviate_module.weaviate_utils import (
+    chunk_text,
+    load_chunks_to_weaviate,
+    delete_chunks_from_weaviate,
+)
+
+logger = get_logger(__name__)
+
+
+def _extract_response_text(raw: Any) -> str:
+    """ai_response is stored as JSON like {"text": ..., "images": ...} or plain text."""
+    text = str(raw or "").strip()
+    if text.startswith("{"):
+        try:
+            text = (json.loads(text).get("text") or "").strip()
+        except (ValueError, TypeError):
+            pass
+    return text
+
+
+# Project titles appear in three shapes across generated content:
+# a standalone title line right above the year line ("POWERHOUSE TELEMARK"
+# then "2020 - BREEAM OUTSTANDING"), an explicit "PROJECT X" header, or a
+# numbered list item ("3. GreenSteel — ...").
+_TITLE_LINE_RE = re.compile(r"^[A-Z0-9][A-Za-z0-9+&'’. -]{2,60}$")
+_YEAR_LINE_RE = re.compile(r"^\s*(19|20)\d{2}\b")
+_PROJECT_HEADER_RE = re.compile(r"(?im)^PROJECT\s+([A-Z0-9][A-Za-z0-9+&'’. -]{2,60})\s*$")
+_NUMBERED_ITEM_RE = re.compile(
+    r"(?m)^\s*\d+\.\s*(?:Project\s+)?([A-Z][A-Za-z0-9+&'’. -]{2,60}?)\s*(?:[—–:-]|$)"
+)
+
+
+def _extract_project_names(text: str) -> List[str]:
+    """Project names mentioned in one generated response (deterministic, no AI)."""
+    if not text:
+        return []
+    names = []
+    lines = [ln.strip() for ln in text.splitlines()]
+    for i, line in enumerate(lines):
+        if not _TITLE_LINE_RE.match(line):
+            continue
+        if line.upper().startswith("PROJECT "):
+            continue  # the PROJECT-header regex captures these without the prefix
+        # the title line is the one directly above the year/status line
+        for nxt in lines[i + 1 : i + 3]:
+            if not nxt:
+                continue
+            if _YEAR_LINE_RE.match(nxt):
+                names.append(line)
+            break
+    names.extend(m.group(1) for m in _PROJECT_HEADER_RE.finditer(text))
+    names.extend(m.group(1) for m in _NUMBERED_ITEM_RE.finditer(text))
+    unique = []
+    seen = set()
+    for name in names:
+        cleaned = " ".join(name.split()).strip(".- ")
+        key = cleaned.casefold()
+        if cleaned and key not in seen:
+            seen.add(key)
+            unique.append(cleaned)
+    return unique
+
+
+def _get_seen_project_names(
+    db: PostgresDB, content_id: Optional[int], max_names: int = 60
+) -> Optional[List[str]]:
+    """
+    Project names from ALL earlier generations for this page (every session) —
+    passed to generation so new drafts surface fresh projects instead of
+    repeating ones the user has already seen.
+    """
+    if not content_id:
+        return None
+    try:
+        rows = db.read(
+            "prompt_history",
+            conditions={"content_id": content_id, "deleted_on": None},
+            columns=["ai_response"],
+            order_by=[("created_on", False)],
+            limit=40,
+        )
+        names = []
+        seen = set()
+        for row in rows or []:  # newest first, so recent names win the cap
+            text = _extract_response_text(row.get("ai_response"))
+            for name in _extract_project_names(text):
+                key = name.casefold()
+                if key not in seen:
+                    seen.add(key)
+                    names.append(name)
+            if len(names) >= max_names:
+                break
+        return names[:max_names] or None
+    except Exception as e:
+        logger.warning(f"Could not load seen projects for content {content_id}: {e}")
+        return None
+
+
+def _get_conversation_history(
+    db: PostgresDB, prompt_session_id: Optional[str], limit: int = 4
+):
+    """
+    Last few completed exchanges of this prompt session (oldest first) —
+    passed to generation so follow-ups like "add X to project 3" build on
+    the previous response instead of being refused as out of scope.
+    """
+    if not prompt_session_id:
+        return None
+    try:
+        rows = db.read(
+            "prompt_history",
+            conditions={"prompt_session_id": prompt_session_id, "deleted_on": None},
+            order_by=[("created_on", False)],
+            limit=limit * 2,  # some rows are placeholders without a response yet
+        )
+        # Refusal/error responses are not content — building a follow-up on
+        # top of them would carry the failure forward
+        skip_markers = (
+            "outside the scope of the provided context",
+            "i am sorry, but as a lot21 specialist",
+            "we're having trouble reaching the ai agent",
+            "unable to connect to the ai service",
+        )
+        turns = []
+        for row in rows or []:  # newest first
+            user_prompt = (row.get("user_prompt") or "").strip()
+            response_text = _extract_response_text(row.get("ai_response"))
+            if not user_prompt or not response_text:
+                continue
+            if any(m in response_text.lower() for m in skip_markers):
+                continue
+            turns.append(
+                {"prompt": user_prompt[:1000], "response": response_text[:4000]}
+            )
+            if len(turns) >= limit:
+                break
+        turns.reverse()  # oldest first for the model
+        return turns or None
+    except Exception as e:
+        logger.warning(
+            f"Could not load conversation history for session {prompt_session_id}: {e}"
+        )
+        return None
+
+
+def _get_page_sub_category(db: PostgresDB, content_id: Optional[int]) -> Optional[str]:
+    """The page's saved climate pillar (ADAPT/MITIGATE/RESTORE), if configured."""
+    if not content_id:
+        return None
+    try:
+        contents = db.read(
+            "content",
+            conditions={"id": content_id, "deleted_on": None},
+            columns=["page_id"],
+            limit=1,
+        )
+        page_id = contents[0].get("page_id") if contents else None
+        if not page_id:
+            return None
+        pages = db.read(
+            "pages",
+            conditions={"id": page_id, "deleted_on": None},
+            columns=["sub_category"],
+            limit=1,
+        )
+        return pages[0].get("sub_category") if pages else None
+    except Exception as e:
+        logger.warning(f"Could not read page sub_category for content {content_id}: {e}")
+        return None
+
+
+def _get_rejected_feedback(db: PostgresDB, content_id: Optional[int], limit: int = 3):
+    """
+    Recent rejected drafts for this content — passed to generation so the next
+    draft avoids what the user already turned down.
+    """
+    if not content_id:
+        return None
+    try:
+        rows = db.read(
+            "prompt_history",
+            conditions={
+                "content_id": content_id,
+                "prompt_action": "REJECTED",
+                "deleted_on": None,
+            },
+            order_by=[("updated_on", False)],
+            limit=limit,
+        )
+        items = []
+        for row in rows or []:
+            text = _extract_response_text(row.get("ai_response"))
+            if not text:
+                continue
+            items.append({
+                "text": text[:400],
+                "note": (row.get("prompt_description") or "").strip(),
+            })
+        return items or None
+    except Exception as e:
+        logger.warning(f"Could not load rejected feedback for content {content_id}: {e}")
+        return None
+
+
+def _sync_approval_training_data(record: Dict[str, Any]):
+    """
+    Approval is a training signal: approved responses are ingested into
+    Weaviate as high-quality training data; rejecting withdraws them.
+    """
+    action = record.get("prompt_action")
+    action = action.value if hasattr(action, "value") else action
+    doc_id = f"approved_prompt_{record['id']}"
+
+    if action == "APPROVED":
+        text = _extract_response_text(record.get("ai_response"))
+        if not text:
+            return
+        # re-approval replaces instead of duplicating
+        delete_chunks_from_weaviate("training_data", doc_id)
+        chunks = chunk_text(text)
+        load_chunks_to_weaviate(
+            chunks,
+            "training_data",
+            doc_id,
+            description="User-approved content",
+            source="approved_content",
+        )
+        logger.info(f"Approved response {record['id']} ingested as training data ({len(chunks)} chunks)")
+    elif action == "REJECTED":
+        delete_chunks_from_weaviate("training_data", doc_id)
 
 
 def add_attachments_to_prompt_history(db: PostgresDB, prompt_history_id: int, img: str):
@@ -77,17 +310,21 @@ def create_prompt_history_record(
             print(f"Adding attachment to prompt history ID {prompt_history['id']}")
             add_attachments_to_prompt_history(db, prompt_history["id"], img)
             
+    # Dedup: projects already generated for this page must not reappear as new
+    seen_items = _get_seen_project_names(db, content_id)
+
     # Retrieve context for the draft prompt (not used here but could be logged or processed)
     rag = RagModule()
     rag_result = rag.rag_entry_point(
-        query=prompt_data, 
-        user_id=user_id, 
+        query=prompt_data,
+        user_id=user_id,
         context_override=context_override,
         image_base_64=image_base_64,
         prompt_session_id=prompt_session_id,
         image_attachment_mode=image_attachment_mode,
         category_id=category_id,
-        context=context
+        context=context,
+        seen_items=seen_items
     )
     
     # Extract text response from the result dictionary
@@ -107,7 +344,9 @@ def create_prompt_history_record(
         "prompt_action": "DRAFT",
         "ai_response": json.dumps({
             "text": ai_response,
-            "images": images if len(images) > 0 else None
+            "images": images if len(images) > 0 else None,
+            "sources": rag_result.get("sources") or None if isinstance(rag_result, dict) else None,
+            "excluded_seen": rag_result.get("excluded_seen") or 0 if isinstance(rag_result, dict) else 0
         })
     }
 
@@ -173,17 +412,32 @@ def add_draft_to_prompt_history(
 
     context = context
 
-    # Retrieve context for the draft prompt (not used here but could be logged or processed)
+    # Rejected drafts for this content become an avoid signal for the new draft
+    rejected_feedback = _get_rejected_feedback(db, content_id)
+
+    # The page's configured climate pillar beats keyword guessing
+    sub_category = _get_page_sub_category(db, content_id)
+
+    # Multi-turn: prior exchanges of this session let follow-ups build on them
+    conversation_history = _get_conversation_history(db, prompt_session_id)
+
+    # Dedup: projects already generated for this page must not reappear as new
+    seen_items = _get_seen_project_names(db, content_id)
+
     rag = RagModule()
     rag_result = rag.rag_entry_point(
-        query=prompt_text, 
-        user_id=user_id, 
-        context_override=context_override, 
+        query=prompt_text,
+        user_id=user_id,
+        context_override=context_override,
         image_base_64=image_base_64,
         image_attachment_mode=image_attachment_mode,
         category_id=category_id,
-        context=context
-    ) 
+        context=context,
+        rejected_feedback=rejected_feedback,
+        sub_category=sub_category,
+        conversation_history=conversation_history,
+        seen_items=seen_items
+    )
 
     # Extract text response from the result dictionary
     ai_response = rag_result.get("text", "") if isinstance(rag_result, dict) else str(rag_result)
@@ -213,7 +467,9 @@ def add_draft_to_prompt_history(
             "prompt_action": "DRAFT",
             "ai_response": json.dumps({
                 "text": ai_response,
-                "images": images if len(images) > 0 else None
+                "images": images if len(images) > 0 else None,
+                "sources": rag_result.get("sources") or None if isinstance(rag_result, dict) else None,
+                "excluded_seen": rag_result.get("excluded_seen") or 0 if isinstance(rag_result, dict) else 0
             })
         }
         
@@ -235,7 +491,9 @@ def add_draft_to_prompt_history(
             "user_prompt": prompt_text,
             "ai_response": json.dumps({
                 "text": ai_response,
-                "images": images if len(images) > 0 else None
+                "images": images if len(images) > 0 else None,
+                "sources": rag_result.get("sources") or None if isinstance(rag_result, dict) else None,
+                "excluded_seen": rag_result.get("excluded_seen") or 0 if isinstance(rag_result, dict) else 0
             }),
             "prompt_type": "TEXT",
             "prompt_action": "DRAFT"  # Default to DRAFT for drafts
@@ -333,7 +591,96 @@ def update_prompt_action(
     if not updated_records or len(updated_records) == 0:
         raise Exception("Failed to update prompt history")
 
-    return dict(updated_records[0]._mapping)
+    record = dict(updated_records[0]._mapping)
+
+    # Training signal must never break the approve/reject action itself
+    try:
+        _sync_approval_training_data(record)
+    except Exception as e:
+        logger.warning(f"Training-signal sync failed (action saved regardless): {e}")
+
+    return record
+
+
+def get_content_version_history(content_id: int) -> List[Dict[str, Any]]:
+    """
+    Every saved version of a piece of content, newest first, across all
+    sessions. Versions with no usable response text (errors, empty) are
+    skipped. Feeds the Draft History panel.
+    """
+    if not content_id:
+        return []
+    db = PostgresDB()
+    rows = db.read(
+        "prompt_history",
+        conditions={"content_id": content_id, "deleted_on": None},
+        order_by=[("created_on", False)],
+    )
+    versions = []
+    for row in rows or []:
+        text = _extract_response_text(row.get("ai_response"))
+        if not text:
+            continue
+        action = row.get("prompt_action")
+        action = getattr(action, "value", action)  # unwrap enum if present
+        created = row.get("created_on")
+        versions.append({
+            "id": row.get("id"),
+            "created_on": created.isoformat() if hasattr(created, "isoformat") else created,
+            "user_prompt": row.get("user_prompt") or "",
+            "prompt_action": action,
+            "text": text,
+            "preview": text[:120],
+        })
+    return versions
+
+
+def restore_content_version(
+    content_id: int, version_id: int, user_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Non-destructive restore: copy the chosen version's response into a NEW
+    latest prompt_history row (prompt_action=RESTORE). The original versions
+    are left untouched, so nothing is ever lost.
+    """
+    db = PostgresDB()
+
+    rows = db.read(
+        "prompt_history",
+        conditions={"id": version_id, "content_id": content_id, "deleted_on": None},
+        limit=1,
+    )
+    if not rows:
+        raise ValueError(f"Version {version_id} not found for content {content_id}")
+    source = rows[0]
+
+    # Reuse the content's current session so the restored copy lands in the
+    # same thread; fall back to the source version's own session.
+    latest = db.read(
+        "prompt_history",
+        conditions={"content_id": content_id, "deleted_on": None},
+        columns=["prompt_session_id"],
+        order_by=[("created_on", False)],
+        limit=1,
+    )
+    session_id = (latest[0].get("prompt_session_id") if latest
+                  else source.get("prompt_session_id")) or str(uuid.uuid4())
+
+    src_created = source.get("created_on")
+    src_ts = src_created.strftime("%b %d, %Y %I:%M %p") if hasattr(src_created, "strftime") else str(src_created)
+
+    new_row = db.create("prompt_history", {
+        "prompt_session_id": session_id,
+        "content_id": content_id,
+        "user_prompt": f"Restored version from {src_ts}",
+        "ai_response": source.get("ai_response"),
+        "prompt_type": "TEXT",
+        "prompt_action": "RESTORE",
+    })
+    if not new_row:
+        raise Exception("Failed to create restored version")
+    logger.info(f"Restored version {version_id} as new row {new_row['id']} for content {content_id}")
+    return dict(new_row)
 
 
 def get_all_prompts(

@@ -9,6 +9,7 @@ class PageCreateRequest(BaseModel):
     """
     page_name: str = Field(..., min_length=1, max_length=255, description="Name of the page")
     category_id: Optional[int] = Field(default=None, description="ID of the category (nullable)")
+    sub_category: Optional[str] = Field(default=None, description="Climate pillar: ADAPT, MITIGATE or RESTORE (nullable)")
     description: Optional[str] = Field(default=None, description="Description of the page")
     is_active: bool = Field(default=True, description="Flag indicating if the page is active")
     content: Optional[str] = Field(default=None, description="Optional content for the page")
@@ -23,6 +24,7 @@ class PageResponse(BaseModel):
     id: int
     page_name: str
     category_id: Optional[int]
+    sub_category: Optional[str] = None
     description: Optional[str]
     created_by: Optional[int]
     is_active: bool

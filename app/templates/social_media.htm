@@ -1,0 +1,61 @@
+{% extends "base.htm" %}
+
+{% block title %}Social Media - Lottie{% endblock %}
+
+{% block nav_social %}active{% endblock %}
+
+{% block page_title %}Social Media Content Generator{% endblock %}
+{% block page_subtitle %}Create platform-ready social content and campaigns{% endblock %}
+
+{% block content %}
+<style>
+    .sm-header {
+        display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;
+    }
+    .sm-card{background:var(--bg-card);border:1px solid var(--border-color);padding:20px;border-radius:8px}
+    .sm-actions{display:flex;gap:8px}
+</style>
+
+<div class="sm-header">
+    <h3>Social Media</h3>
+    <div class="sm-actions">
+        <button class="search-new-btn">New Prompt</button>
+    </div>
+</div>
+
+<div class="sm-card">
+    <form method="post" action="/user/generate-social">
+        <div class="form-group">
+            <label>Headline / Topic</label>
+            <input name="headline" class="form-control" placeholder="Enter a short headline or topic" />
+        </div>
+        <div class="form-group">
+            <label>Context / Article (optional)</label>
+            <textarea name="context" class="form-control" rows="6" placeholder="Paste article or context to extract facts from"></textarea>
+        </div>
+        <div class="form-row" style="display:flex;gap:12px;margin-top:12px;">
+            <select name="platform" class="form-control" style="width:200px;">
+                <option value="x">X</option>
+                <option value="instagram">Instagram</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="facebook">Facebook</option>
+            </select>
+            <select name="tone" class="form-control" style="width:200px;">
+                <option value="informative">Informative</option>
+                <option value="optimistic">Optimistic</option>
+                <option value="urgent">Urgent</option>
+            </select>
+            <select name="length" class="form-control" style="width:200px;">
+                <option value="short">Short</option>
+                <option value="medium">Medium</option>
+                <option value="long">Long</option>
+            </select>
+        </div>
+
+        <div style="margin-top:12px;">
+            <button class="search-new-btn" type="submit">Generate</button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

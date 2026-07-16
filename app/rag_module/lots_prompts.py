@@ -1,4 +1,5 @@
 from rag_module.prompt_rules import LottiePrompts
+from rag_module.static_links import get_links_as_string
 
 def build_lots_prompt(
         query: str = None,
@@ -31,10 +32,10 @@ def build_lots_prompt(
 
 {LottiePrompts.PLAIN_TEXT_RULES}
 
-CRITICAL CONTEXT RULE (MANDATORY):
-You must answer using ONLY the information present in the CONTEXT section below.
-If the query cannot be answered directly from it, respond with EXACTLY:
-"This question is outside the scope of the provided context."
+CONTENT SOURCE RULE (MANDATORY):
+The CONTEXT section below is your sole source of facts.
+Extract all names, years, organizations, and details directly from it.
+Do NOT fabricate or invent any information not present in the context.
 
 TASK:
 Produce a concise summary of the LOTS entry constrained to the line limits provided.
@@ -58,10 +59,11 @@ CONTEXT:
 
 {LottiePrompts.PLAIN_TEXT_RULES}
 
-CRITICAL CONTEXT RULE (MANDATORY):
-You must answer using ONLY the information present in the CONTEXT section below.
-If the user question is NOT related to the CONTEXT, respond with EXACTLY:
-"This question is outside the scope of the provided context."
+CONTENT SOURCE RULE (MANDATORY):
+The KNOWLEDGE CONTEXT section below is your sole source of facts.
+Use it as the source material to generate the LOTS card.
+Extract all names, years, organizations, technologies, and details directly from it.
+Do NOT fabricate or invent any information not present in the context.
 
 You are an expert content author for Lottie, specializing in the "LOTS" category which features new initiatives and biotechnological innovations.
 
@@ -116,6 +118,9 @@ KNOWLEDGE CONTEXT:
 ==================================================
 {context_str}
 
+
+ADDITIONAL RESEARCH SOURCES (FALLBACK):
+{get_links_as_string(["lots", "policy"])}
 
 """
 # After the footer, add exactly:

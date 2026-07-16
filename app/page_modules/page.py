@@ -148,6 +148,7 @@ async def create_page(
             page_data_dict = create_page_record(
                 page_name=page_data.page_name,
                 category_id=page_data.category_id,
+                sub_category=page_data.sub_category,
                 created_by=user_id,
                 is_active=page_data.is_active,
                 content=page_data.content,
@@ -307,6 +308,7 @@ async def update_page_endpoint(
                 page_id=page_id,
                 page_name=page_data.page_name,
                 category_id=page_data.category_id,
+                sub_category=page_data.sub_category,
                 is_active=page_data.is_active,
                 content=page_data.content,
                 source_url=page_data.source_url,

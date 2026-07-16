@@ -1,10 +1,12 @@
 from rag_module.prompt_rules import LottiePrompts
+from rag_module.static_links import get_links_as_string
 
 def build_policy_prompt(
     query: str = None, 
     context_str: str = None, 
     scope: str = "National", 
-    sources: str = ""
+    sources: str = "",
+    line_rule: str = ""
 ) -> str:
     """
     Generates a context-bound prompt for the Policy category.
@@ -25,6 +27,8 @@ def build_policy_prompt(
     return f"""{LottiePrompts.GUARDRAIL_RULES}
 
 {LottiePrompts.PLAIN_TEXT_RULES}
+
+{line_rule}
 
 CRITICAL CONTEXT RULE (MANDATORY):
 You must answer using ONLY the information present in the INTERNAL RESEARCH section below.
@@ -81,6 +85,9 @@ SOURCES:
 INTERNAL RESEARCH CONTEXT:
 {context_str}
 
+
+ADDITIONAL RESEARCH SOURCES (FALLBACK):
+{get_links_as_string("policy")}
 
 """
 # After the content, add exactly:

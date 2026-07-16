@@ -1,196 +1,261 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Design by foolishdeveloper.com -->
-    <title>{% block title %}Lottie{% endblock %}</title>
- 
+    <title>Lottie</title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
-    <!--Stylesheet-->
-    <style media="screen">
-      *,
-*:before,
-*:after{
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
-}
-body{
-    background-color: #080710;
-}
-.background{
-    width: 430px;
-    height: 520px;
-    position: absolute;
-    transform: translate(-50%,-50%);
-    left: 50%;
-    top: 50%;
-}
-.background .shape{
-    height: 200px;
-    width: 200px;
-    position: absolute;
-    border-radius: 50%;
-}
-.shape:first-child{
-    background: linear-gradient(
-        #1845ad,
-        #23a2f6
-    );
-    left: -80px;
-    top: -80px;
-}
-.shape:last-child{
-    background: linear-gradient(
-        to right,
-        #ff512f,
-        #f09819
-    );
-    right: -30px;
-    bottom: -80px;
-}
-form{
-    height: 520px;
-    width: 400px;
-    background-color: rgba(255,255,255,0.13);
-    position: absolute;
-    transform: translate(-50%,-50%);
-    top: 50%;
-    left: 50%;
-    border-radius: 10px;
-    backdrop-filter: blur(10px);
-    border: 2px solid rgba(255,255,255,0.1);
-    box-shadow: 0 0 40px rgba(8,7,16,0.6);
-    padding: 50px 35px;
-}
-form *{
-    font-family: 'Poppins',sans-serif;
-    color: #ffffff;
-    letter-spacing: 0.5px;
-    outline: none;
-    border: none;
-}
-form h3{
-    font-size: 32px;
-    font-weight: 500;
-    line-height: 42px;
-    text-align: center;
-}
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *:before, *:after {
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
 
-label{
-    display: block;
-    margin-top: 30px;
-    font-size: 16px;
-    font-weight: 500;
-}
-input{
-    display: block;
-    height: 50px;
-    width: 100%;
-    background-color: rgba(255,255,255,0.07);
-    border-radius: 3px;
-    padding: 0 10px;
-    margin-top: 8px;
-    font-size: 14px;
-    font-weight: 300;
-}
-::placeholder{
-    color: #e5e5e5;
-}
-button{
-    margin-top: 50px;
-    width: 100%;
-    background-color: #ffffff;
-    color: #080710;
-    padding: 15px 0;
-    font-size: 18px;
-    font-weight: 600;
-    border-radius: 5px;
-    cursor: pointer;
-}
-.social{
-  margin-top: 30px;
-  display: flex;
-}
-.social div{
-  background: red;
-  width: 150px;
-  border-radius: 3px;
-  padding: 5px 10px 10px 5px;
-  background-color: rgba(255,255,255,0.27);
-  color: #eaf0fb;
-  text-align: center;
-}
-.social div:hover{
-  background-color: rgba(255,255,255,0.47);
-}
-.social .fb{
-  margin-left: 25px;
-}
-.social i{
-  margin-right: 4px;
-}
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #0d0f1a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
 
+        /* Background: keyboard + binary overlay effect using CSS */
+        .bg-overlay {
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(135deg, rgba(13,15,26,0.82) 0%, rgba(13,15,26,0.65) 100%),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 28px,
+                    rgba(0,217,181,0.03) 28px,
+                    rgba(0,217,181,0.03) 29px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 28px,
+                    rgba(0,217,181,0.03) 28px,
+                    rgba(0,217,181,0.03) 29px
+                );
+            background-color: #0d0f1a;
+            z-index: 0;
+        }
+
+        /* Decorative key shapes */
+        .bg-keys {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .key {
+            position: absolute;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3);
+        }
+
+        /* Binary text overlay */
+        .binary-text {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            font-family: monospace;
+            font-size: 11px;
+            line-height: 18px;
+            color: rgba(0, 217, 181, 0.07);
+            word-break: break-all;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        form {
+            position: relative;
+            z-index: 10;
+            width: 400px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(197, 224, 180, 0.15);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            padding: 50px 40px;
+        }
+
+        form * {
+            font-family: 'Montserrat', sans-serif;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+            outline: none;
+            border: none;
+        }
+
+        .form-logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #C5E0B4;
+            text-align: center;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        form h3 {
+            font-size: 16px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.5);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-top: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #D9D9D9;
+            margin-bottom: 6px;
+        }
+
+        input {
+            display: block;
+            height: 46px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 6px;
+            padding: 0 14px;
+            font-size: 14px;
+            font-weight: 300;
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: rgba(197,224,180,0.4) !important;
+            background: rgba(255,255,255,0.1);
+        }
+
+        ::placeholder {
+            color: rgba(255,255,255,0.3);
+        }
+
+        .error-box {
+            background: rgba(255,81,47,0.15);
+            color: #ff8a6e;
+            border: 1px solid rgba(255,81,47,0.3);
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        button[type="submit"] {
+            margin-top: 30px;
+            width: 100%;
+            background: transparent;
+            color: #C5E0B4;
+            padding: 13px 0;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid #C5E0B4 !important;
+            transition: all 0.25s;
+            letter-spacing: 0.5px;
+        }
+
+        button[type="submit"]:hover {
+            background: #C5E0B4;
+            color: #0d0f1a;
+        }
     </style>
 </head>
 <body>
-    <div class="background">
-        <div class="shape"></div>
-        <div class="shape"></div>
-    </div>
+
+    <!-- Background layers -->
+    <div class="bg-overlay"></div>
+    <div class="binary-text" id="binaryText"></div>
+    <div class="bg-keys" id="bgKeys"></div>
+
     <form id="loginForm">
-        <h3>Login Here</h3>
+        <div class="form-logo">Lottie</div>
+        <h3>AI Content Assistant</h3>
 
         {% if error %}
-        <div style="background-color: #ff000099; color:#ffffff; padding: 10px; border-radius: 5px; margin-bottom: 20px; margin-top: 20px; text-align: center;">
-            {{ error }}
-        </div>
+        <div class="error-box">{{ error }}</div>
         {% endif %}
 
         <label for="email">Email</label>
-        <input type="email" placeholder="Email or Phone" id="email" name="email" required>
+        <input type="email" placeholder="Enter your email" id="email" name="email" required>
 
         <label for="passwd">Password</label>
-        <input type="password" placeholder="Password" id="passwd" name="passwd" required>
+        <input type="password" placeholder="Enter your password" id="passwd" name="passwd" required>
 
         <button type="submit">Log In</button>
     </form>
 
     <script>
+        // Generate binary background text
+        (function() {
+            const el = document.getElementById('binaryText');
+            let text = '';
+            for (let i = 0; i < 3000; i++) {
+                text += Math.random() > 0.5 ? '1' : '0';
+                if (i % 80 === 79) text += '\n';
+                else text += ' ';
+            }
+            el.textContent = text;
+        })();
+
+        // Generate keyboard key shapes
+        (function() {
+            const container = document.getElementById('bgKeys');
+            const sizes = [60, 70, 80, 90, 100, 120];
+            for (let i = 0; i < 25; i++) {
+                const key = document.createElement('div');
+                key.className = 'key';
+                const size = sizes[Math.floor(Math.random() * sizes.length)];
+                const w = size + Math.random() * 20;
+                const h = size;
+                key.style.width = w + 'px';
+                key.style.height = h + 'px';
+                key.style.left = (Math.random() * 110 - 5) + '%';
+                key.style.top = (Math.random() * 110 - 5) + '%';
+                key.style.transform = `rotate(${(Math.random() - 0.5) * 10}deg)`;
+                container.appendChild(key);
+            }
+        })();
+
+        // Login form submit
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const email = document.getElementById('email').value;
             const passwd = document.getElementById('passwd').value;
-            
             try {
                 const response = await fetch('/auth/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, passwd })
                 });
-                
                 const data = await response.json();
-                
                 if (response.ok) {
-                    // Store JWT token in localStorage
                     localStorage.setItem('access_token', data.access_token);
-                    
-                    // Store session token in cookie if provided
                     if (data.session_token) {
-                        // Set cookie with 1 hour expiry
                         const expires = new Date();
                         expires.setHours(expires.getHours() + 1);
                         document.cookie = `session_token=${data.session_token}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
                     }
-                    
-                    // Redirect to dashboard HTML page
                     window.location.href = '/user/dashboard';
                 } else {
-                    // Redirect to login with error message
                     window.location.href = '/';
                 }
             } catch (error) {

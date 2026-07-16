@@ -9,10 +9,14 @@ from typing import Optional, Dict, Any, List
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import weaviate
-from weaviate.classes.config import Property, DataType
+from weaviate.classes.config import Property, DataType, Configure
 from weaviate.exceptions import WeaviateBaseError, WeaviateConnectionError
 
-from service_utils.db_utils.conf.weaviate_conf import WEAVIATE_URL
+from service_utils.db_utils.conf.weaviate_conf import (
+    WEAVIATE_URL,
+    WEAVIATE_OLLAMA_ENDPOINT,
+    WEAVIATE_EMBED_MODEL,
+)
 from service_utils.log_management import get_logger
 
 # Set up logging
@@ -195,14 +199,21 @@ class WeaviateDB:
                         )
                     )
             
-            # Configure for external vectors (no built-in vectorizer)
-            # Use named vectors with explicit configuration
+            # "text2vec-ollama" lets Weaviate embed objects and queries itself
+            # (required for hybrid search); anything else means no vectorizer
+            vector_config = None
+            if vectorizer == "text2vec-ollama":
+                vector_config = Configure.Vectors.text2vec_ollama(
+                    api_endpoint=WEAVIATE_OLLAMA_ENDPOINT,
+                    model=WEAVIATE_EMBED_MODEL,
+                    source_properties=["text"],
+                )
+
             collection = self.client.collections.create(
                 name=name,
                 description=description,
                 properties=property_list,
-                vectorizer_config=None,  # No vectorizer - using external embeddings
-                vector_index_config=None  # Use default vector index settings
+                vector_config=vector_config,
             )
             
             logger.info(f"Collection '{name}' created successfully")

@@ -4,6 +4,14 @@
 
 {% block nav_page_settings %}active{% endblock %}
 
+{% block generate_footer %}
+<div class="generate-footer-bar">
+    <a href="/user/content">Lot21 AI</a>
+    <a href="/user/freeform/">Free Form AI</a>
+    <a href="/user/page-settings" class="active">Page Settings</a>
+</div>
+{% endblock %}
+
 {% block page_title %}Page Settings{% endblock %}
 {% block page_subtitle %}Manage and monitor your pages{% endblock %}
 
@@ -25,6 +33,24 @@
 
 {% block extra_styles %}
 <style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes dotPulse {
+        0% { content: ''; }
+        25% { content: '.'; }
+        50% { content: '..'; }
+        75% { content: '...'; }
+        100% { content: ''; }
+    }
+
+    .loading-dots::after {
+        content: '';
+        animation: dotPulse 1.5s infinite;
+    }
+
     .main-layout {
         display: grid;
         grid-template-columns: 2fr 1fr;
@@ -811,9 +837,11 @@
     <!-- Offcanvas Body -->
     <div class="offcanvas-body">
         <!-- Processing Loader -->
-        <div id="addPageLoader" style="display: none; text-align: center; padding: 40px 20px;">
-            <div style="display: inline-block; width: 80px; height: 80px; border: 8px solid #f3f3f3; border-top: 8px solid #ff512f; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <p style="margin-top: 20px; color: var(--text-secondary); font-size: 14px;">Processing your request...</p>
+        <div id="addPageLoader" style="display: none; text-align: center; padding: 25px 20px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 14px;">
+                <div style="width: 28px; height: 28px; border: 3px solid var(--border-color); border-top: 3px solid var(--accent-teal); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <span id="addPageLoaderText" style="color: var(--text-secondary); font-size: 14px;">Scraping data<span class="loading-dots"></span></span>
+            </div>
         </div>
         
         <!-- Alert Messages -->
@@ -860,7 +888,18 @@
                 </select>
                 <!-- Debug: Total categories: {{ categories|length if categories else 0 }} -->
             </div>
-            
+
+            <!-- Climate Pillar (sub-category) -->
+            <div class="form-group">
+                <label class="form-label" for="subCategory">Climate Pillar</label>
+                <select class="form-input" id="subCategory" style="padding-right: 35px;">
+                    <option value="">Auto-detect</option>
+                    <option value="ADAPT">Adapt</option>
+                    <option value="MITIGATE">Mitigate</option>
+                    <option value="RESTORE">Restore</option>
+                </select>
+            </div>
+
             <!-- Description -->
             <div class="form-group">
                 <label class="form-label">Description</label>
@@ -903,9 +942,11 @@
     <!-- Offcanvas Body -->
     <div class="offcanvas-body">
         <!-- Processing Loader -->
-        <div id="editPageLoader" style="display: none; text-align: center; padding: 40px 20px;">
-            <div style="display: inline-block; width: 80px; height: 80px; border: 8px solid #f3f3f3; border-top: 8px solid #ff512f; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <p style="margin-top: 20px; color: var(--text-secondary); font-size: 14px;">Processing your request...</p>
+        <div id="editPageLoader" style="display: none; text-align: center; padding: 25px 20px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 14px;">
+                <div style="width: 28px; height: 28px; border: 3px solid var(--border-color); border-top: 3px solid var(--accent-teal); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <span id="editPageLoaderText" style="color: var(--text-secondary); font-size: 14px;">Scraping data<span class="loading-dots"></span></span>
+            </div>
         </div>
         
         <!-- Alert Messages -->
@@ -962,7 +1003,18 @@
                     {% endif %}
                 </select>
             </div>
-            
+
+            <!-- Climate Pillar (sub-category) -->
+            <div class="form-group">
+                <label class="form-label" for="editSubCategory">Climate Pillar</label>
+                <select class="form-input" id="editSubCategory" style="padding-right: 35px;">
+                    <option value="">Auto-detect</option>
+                    <option value="ADAPT">Adapt</option>
+                    <option value="MITIGATE">Mitigate</option>
+                    <option value="RESTORE">Restore</option>
+                </select>
+            </div>
+
             <!-- Description -->
             <div class="form-group">
                 <label class="form-label">Description</label>
@@ -1185,36 +1237,28 @@
     function clearFilters() {
         filters = {
             category: 'all',
-            status: ['active', 'inactive'],
-            content: ['with-content', 'without-content']
+            status: [],
+            content: []
         };
-        
-        // Reset checkboxes and radios
+
         // Reset category select if present
         const select = document.getElementById('categorySelect');
         if (select) select.value = 'all';
         document.querySelectorAll('input[name="category"]').forEach(radio => {
             radio.checked = radio.value === 'all';
         });
-        
-        document.getElementById('filter-active').checked = true;
-        document.getElementById('filter-inactive').checked = true;
-        document.getElementById('filter-with-content').checked = true;
-        document.getElementById('filter-without-content').checked = true;
 
-        // Show all rows
-        document.querySelectorAll('.page-row').forEach(row => {
-            row.style.display = '';
-        });
-
-        // Remove no results message
-        const noResultsRow = document.querySelector('.no-results-row');
-        if (noResultsRow) {
-            noResultsRow.remove();
-        }
+        // Uncheck all filter checkboxes
+        document.getElementById('filter-active').checked = false;
+        document.getElementById('filter-inactive').checked = false;
+        document.getElementById('filter-with-content').checked = false;
+        document.getElementById('filter-without-content').checked = false;
 
         // Update visual styles
         updateFilterOptionStyles();
+
+        // Apply filters (all rows will be hidden since no status/content is selected)
+        applyFilters();
     }
     
     
@@ -1262,17 +1306,19 @@
         const requestData = {
             page_name: pageName,
             category_id: categoryId && categoryId !== '0' ? parseInt(categoryId) : null,
+            sub_category: document.getElementById('subCategory').value || null,
             description: description || null,
             is_active: isActive,
             content: pageContent || null,
             source_url: sourceUrl || null,
             scrape_data: scrapeData
         };
-        
+
         // Show loader, hide form and alerts
         document.getElementById('addPageForm').style.display = 'none';
         document.getElementById('addPageSuccessAlert').style.display = 'none';
         document.getElementById('addPageErrorAlert').style.display = 'none';
+        document.getElementById('addPageLoaderText').innerHTML = scrapeData ? 'Scraping data<span class="loading-dots"></span>' : 'Creating page<span class="loading-dots"></span>';
         document.getElementById('addPageLoader').style.display = 'block';
         
         try {
@@ -1404,6 +1450,7 @@
             document.getElementById('editSourceUrl').value = page.source_url || '';
             document.getElementById('editIsActive').checked = page.is_active || false;
             document.getElementById('editCategoryId').value = page.category_id || '0';
+            document.getElementById('editSubCategory').value = page.sub_category || '';
             document.getElementById('editPageDescription').value = page.description || '';
             
             // Show scraped data badge if page was scraped
@@ -1481,17 +1528,19 @@
         const requestData = {
             page_name: pageName,
             category_id: categoryId && categoryId !== '0' ? parseInt(categoryId) : null,
+            sub_category: document.getElementById('editSubCategory').value,
             description: description || null,
             is_active: isActive,
             content: pageContent || null,
             source_url: sourceUrl || null,
             scrape_data: scrapeData
         };
-        
+
         // Show loader, hide form and alerts
         document.getElementById('editPageForm').style.display = 'none';
         document.getElementById('editPageSuccessAlert').style.display = 'none';
         document.getElementById('editPageErrorAlert').style.display = 'none';
+        document.getElementById('editPageLoaderText').innerHTML = scrapeData ? 'Scraping data<span class="loading-dots"></span>' : 'Updating page<span class="loading-dots"></span>';
         document.getElementById('editPageLoader').style.display = 'block';
         
         try {

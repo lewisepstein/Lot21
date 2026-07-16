@@ -8,9 +8,11 @@ from content_module.content_responses import PromptHistoryResponse
 from auth_module.auth_utils import verify_token
 from service_utils.log_management import get_logger
 from content_module.prompt_history_utils import (
-    get_prompt_histories, 
+    get_prompt_histories,
     update_prompt_action,
-    get_all_prompts
+    get_all_prompts,
+    get_content_version_history,
+    restore_content_version
 )
 
 from content_module.content_responses import (
@@ -72,6 +74,61 @@ async def get_prompt_history(
         logger.error(f"Error retrieving prompt history: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Unable to retrieve prompt history at this time")
     
+
+@router.get("/content/{content_id}/history")
+async def get_content_history(
+    content_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Draft History: every saved version of a content, newest first."""
+    try:
+        success, status_code, _, _ = verify_token(credentials.credentials)
+        if not success:
+            logger.warning("Invalid token attempt in get_content_history")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+
+        versions = get_content_version_history(content_id)
+        logger.info(f"Draft history: {len(versions)} versions for content {content_id}")
+        return {"content_id": content_id, "versions": versions}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving content history: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to retrieve draft history at this time")
+
+
+@router.post("/content/{content_id}/restore/{version_id}")
+async def restore_content_history_version(
+    content_id: int,
+    version_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Draft History: restore an old version as the new latest (non-destructive)."""
+    try:
+        success, status_code, _, payload = verify_token(credentials.credentials)
+        if not success:
+            logger.warning("Invalid token attempt in restore_content_history_version")
+            raise HTTPException(status_code=status_code, detail="Authentication failed")
+
+        new_version = restore_content_version(
+            content_id=content_id,
+            version_id=version_id,
+            user_id=payload.get("user_id")
+        )
+        return {
+            "message": "Version restored",
+            "restored_from": version_id,
+            "new_version_id": new_version["id"],
+            "prompt_session_id": new_version["prompt_session_id"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring content version: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to restore this version at this time")
+
 
 @router.post("/prompt_history/set_action", response_model=AddDraftContentResponse)
 async def set_action_prompt_history(

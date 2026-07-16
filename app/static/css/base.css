@@ -488,7 +488,7 @@
         }
         
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-primary);
             overflow-x: hidden;
@@ -528,7 +528,7 @@
         .sidebar-brand h2 {
             font-size: 20px;
             font-weight: 600;
-            color: var(--accent-teal);
+            color: #C5E0B4;
             margin: 0;
         }
         
@@ -548,34 +548,30 @@
         
         .menu-section-title {
             font-size: 11px;
-            font-weight: 600;
-            color: var(--text-secondary);
+            font-weight: 700;
+            color: #C5E0B4;
             text-transform: uppercase;
             padding: 0 25px;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
+            margin-bottom: 8px;
+            letter-spacing: 1.5px;
         }
         
         .menu-item {
             display: flex;
             align-items: center;
-            padding: 12px 25px;
-            color: var(--text-secondary);
+            padding: 10px 25px;
+            color: #D9D9D9;
             text-decoration: none;
             transition: all 0.3s;
             cursor: pointer;
+            font-size: 14px;
         }
-        
+
         .menu-item:hover,
         .menu-item.active {
-            background-color: rgba(0, 217, 181, 0.1);
-            color: var(--accent-teal);
-            border-left: 3px solid var(--accent-teal);
-        }
-        
-        .menu-item i {
-            margin-right: 12px;
-            font-size: 18px;
+            background-color: rgba(197, 224, 180, 0.1);
+            color: #C5E0B4;
+            border-left: 3px solid #C5E0B4;
         }
         
         .main-content {
@@ -610,18 +606,20 @@
         
         .logout-btn {
             padding: 10px 20px;
-            background-color: rgba(255, 81, 47, 0.2);
-            color: #ff512f;
-            border: 1px solid #ff512f;
+            background-color: transparent !important;
+            color: #C5E0B4 !important;
+            border: 1px solid #C5E0B4 !important;
             border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
             transition: all 0.3s;
+            font-family: 'Montserrat', sans-serif;
+            box-shadow: none !important;
         }
-        
+
         .logout-btn:hover {
-            background-color: #ff512f;
-            color: white;
+            background-color: #C5E0B4 !important;
+            color: #1a1d2e !important;
         }
         
         .content-wrapper {
@@ -650,6 +648,42 @@
             -ms-overflow-style: none;
         }
         
+        /* ── Generate Section Footer Bar ─────────────────────────── */
+        .generate-footer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .generate-footer-bar a {
+            flex: 1;
+            text-align: center;
+            padding: 14px 20px;
+            color: #D9D9D9;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            font-family: 'Montserrat', sans-serif;
+            transition: all 0.2s;
+            border-right: 1px solid var(--border-color);
+            letter-spacing: 0.3px;
+        }
+
+        .generate-footer-bar a:last-child {
+            border-right: none;
+        }
+
+        .generate-footer-bar a:hover,
+        .generate-footer-bar a.active {
+            background: rgba(197, 224, 180, 0.1);
+            color: #C5E0B4;
+        }
+
         /* Common card styles */
         .stats-grid {
             display: grid;

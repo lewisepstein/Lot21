@@ -7,6 +7,14 @@
 
 {% block nav_free_form %}active{% endblock %}
 
+{% block generate_footer %}
+<div class="generate-footer-bar">
+    <a href="/user/content">Lot21 AI</a>
+    <a href="/user/freeform/" class="active">Free Form AI</a>
+    <a href="/user/page-settings">Page Settings</a>
+</div>
+{% endblock %}
+
 {% block extra_styles %}
 /* Free Form Chat Styles */
 * {
@@ -317,6 +325,30 @@
     margin-top: 6px;
 }
 
+.message-downloads {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.btn-msg-download {
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-size: 15px;
+    border-radius: 4px;
+}
+
+.btn-msg-download:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-msg-download:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 .message-image {
     margin-top: 12px;
     max-width: 100%;
@@ -340,24 +372,65 @@
 .generating-loader {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 16px;
     color: var(--text-secondary);
     font-size: 14px;
 }
 
 .generating-loader.image-loading {
-    flex-direction: column;
-    padding: 40px;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
 }
 
-.loader-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid var(--bg-secondary);
-    border-top: 4px solid var(--accent-primary);
+.image-loader-icon {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-loader-icon i {
+    font-size: 20px;
+    color: var(--accent-teal);
+    animation: pulse-icon 1.5s ease-in-out infinite;
+    z-index: 1;
+}
+
+.image-loader-icon::before {
+    content: '';
+    position: absolute;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--accent-teal);
+    border-right-color: var(--accent-green);
     animation: spin 1s linear infinite;
+}
+
+.image-loader-text {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.image-loader-text span {
+    display: inline-block;
+    animation: loading-fade 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { opacity: 0.6; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes loading-fade {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
 }
 
 .loader-dots {
@@ -368,7 +441,7 @@
 .loader-dots span {
     width: 8px;
     height: 8px;
-    background: var(--accent-primary);
+    background: var(--accent-teal);
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -828,7 +901,7 @@
         <div class="sidebar-header">
             <h3><i class="bi bi-folder"></i> Projects</h3>
             <button class="new-project-btn" onclick="openNewProjectModal()">
-                <i class="bi bi-plus-circle"></i> New Project
+                <i class="bi bi-plus-circle"></i> Add Project
             </button>
         </div>
         <div class="projects-list" id="projectsList">
@@ -856,7 +929,7 @@
                 type="file"
                 id="fileInput"
                 multiple
-                accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.xlsx,.xls"
+                accept="image/*,.pdf,.txt,.doc,.docx,.csv,.json,.xlsx,.xls,.pptx,.ppt"
                 style="display: none;"
                 onchange="handleFileSelect(event)"
             >
@@ -926,6 +999,11 @@ let currentProjectId = null;
 let projects = [];
 let selectedFiles = [];
 let currentAbortController = null;
+let currentTypingIntervalId = null;
+let currentTypingElement = null;
+let currentTypingFullText = null;
+let currentTypingResolve = null;
+let isTypingAnimationActive = false;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -1089,6 +1167,61 @@ async function loadChatHistory(projectId) {
 }
 
 // Render messages
+function downloadButtonsHtml(messageId) {
+    if (!messageId) return '';
+    return `
+        <div class="message-downloads">
+            <button class="btn-msg-download" onclick="downloadFreeformMessage(${messageId}, 'docx', this)" title="Download as Word"><i class="bi bi-file-earmark-word" style="color:#4a9eda"></i></button>
+            <button class="btn-msg-download" onclick="downloadFreeformMessage(${messageId}, 'pdf', this)" title="Download as PDF"><i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i></button>
+            <button class="btn-msg-download" onclick="downloadFreeformMessage(${messageId}, 'png', this)" title="Download as PNG"><i class="bi bi-filetype-png" style="color:#4adaba"></i></button>
+            <button class="btn-msg-download" onclick="downloadFreeformMessage(${messageId}, 'jpg', this)" title="Download as JPG"><i class="bi bi-filetype-jpg" style="color:#c58bff"></i></button>
+        </div>`;
+}
+
+async function downloadFreeformMessage(messageId, fileFormat, btn) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.replace('/?error=' + encodeURIComponent('Please login first'));
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch(`/user/download/freeform/${messageId}?file_format=${fileFormat}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            if (handleTokenExpiration(response)) return;
+            let message = 'Download failed';
+            try {
+                const err = await response.json();
+                if (err && err.detail) message = err.detail;
+            } catch (e) { /* non-JSON error body */ }
+            alert(message);
+            return;
+        }
+
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        const filename = match ? match[1] : `lottie_message_${messageId}.${fileFormat}`;
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Download failed. Please try again.');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 function renderMessages(messages) {
     console.log('=== renderMessages called ===');
     console.log('Number of messages:', messages.length);
@@ -1120,7 +1253,7 @@ function renderMessages(messages) {
 
         // Only show content div if there's actual text content
         const contentHtml = hasText
-            ? `<div class="message-content">${formatTextContent(msg.content)}</div>`
+            ? `<div class="message-content" id="content-${msgId}">${formatTextContent(msg.content)}</div>`
             : '';
 
         messageDiv.innerHTML = `
@@ -1131,6 +1264,7 @@ function renderMessages(messages) {
                 ${contentHtml}
                 ${hasImage ? `<div class="message-image" id="img-${msgId}"></div>` : ''}
                 <div class="message-time">${formatDate(msg.created_on)}</div>
+                ${msg.role === 'ASSISTANT' && hasText ? downloadButtonsHtml(msg.id) : ''}
             </div>
         `;
 
@@ -1194,6 +1328,12 @@ function typeText(element, text, speed = 15) {
             const textStr = String(text);
             element.innerHTML = '';
 
+            // Store typing state globally so stop button can cancel it
+            currentTypingElement = element;
+            currentTypingFullText = textStr;
+            currentTypingResolve = resolve;
+            isTypingAnimationActive = true;
+
             // Add cursor
             const cursor = document.createElement('span');
             cursor.className = 'typing-cursor';
@@ -1218,11 +1358,17 @@ function typeText(element, text, speed = 15) {
                             cursor.remove();
                         }
                         clearInterval(interval);
+                        currentTypingIntervalId = null;
+                        currentTypingResolve = null;
+                        isTypingAnimationActive = false;
                         resolve();
                     }
                 } catch (err) {
                     console.error('Error in typing interval:', err);
                     clearInterval(interval);
+                    currentTypingIntervalId = null;
+                    currentTypingResolve = null;
+                    isTypingAnimationActive = false;
                     if (cursor && cursor.parentNode) {
                         cursor.remove();
                     }
@@ -1231,8 +1377,13 @@ function typeText(element, text, speed = 15) {
                     resolve();
                 }
             }, speed);
+
+            // Store interval ID globally so it can be cleared by stop button
+            currentTypingIntervalId = interval;
+
         } catch (error) {
             console.error('Error setting up typing effect:', error);
+            isTypingAnimationActive = false;
             // Fallback: just show the text
             if (element) {
                 element.textContent = text;
@@ -1243,7 +1394,7 @@ function typeText(element, text, speed = 15) {
 }
 
 // Add loading message to chat
-function addLoadingMessage(isImageRequest = false) {
+function addLoadingMessage(loaderType = 'text') {
     const chatMessages = document.getElementById('chatMessages');
     const emptyState = document.getElementById('emptyState');
 
@@ -1255,15 +1406,43 @@ function addLoadingMessage(isImageRequest = false) {
     loadingDiv.className = 'message assistant';
     loadingDiv.id = 'loading-message';
 
-    if (isImageRequest) {
+    if (loaderType === 'image_generate') {
         loadingDiv.innerHTML = `
             <div class="message-avatar">
                 <i class="bi bi-robot"></i>
             </div>
             <div style="flex: 1;">
                 <div class="generating-loader image-loading">
-                    <div class="loader-spinner"></div>
-                    <div>Generating your image...</div>
+                    <div class="image-loader-icon"><i class="bi bi-image"></i></div>
+                    <div class="image-loader-text"><span>Generating your image...</span></div>
+                </div>
+            </div>
+        `;
+    } else if (loaderType === 'image_edit') {
+        loadingDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="bi bi-robot"></i>
+            </div>
+            <div style="flex: 1;">
+                <div class="generating-loader image-loading">
+                    <div class="image-loader-icon"><i class="bi bi-pencil-square"></i></div>
+                    <div class="image-loader-text"><span>Editing your image...</span></div>
+                </div>
+            </div>
+        `;
+    } else if (loaderType === 'document') {
+        loadingDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="bi bi-robot"></i>
+            </div>
+            <div style="flex: 1;">
+                <div class="generating-loader">
+                    <div class="loader-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span>Analyzing document...</span>
                 </div>
             </div>
         `;
@@ -1313,11 +1492,40 @@ function isImageRequest(message) {
         'design an image', 'design a picture', 'design a visual',
         'i want an image', 'i want a picture', 'i want a photo',
         'i need an image', 'i need a picture', 'i need a photo',
-        'can you generate an image', 'can you create an image', 'can you make an image'
+        'can you generate an image', 'can you create an image', 'can you make an image',
+        'generate a diagram', 'create a diagram', 'make a diagram', 'draw a diagram',
+        'generate diagram', 'create diagram', 'make diagram', 'draw diagram',
+        'new diagram', 'create one new', 'generate one new',
+        'create a new diagram', 'generate a new diagram',
+        'high-resolution diagram', 'high resolution diagram',
+        'design a diagram', 'produce a diagram', 'build a diagram'
     ];
 
     const msgLower = message.toLowerCase().trim();
     return imageTriggers.some(trigger => msgLower.includes(trigger));
+}
+
+// Check if message is requesting image editing/modification
+function isImageEditRequest(message) {
+    const editTriggers = [
+        'refine', 'edit this image', 'edit the image', 'modify',
+        'change background', 'change the background', 'change color', 'change the color',
+        'remove background', 'remove the background',
+        'make it brighter', 'make it darker', 'make it sharper',
+        'enhance', 'improve this image', 'improve the image',
+        'brighten', 'darken', 'sharpen', 'blur',
+        'add filter', 'apply filter', 'crop this', 'resize this',
+        'change this image', 'change the image',
+        'fix this image', 'fix the image',
+        'make the background', 'set the background',
+        'make it black and white', 'make it grayscale',
+        'add border', 'add frame', 'blur the background',
+        'change style', 'change the style',
+        'regenerate this', 'redo this image'
+    ];
+
+    const msgLower = message.toLowerCase().trim();
+    return editTriggers.some(trigger => msgLower.includes(trigger));
 }
 
 // Add message to chat with optional typing effect
@@ -1355,6 +1563,7 @@ async function addMessageToChat(msg, withTypingEffect = false) {
                 ${hasText ? `<div class="message-content" id="${uniqueId}"></div>` : ''}
                 ${hasImage ? `<div class="message-image" id="img-${uniqueId}"></div>` : ''}
                 <div class="message-time">${formatDate(msg.created_on)}</div>
+                ${msg.role === 'ASSISTANT' && hasText ? downloadButtonsHtml(msg.id) : ''}
             </div>
         `;
 
@@ -1460,12 +1669,53 @@ function hideStopButton() {
     sendBtn.style.display = 'flex';
 }
 
-// Stop generation
+// Stop generation - handles both fetch abort and typing animation stop
 function stopGeneration() {
+    // Abort the fetch request if still waiting for response
     if (currentAbortController) {
         currentAbortController.abort();
         currentAbortController = null;
     }
+
+    // Stop typing animation if it's running
+    if (currentTypingIntervalId) {
+        clearInterval(currentTypingIntervalId);
+        currentTypingIntervalId = null;
+    }
+
+    if (isTypingAnimationActive && currentTypingElement && currentTypingFullText) {
+        // Remove the blinking cursor
+        const cursor = currentTypingElement.querySelector('.typing-cursor');
+        if (cursor) {
+            cursor.remove();
+        }
+        // Show the full formatted text immediately (what was typed so far + rest)
+        currentTypingElement.innerHTML = formatTextContent(currentTypingFullText);
+        console.log('Typing animation stopped - showing full text');
+    }
+
+    // Resolve the typing promise so the await chain in sendMessage completes
+    const typingResolve = currentTypingResolve;
+
+    // Reset typing state
+    isTypingAnimationActive = false;
+    currentTypingElement = null;
+    currentTypingFullText = null;
+    currentTypingResolve = null;
+
+    if (typingResolve) {
+        typingResolve();
+    }
+
+    // Re-enable input and hide stop button
+    hideStopButton();
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const attachBtn = document.getElementById('attachBtn');
+    if (chatInput) chatInput.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (attachBtn) attachBtn.disabled = false;
+    if (chatInput) chatInput.focus();
 }
 
 // Send message
@@ -1490,13 +1740,30 @@ async function sendMessage() {
     currentAbortController = new AbortController();
 
     // Determine loader type
-    const hasImageRequest = isImageRequest(message) || selectedFiles.some(f => f.type.startsWith('image/'));
-    const loadingMsg = addLoadingMessage(hasImageRequest);
+    const hasImageFiles = selectedFiles.some(f => f.type.startsWith('image/'));
+    const hasDocFiles = selectedFiles.some(f => !f.type.startsWith('image/'));
+    let loaderType = 'text';
+    if (hasImageFiles && isImageEditRequest(message)) {
+        loaderType = 'image_edit';
+    } else if (isImageRequest(message)) {
+        loaderType = 'image_generate';
+    } else if (hasDocFiles) {
+        loaderType = 'document';
+    }
+    const loadingMsg = addLoadingMessage(loaderType);
 
     // Clear input immediately
     const originalMessage = message;
     chatInput.value = '';
     chatInput.style.height = 'auto';
+
+    // Show user message immediately in chat (before API call)
+    await addMessageToChat({
+        role: 'USER',
+        content: originalMessage,
+        content_type: 'TEXT',
+        created_on: new Date().toISOString()
+    }, false);
 
     try {
         // Convert files to base64
@@ -1528,7 +1795,30 @@ async function sendMessage() {
 
         if (!response.ok) {
             loadingMsg.remove();
-            handleTokenExpiration(response);
+            if (!handleTokenExpiration(response)) {
+                const chatMessages = document.getElementById('chatMessages');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message assistant';
+                let errorMsg = `Something went wrong (error ${response.status}). Please try again.`;
+                if (response.status === 413) {
+                    errorMsg = 'The attached file is too large for the server to process. Please ask your administrator to increase the server upload limit, or try a smaller file.';
+                } else if (response.status === 500) {
+                    errorMsg = 'The server encountered an error processing your request. This can happen with complex image generation or large attachments. Please try again.';
+                }
+                errorDiv.innerHTML = `
+                    <div class="message-avatar">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="message-content" style="color: #ff512f; border: 1px solid rgba(255,81,47,0.3); background: rgba(255,81,47,0.1);">
+                            ${errorMsg}
+                        </div>
+                        <div class="message-time">Just now</div>
+                    </div>
+                `;
+                chatMessages.appendChild(errorDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
             return;
         }
 
@@ -1540,14 +1830,6 @@ async function sendMessage() {
 
         // Remove loading message
         loadingMsg.remove();
-
-        // Add user message immediately
-        try {
-            const userMsg = data.user_message;
-            await addMessageToChat(userMsg, false);
-        } catch (err) {
-            console.error('Error adding user message:', err);
-        }
 
         // Add AI response with typing effect
         try {
@@ -1569,20 +1851,35 @@ async function sendMessage() {
             const loadingElem = document.getElementById('loading-message');
             if (loadingElem) loadingElem.remove();
 
-            // Try to reload chat history as fallback
-            try {
-                await loadChatHistory(currentProjectId);
-            } catch (e) {
-                alert('Failed to send message. Please try again.');
-            }
+            // Show inline error without wiping the chat messages
+            const chatMessages = document.getElementById('chatMessages');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'message assistant';
+            errorDiv.innerHTML = `
+                <div class="message-avatar">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div class="message-content" style="color: #ff512f; border: 1px solid rgba(255,81,47,0.3); background: rgba(255,81,47,0.1);">
+                        Something went wrong sending your message. Please try again.
+                    </div>
+                    <div class="message-time">Just now</div>
+                </div>
+            `;
+            chatMessages.appendChild(errorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     } finally {
         currentAbortController = null;
-        hideStopButton();
-        chatInput.disabled = false;
-        sendBtn.disabled = false;
-        attachBtn.disabled = false;
-        chatInput.focus();
+        // Only clean up UI if typing animation isn't active
+        // (if typing is active, stop button should remain visible for user to stop it)
+        if (!isTypingAnimationActive) {
+            hideStopButton();
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+            attachBtn.disabled = false;
+            chatInput.focus();
+        }
     }
 }
 
@@ -1758,13 +2055,25 @@ function formatTextContent(text) {
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-    // Convert bullet points
-    formatted = formatted.replace(/^\* (.+)$/gm, '<li style="margin-left: 20px;">$1</li>');
-    formatted = formatted.replace(/^- (.+)$/gm, '<li style="margin-left: 20px;">$1</li>');
+    // Convert numbered list items (1. item, 2. item, etc.)
+    formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<oli style="margin-left: 20px;">$1</oli>');
 
-    // Wrap consecutive list items in ul tags
-    formatted = formatted.replace(/(<li[^>]*>.*<\/li>\n?)+/g, function(match) {
-        return '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">' + match + '</ul>';
+    // Convert bullet points
+    formatted = formatted.replace(/^\* (.+)$/gm, '<uli style="margin-left: 20px;">$1</uli>');
+    formatted = formatted.replace(/^- (.+)$/gm, '<uli style="margin-left: 20px;">$1</uli>');
+
+    // Wrap consecutive numbered list items in ol tags
+    formatted = formatted.replace(/(<oli[^>]*>.*<\/oli>\n?)+/g, function(match) {
+        // Convert <oli> to <li> inside the wrapper
+        var items = match.replace(/<oli/g, '<li').replace(/<\/oli>/g, '</li>');
+        return '<ol style="margin: 8px 0; padding-left: 20px;">' + items + '</ol>';
+    });
+
+    // Wrap consecutive bullet list items in ul tags
+    formatted = formatted.replace(/(<uli[^>]*>.*<\/uli>\n?)+/g, function(match) {
+        // Convert <uli> to <li> inside the wrapper
+        var items = match.replace(/<uli/g, '<li').replace(/<\/uli>/g, '</li>');
+        return '<ul style="margin: 8px 0; padding-left: 20px; list-style-type: disc;">' + items + '</ul>';
     });
 
     // Convert line breaks to <br> tags
@@ -1775,6 +2084,8 @@ function formatTextContent(text) {
     formatted = formatted.replace(/<\/h[123]><br>/g, '</h$1>');
     formatted = formatted.replace(/<br><ul/g, '<ul');
     formatted = formatted.replace(/<\/ul><br>/g, '</ul>');
+    formatted = formatted.replace(/<br><ol/g, '<ol');
+    formatted = formatted.replace(/<\/ol><br>/g, '</ol>');
 
     return formatted;
 }
@@ -1860,6 +2171,8 @@ function getFileIcon(fileType, fileName) {
     if (fileType.includes('pdf')) return 'bi bi-file-pdf';
     if (fileType.includes('text') || fileName.endsWith('.txt')) return 'bi bi-file-text';
     if (fileType.includes('word') || fileName.endsWith('.doc') || fileName.endsWith('.docx')) return 'bi bi-file-word';
+    if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return 'bi bi-file-excel';
+    if (fileType.includes('presentation') || fileType.includes('powerpoint') || fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) return 'bi bi-file-ppt';
     if (fileType.includes('csv') || fileName.endsWith('.csv')) return 'bi bi-file-spreadsheet';
     if (fileType.includes('json') || fileName.endsWith('.json')) return 'bi bi-file-code';
     return 'bi bi-file-earmark';

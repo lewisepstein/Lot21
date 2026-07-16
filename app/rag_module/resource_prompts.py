@@ -1,6 +1,13 @@
 from rag_module.prompt_rules import ALPHA_REGEX, LottiePrompts
+from rag_module.static_links import get_links_as_string
 
-def build_resource_prompt(query: str, context_str: str, resource_type: str, sources: str) -> str:
+def build_resource_prompt(
+        query: str, 
+        context_str: str, 
+        resource_type: str, 
+        sources: str,
+        line_rule: str = ""
+) -> str:
     """
     Generates a prompt for the Resources section (Materials or Tools).
     It extracts resource types from the context/query and enforces the 
@@ -18,6 +25,8 @@ def build_resource_prompt(query: str, context_str: str, resource_type: str, sour
     return f"""{LottiePrompts.GUARDRAIL_RULES}
 
 {LottiePrompts.PLAIN_TEXT_RULES}
+
+{line_rule}
 
 You are an expert material and technical resource analyst for Lottie.
 
@@ -67,6 +76,9 @@ KNOWLEDGE CONTEXT:
 AUTHORITATIVE SOURCES FOR REFERENCE:
 {sources}
 
+
+ADDITIONAL RESEARCH SOURCES (FALLBACK):
+{get_links_as_string("resources")}
 
 """
 # After generating the content, add exactly:

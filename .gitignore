@@ -219,3 +219,12 @@ alembic/versions/
 
 # Alembic cache files
 *.pyc
+
+# Local FastAPI folder
+fastapi_claude_template/
+
+# Local docs / notes
+CHANGES_FROM_CLIENT_PDF.md
+DAILY_UPDATE_2026-07-09.md
+Lottie_User_Guide.md
+PROJECT_ANALYSIS.md

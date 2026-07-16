@@ -23,6 +23,7 @@ class Page(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     page_name = Column(String(255), nullable=False, index=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    sub_category = Column(String(20), nullable=True)  # ADAPT / MITIGATE / RESTORE
     description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     source_url = Column(String(200), nullable=True)
@@ -44,6 +45,7 @@ class Page(Base):
             "id": self.id,
             "page_name": self.page_name,
             "category_id": self.category_id,
+            "sub_category": self.sub_category,
             "description": self.description,
             "is_active": self.is_active,
             "source_url": self.source_url,

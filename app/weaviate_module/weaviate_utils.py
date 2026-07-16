@@ -10,6 +10,7 @@ from datetime import datetime
 import uuid
 
 from sqlalchemy import text
+from weaviate.classes.query import Filter
 
 from service_utils.db_utils.weaviate_db import WeaviateDB
 from service_utils.db_utils.pg_db import PostgresDB
@@ -281,7 +282,8 @@ def load_chunks_to_weaviate(
     chunks: List[str],
     collection_name: str,
     doc_id: str,
-    description: str = ""
+    description: str = "",
+    source: str = "agent_training_data"
 ) -> Dict[str, Any]:
     """
     Load text chunks into Weaviate vector database.
@@ -322,7 +324,7 @@ def load_chunks_to_weaviate(
                     {"name": "chunk_index", "data_type": "int"},
                     {"name": "doc_id", "data_type": "text"},
                 ],
-                vectorizer="text2vec-openai"
+                vectorizer="text2vec-ollama"
             )
         
         chunks_count = len(chunks)
@@ -337,12 +339,21 @@ def load_chunks_to_weaviate(
             for idx, chunk in enumerate(chunks):
                 properties = {
                     "text": chunk,
-                    "source": "agent_training_data",
+                    "source": source,
                     "chunk_index": idx,
                     "doc_id": doc_id,
                 }
                 batch.add_object(properties=properties)
-        
+
+        # Batch errors don't raise on their own — without this check, chunks
+        # dropped by a failed embedder (e.g. Ollama down) would vanish silently
+        failed = collection.batch.failed_objects
+        if failed:
+            raise RuntimeError(
+                f"{len(failed)} of {chunks_count} chunks failed to insert "
+                f"(is the embedding service running?): {failed[0].message}"
+            )
+
         logger.info(f"Successfully loaded {chunks_count} chunks into collection '{collection_name}'")
         
         return {
@@ -396,11 +407,7 @@ def delete_chunks_from_weaviate(
         
         # Delete all objects with matching doc_id
         result = collection.data.delete_many(
-            where={
-                "path": ["doc_id"],
-                "operator": "Equal",
-                "valueText": doc_id
-            }
+            where=Filter.by_property("doc_id").equal(doc_id)
         )
         
         deleted_count = result.successful if hasattr(result, 'successful') else 0

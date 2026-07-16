@@ -6,8 +6,12 @@ from datetime import datetime, timezone
 from typing import Optional, Dict
 
 from dashboard_module.dashboard_responses import DashboardResponse
+from dashboard_module.dashboard_utils import (
+    get_category_stats, get_category_breakdown,
+    get_pages_needing_attention, get_recent_activity
+)
 from auth_module.auth_utils import (
-    verify_token, get_user_data, 
+    verify_token, get_user_data,
     require_session_auth
 )
 from service_utils.log_management import get_logger
@@ -45,9 +49,28 @@ async def dashboard_page(
         Dashboard HTML page or redirect to login
     """
     try:
+        stats = get_category_stats()
+        category_breakdown = get_category_breakdown()
+        pages_attention = get_pages_needing_attention(limit=8)
+        recent_activity = get_recent_activity(limit=6)
+
+        chart_labels = [c['category_name'] for c in category_breakdown[:8]]
+        chart_data = [c['total_pages'] for c in category_breakdown[:8]]
+
         return templates.TemplateResponse(
             request=request,
-            name="dashboard.htm"
+            name="dashboard.htm",
+            context={
+                "total_categories": stats['total_categories'],
+                "total_pages": stats['total_pages'],
+                "pages_needing_attention": stats['pages_needing_attention'],
+                "pending_approvals": stats['pending_approvals'],
+                "category_breakdown": category_breakdown,
+                "pages_attention": pages_attention,
+                "recent_activity": recent_activity,
+                "chart_labels": chart_labels,
+                "chart_data": chart_data,
+            }
         )
     except HTTPException:
         raise

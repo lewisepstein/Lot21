@@ -1,0 +1,80 @@
+{
+  "_comment": "ACF field names will be filled in once WP team enables 'Show in REST API' on each field group. CPT slugs are confirmed live from lot21.org REST API.",
+
+  "PROJECTS": {
+    "cpt_slug": "lot_projects",
+    "taxonomy": "project_categories",
+    "taxonomy_terms": {
+      "Adapt": 4,
+      "Mitigate": 5,
+      "Restore": 6
+    },
+    "acf_fields": {
+      "_pending": "WP team to enable ACF REST API — field names will appear here"
+    }
+  },
+
+  "POLICY": {
+    "cpt_slug": "lot_policies",
+    "taxonomy": "policy_categories",
+    "taxonomy_terms": {
+      "International": 9,
+      "National": 8
+    },
+    "acf_fields": {
+      "_pending": "WP team to enable ACF REST API — field names will appear here"
+    }
+  },
+
+  "LOTS": {
+    "cpt_slug": "lot_lots",
+    "taxonomy": "lot_categories",
+    "taxonomy_terms": {
+      "Lots": 10
+    },
+    "acf_fields": {
+      "_pending": "WP team to enable ACF REST API — field names will appear here"
+    }
+  },
+
+  "RESOURCES": {
+    "cpt_slug": "lot_resources",
+    "taxonomy": "resource_categories",
+    "taxonomy_terms": {
+      "Materials": 11,
+      "Tools": 31
+    },
+    "acf_fields": {
+      "_pending": "WP team to enable ACF REST API — field names will appear here"
+    }
+  },
+
+  "NEWSLETTER": {
+    "cpt_slug": "posts",
+    "taxonomy": "categories",
+    "taxonomy_terms": {
+      "Newsletters": 7
+    },
+    "acf_fields": {
+      "_pending": "WP team to enable ACF REST API — field names will appear here"
+    }
+  },
+
+  "UNDERSTANDING": {
+    "cpt_slug": "pages",
+    "taxonomy": null,
+    "taxonomy_terms": {},
+    "acf_fields": {
+      "_pending": "WP team to confirm CPT + enable ACF REST API"
+    }
+  },
+
+  "SOCIAL": {
+    "cpt_slug": null,
+    "taxonomy": null,
+    "taxonomy_terms": {},
+    "acf_fields": {
+      "_pending": "WP team to confirm if a CPT exists for social media posts"
+    }
+  }
+}

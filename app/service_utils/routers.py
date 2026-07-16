@@ -15,12 +15,14 @@ from category_module.category import router as category_router
 from page_modules.page import router as page_router
 from agent_module.agent import router as agent_router
 from freeform_module.freeform import router as freeform_router
+from wordpress_module.wordpress_routes import router as wordpress_router
+from download_module.download_routes import router as download_router
 
 
 def register_routers(app: FastAPI) -> None:
     """
     Register all application routers to the FastAPI app instance.
-    
+
     Args:
         app: FastAPI application instance
     """
@@ -34,3 +36,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(page_router, tags=["user"])
     app.include_router(agent_router, tags=["user"])
     app.include_router(freeform_router, tags=["freeform"])
+    app.include_router(wordpress_router, tags=["wordpress"])
+    app.include_router(download_router, tags=["download"])

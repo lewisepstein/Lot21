@@ -154,6 +154,7 @@ def check_root_exists() -> bool:
 def create_page_record(
     page_name: str,
     category_id: Optional[int] = None,
+    sub_category: Optional[str] = None,
     created_by: Optional[int] = None,
     is_active: bool = True,
     content: Optional[str] = None,
@@ -215,7 +216,8 @@ def create_page_record(
             'is_active': is_active,
             'source_url': source_url,
             'scrape_data': scrape_data,
-            'description': description
+            'description': description,
+            'sub_category': sub_category.upper() if sub_category else None
         }
 
         if category_id is not None:
@@ -441,7 +443,7 @@ def get_page_by_id(page_id: int) -> Optional[Dict[str, Any]]:
                 'id': page_id,
                 'deleted_on': None
             },
-            columns=['id', 'page_name', 'category_id', 'is_active', 
+            columns=['id', 'page_name', 'category_id', 'sub_category', 'is_active',
                     'source_url', 'description', 'created_on', 'updated_on']
         )
         
@@ -460,18 +462,21 @@ def get_page_by_id(page_id: int) -> Optional[Dict[str, Any]]:
                 'page_id': page_id,
                 'deleted_on': None
             },
-            columns=['generated_content']
+            columns=['id', 'generated_content']
         )
-        
+
         content = content_data[0]['generated_content'] if content_data and len(content_data) > 0 else None
-        
+        content_id = content_data[0]['id'] if content_data and len(content_data) > 0 else None
+
         # Convert to dictionary with proper formatting
         page_dict = {
             'id': page['id'],
             'page_name': page['page_name'],
             'category_id': page['category_id'] if page['category_id'] else None,
+            'sub_category': page.get('sub_category'),
             'is_active': page['is_active'],
             'content': content,
+            'content_id': content_id,
             'source_url': page['source_url'],
             'description': page['description'],
             'created_on': convert_datetime_to_formatted_string(page['created_on']) if page.get('created_on') else None,
@@ -490,6 +495,7 @@ def update_page(
     page_id: int,
     page_name: Optional[str] = None,
     category_id: Optional[int] = None,
+    sub_category: Optional[str] = None,
     is_active: Optional[bool] = None,
     content: Optional[str] = None,
     source_url: Optional[str] = None,
@@ -612,7 +618,11 @@ def update_page(
         
         if category_id is not None:
             page_update_data['category_id'] = category_id if category_id > 0 else None
-        
+
+        # empty string clears the pillar; None leaves it unchanged
+        if sub_category is not None:
+            page_update_data['sub_category'] = sub_category.upper() if sub_category.strip() else None
+
         if is_active is not None:
             page_update_data['is_active'] = is_active
         
@@ -866,6 +876,18 @@ def delete_page(page_id: int) -> None:
             db.delete('weaviate_data_versions', conditions={'weaviate_data_id': weaviate[0]['id']})
 
         db.delete('weaviate_data', conditions={'page_id': page_id})
+
+        # Delete prompt_history and its dependents before deleting content
+        content_records = db.read('content', conditions={'page_id': page_id}, columns=['id'])
+        for content_record in content_records:
+            content_id = content_record['id']
+            prompt_records = db.read('prompt_history', conditions={'content_id': content_id}, columns=['id'])
+            for prompt_record in prompt_records:
+                prompt_id = prompt_record['id']
+                db.delete('prompt_attachments', conditions={'prompt_history_id': prompt_id})
+                db.update('task_runs', {'prompt_history_id': None}, {'prompt_history_id': prompt_id})
+            db.delete('prompt_history', conditions={'content_id': content_id})
+
         db.delete('content', conditions={'page_id': page_id})
 
         # 3. Delete page

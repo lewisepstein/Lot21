@@ -14,6 +14,7 @@ from models.weaviate_data_versions import WeaviateDataVersion
 from models.attachments import PromptAttachments
 from models.freeform_projects import FreeFormProject
 from models.freeform_chat import FreeFormChat
+from models.wordpress_publish import WordPressPublishLog, WPPublishStatusEnum
 
 __all__ = [
     "Base",
@@ -32,4 +33,6 @@ __all__ = [
     "PromptAttachments",
     "FreeFormProject",
     "FreeFormChat",
+    "WordPressPublishLog",
+    "WPPublishStatusEnum",
 ]

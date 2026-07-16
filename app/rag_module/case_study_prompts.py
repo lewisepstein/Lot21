@@ -1,10 +1,12 @@
 from rag_module.prompt_rules import LottiePrompts
+from rag_module.static_links import get_links_as_string
 
 def build_project_case_study_prompt(
         query: str = None, 
         context_str: str = None, 
         project_sources: dict = None,
-        category_id: int = 1
+        category_id: int = 1,
+        line_rule: str = ""
 ) -> str:
     """
     Generates a prompt to produce a Project Case Study in the exact 
@@ -31,6 +33,8 @@ def build_project_case_study_prompt(
 
                 {LottiePrompts.PLAIN_TEXT_RULES}
 
+                {line_rule}
+
                 You are an expert project analyst for Lottie.
                 Your task is to generate or refine a Project Case Study using the Lottie minimalist card format.
 
@@ -44,13 +48,13 @@ def build_project_case_study_prompt(
                 Collected works at the forefront of {meta['focus']}
 
                 [PROJECT TITLE]
-                /
+                
                 [YEARS] - [STATUS/AWARDS]
                 Source: © [FIRM NAME]
                 www:[WEBSITE DOMAIN]
 
                 [DESCRIPTION PARAGRAPHS]
-                - Write 2-3 natural flowing paragraphs. 
+                - Write 2 natural flowing paragraphs. 
                 - Do NOT use bullet points.
                 - Focus on site transformation, specific climate features (e.g., flood protection, water capture), and the synergy between nature and infrastructure.
                 - Use technical yet evocative language.
@@ -63,8 +67,14 @@ def build_project_case_study_prompt(
                 EXTERNAL SOURCES FOR REFERENCE:
                 {links_str}
 
-                After the project content, add exactly:
-                ---BEGIN EXPLANATION---
-                Briefly explain which technical details were pulled from the context and any assumptions made about the project status or firm.
-                ---END EXPLANATION---
-                """
+                
+ADDITIONAL RESEARCH SOURCES (FALLBACK):
+{get_links_as_string(["projects", "policy"])}
+
+"""
+
+
+# After the project content, add exactly:
+#                 ---BEGIN EXPLANATION---
+#                 Briefly explain which technical details were pulled from the context and any assumptions made about the project status or firm.
+#                 ---END EXPLANATION---

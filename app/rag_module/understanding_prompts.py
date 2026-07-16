@@ -1,4 +1,5 @@
 from rag_module.prompt_rules import LottiePrompts
+from rag_module.static_links import get_links_as_string
 
 def build_full_understanding_prompt(
         query: str = None,
@@ -86,13 +87,13 @@ The specific extracted name of the technical solution in ALL CAPS.
 (Note: Never use "GENERAL TOPIC" or generic placeholders).
 
 [INTRODUCTION & OVERVIEW]
-Write 3-5 paragraphs providing a comprehensive overview:
+Write 2-3 paragraphs providing a comprehensive overview:
 - Start with a "What is [Identified Topic]?" framing if not present as a standalone heading.
 - Explain the core motivations (e.g., scalability vs land-based solutions).
 - Explicitly mention that the practices vary in durability, financeability, scalability, and equity.
 
 [DYNAMIC EXTRA SUBHEADINGS]
-(Extract any specific headings found in the context that provide extra technical detail, such as "How it Works" or "Primary Mechanisms". Generate 2-3 paragraphs for each, including all technical details and terms from the context.)
+(Extract any specific headings found in the context that provide extra technical detail, such as "How it Works" or "Primary Mechanisms". Generate 1-2 paragraphs for each, including all technical details and terms from the context.)
 
 DURABILITY
 Detail storage duration and conditions for permanence based ONLY on context.
@@ -132,6 +133,11 @@ Subscribe to the Lot21 QUARTERLY newsletter for quick updates and links to learn
 KNOWLEDGE CONTEXT:
 ==================================================
 {context_str}
+
+
+ADDITIONAL RESEARCH SOURCES (FALLBACK):
+If the provided KNOWLEDGE CONTEXT is insufficient, you may refer to these reliable sources for general knowledge or citations.
+{get_links_as_string("solutions")}
 
 
 """

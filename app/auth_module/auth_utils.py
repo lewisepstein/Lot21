@@ -125,6 +125,8 @@ def get_user(username: str) -> Optional[Dict[str, Any]]:
     try:
         db = PostgresDB()
         users = db.read('users', conditions={'email': username, 'is_active': True})
+
+        print(users, username)
         
         if not users:
             return None
@@ -151,7 +153,13 @@ def authenticate_user(username: str, password: str) -> Tuple[bool, int, str, Opt
     Returns:
         Tuple of (success: bool, status_code: int, message: str, user_data: dict or None)
     """
+
+    print(username, password)
+
     user = get_user(username)
+
+    print(user)
+
     if not user:
         return False, 401, "User not found", None
     
@@ -212,7 +220,7 @@ def verify_token(token: str) -> Tuple[bool, int, str, Optional[Dict[str, Any]]]:
         return True, 200, "Token verified successfully", payload
     except jwt.ExpiredSignatureError:
         return False, 401, "Token has expired", None
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         return False, 401, "Invalid token", None
 
 

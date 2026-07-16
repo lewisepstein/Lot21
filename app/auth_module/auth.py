@@ -53,6 +53,8 @@ async def login(login_data: LoginRequest, request: Request):
         login_data.passwd
     )
     
+    print(success, status_code, message, user)
+
     if not success:
         raise HTTPException(status_code=status_code, detail=message)
     

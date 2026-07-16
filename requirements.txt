@@ -5,6 +5,12 @@ google-generativeai
 google-genai
 protobuf
 pillow
+PyPDF2
+pdfplumber
+python-docx
+reportlab
+openpyxl
+python-pptx
 websockets
 numpy
 pandas
