@@ -1938,7 +1938,11 @@ async function downloadApprovedContent(fileFormat, btn, promptId = null) {
         return;
     }
 
-    if (btn) btn.disabled = true;
+    const originalHtml = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    }
     try {
         const promptParam = promptId ? `&prompt_id=${promptId}` : '';
         const response = await fetch(`/user/download/content/${contentId}?file_format=${fileFormat}${promptParam}`, {
@@ -1972,7 +1976,10 @@ async function downloadApprovedContent(fileFormat, btn, promptId = null) {
     } catch (err) {
         alert('Download failed. Please try again.');
     } finally {
-        if (btn) btn.disabled = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
     }
 }
 
