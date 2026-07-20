@@ -102,8 +102,8 @@ OUT_OF_SCOPE_TEXT = "This question is outside the scope of the provided context.
 
 NO_CONTENT_TO_REFINE_TEXT = (
     "There's no content to refine yet. Please generate content first (describe "
-    "what you'd like me to create), then use commands like \"refine it\" or "
-    "\"make it shorter\" to improve it."
+    'what you\'d like me to create), then use commands like "refine it" or '
+    '"make it shorter" to improve it.'
 )
 
 # Page-configured climate pillar -> case study category id
@@ -250,31 +250,110 @@ def is_follow_up_query(query: str) -> bool:
     if re.search(r"\b(project|item|point|entry|number|no\.?|#)\s*\d+\b", q):
         return True
     cues = (
-        "this list", "the list", "that list", "the above", "above list",
-        "previous response", "last response", "add ", "remove ", "replace ",
-        "delete ", "drop ", "swap ", "instead", "another", "one more",
-        " more ", " also ", " again ", " it ", " them ", " these ", " those ",
+        "this list",
+        "the list",
+        "that list",
+        "the above",
+        "above list",
+        "previous response",
+        "last response",
+        "add ",
+        "remove ",
+        "replace ",
+        "delete ",
+        "drop ",
+        "swap ",
+        "instead",
+        "another",
+        "one more",
+        " more ",
+        " also ",
+        " again ",
+        " it ",
+        " them ",
+        " these ",
+        " those ",
     )
     return any(c in q for c in cues)
 
 
 # Verbs that, on their own, only make sense as edits of existing content
 _EDIT_VERBS = {
-    "refine", "refi", "rewrite", "rephrase", "reword", "revise", "edit",
-    "polish", "improve", "enhance", "fix", "correct", "redo", "shorten",
-    "condense", "simplify", "expand", "elaborate", "tighten", "reformat",
+    "refine",
+    "refi",
+    "rewrite",
+    "rephrase",
+    "reword",
+    "revise",
+    "edit",
+    "polish",
+    "improve",
+    "enhance",
+    "fix",
+    "correct",
+    "redo",
+    "shorten",
+    "condense",
+    "simplify",
+    "expand",
+    "elaborate",
+    "tighten",
+    "reformat",
 }
 # Filler + quality adjectives that may accompany an edit verb without adding
 # a topic of their own
 _EDIT_FILLERS = {
-    "it", "this", "that", "them", "these", "those", "the", "a", "an",
-    "please", "again", "more", "less", "bit", "little", "up",
-    "and", "by", "for", "me", "make", "keep", "content", "text", "response",
-    "draft", "version", "one", "now", "some",
+    "it",
+    "this",
+    "that",
+    "them",
+    "these",
+    "those",
+    "the",
+    "a",
+    "an",
+    "please",
+    "again",
+    "more",
+    "less",
+    "bit",
+    "little",
+    "up",
+    "and",
+    "by",
+    "for",
+    "me",
+    "make",
+    "keep",
+    "content",
+    "text",
+    "response",
+    "draft",
+    "version",
+    "one",
+    "now",
+    "some",
     # quality adjectives ("make it <adj>")
-    "better", "concise", "shorter", "longer", "clearer", "clear", "formal",
-    "informal", "professional", "simpler", "simple", "engaging", "readable",
-    "brief", "detailed", "stronger", "smoother", "tighter", "cleaner", "punchy",
+    "better",
+    "concise",
+    "shorter",
+    "longer",
+    "clearer",
+    "clear",
+    "formal",
+    "informal",
+    "professional",
+    "simpler",
+    "simple",
+    "engaging",
+    "readable",
+    "brief",
+    "detailed",
+    "stronger",
+    "smoother",
+    "tighter",
+    "cleaner",
+    "punchy",
 }
 
 
@@ -303,6 +382,7 @@ def is_contentless_edit_command(query: str) -> bool:
 class RagModule:
     # ---------------- INIT ----------------
     def __init__(self):
+
         self.client = WeaviateDB().client
         self.collection = self.client.collections.get("training_data")
 
@@ -311,10 +391,11 @@ class RagModule:
         # Configure text model
         text_api_key = os.getenv("GEMINI_TEXT_API_KEY")
         if not text_api_key:
-            pass
+            print("WARNING: GEMINI_TEXT_API_KEY not set in environment")
         genai.configure(api_key=text_api_key)
 
         text_model_id = os.getenv("TEXT_MODEL_ID", "gemini-3-flash-preview")
+        print(f"Initializing text model: {text_model_id}")
         self.text_model = genai.GenerativeModel(text_model_id)
         self.text_model_id = text_model_id
 
@@ -330,10 +411,11 @@ class RagModule:
         image_model_id = os.getenv("IMAGE_MODEL_ID")
 
         if not image_api_key:
-            pass
+            print("WARNING: GEMINI_IMAGE_API_KEY not set in environment")
         if not image_model_id:
-            pass
+            print("WARNING: IMAGE_MODEL_ID not set in environment")
 
+        print(f"Initializing image model: {image_model_id}")
         self.image_client = genai_new.Client(
             api_key=image_api_key, http_options={"api_version": "v1beta"}
         )
@@ -351,6 +433,7 @@ class RagModule:
             )
         except Exception as e:
             # Hybrid needs the vectorizer (Ollama); keyword search works without it
+            print(f"WARNING: hybrid search failed ({e}), falling back to BM25")
             res = self.collection.query.bm25(
                 query=query,
                 limit=MAX_CONTEXT_CHUNKS,
@@ -400,7 +483,7 @@ class RagModule:
                     seen.add(key)
                     sources.append({"title": title, "url": url})
         except Exception as e:
-            pass
+            print(f"Source label resolution failed (citations skipped): {e}")
         return sources
 
     # ---------------- TEXT ----------------
@@ -480,6 +563,7 @@ class RagModule:
             else None
         )
         searches = getattr(gm, "web_search_queries", None) or []
+        print(f"Live web research ran {len(searches)} searches")
 
         web_sources = []
         seen = set()
@@ -520,6 +604,9 @@ class RagModule:
         # (e.g. a case study titled "REFI IT BETTER"). Refuse gracefully.
         if is_contentless_edit_command(query) and not (context or conversation_history):
             telemetry.mark("no_content_to_refine")
+            print(
+                "Edit command with no content to refine; asking user to generate first"
+            )
             return NO_CONTENT_TO_REFINE_TEXT, telemetry.export(), [], 0
 
         sources = []
@@ -552,8 +639,11 @@ class RagModule:
                         + live_facts
                     )
                     telemetry.mark("websearch_ms")
+                    print("Live web search ENABLED — current facts added to context")
             except Exception as web_error:
-                pass
+                print(
+                    f"Live web research failed, continuing with training data only: {web_error}"
+                )
 
         # Detect limits
         max_lines = detect_max_lines_from_query(query)
@@ -569,6 +659,13 @@ class RagModule:
 
         is_rewrite = is_rewrite_intent(query)
 
+        print("generate_content called with:")
+        print(f"  - category_id: {category_id}")
+        print(f"  - query: {query[:100] if query else 'None'}...")
+        print(f"  - context length: {len(context_str)} chars")
+        print(
+            f"  - context preview: {context_str[:100] if context_str else 'EMPTY'}..."
+        )
 
         prompt = None
 
@@ -610,6 +707,9 @@ class RagModule:
                 length_constraint=length_constraint_str,
             )
             telemetry.mark("multi_turn")
+            print(
+                f"Multi-turn follow-up: building on {len(conversation_history)} prior exchange(s)"
+            )
 
         elif is_bare_refine:
             # Treat the existing content as a one-turn conversation so the
@@ -626,6 +726,9 @@ class RagModule:
                 length_constraint=length_constraint_str,
             )
             telemetry.mark("bare_refine")
+            print(
+                "Bare refine command with content: refining in place, structure preserved"
+            )
 
         elif category_id == 2:
             if has_sentence_constraint:
@@ -674,7 +777,7 @@ class RagModule:
                 # is only the fallback for unconfigured pages
                 detected_cat = SUB_CATEGORY_IDS.get((sub_category or "").upper())
                 if detected_cat:
-                    pass
+                    print(f"Using page-configured sub-category: {sub_category}")
                 else:
                     detected_cat = detect_case_study_category(query, context_str)
                 prompt = build_project_case_study_prompt(
@@ -779,6 +882,9 @@ class RagModule:
 
         # If we didn't build a prompt (unknown category or routing), return out-of-scope text
         if not prompt:
+            print(
+                "No prompt was constructed for this request; returning out-of-scope message."
+            )
             telemetry.mark("llm_skipped")
             return OUT_OF_SCOPE_TEXT, telemetry.export(), [], 0
 
@@ -796,6 +902,9 @@ class RagModule:
                     avoid_block += f" (user note: {item['note']})"
                 avoid_block += f":\n{item['text']}"
             prompt += avoid_block
+            print(
+                f"Added {len(rejected_feedback)} rejected draft(s) as avoidance signal"
+            )
 
         # Dedup: projects the user has already seen on this page must not come
         # back as new items in project-list sections (case studies, lots)
@@ -812,28 +921,38 @@ class RagModule:
                 "that already contains them."
             )
             telemetry.mark("dedup_filter")
+            print(f"Dedup: excluding {excluded_seen} previously generated project(s)")
 
         telemetry.add_text_cost(prompt)
 
+        print(
+            f"Starting text generation for query: {query[:100]}..."
+        )  # Log first 100 chars
 
         resp = None
         try:
             future = self.executor.submit(self._generate_text_content, prompt)
             resp = future.result(timeout=TEXT_MODEL_TIMEOUT_SEC)
+            print("Text generation completed successfully")
         except Exception as e:
-            pass
+            print(f"Error during text generation: {str(e)}")
 
         # Automatic model fallback: one silent retry on the backup model when
         # the primary failed, timed out, or returned an empty/blocked response
         if not self._safe_response_text(resp).strip():
+            print(
+                f"Primary model gave no usable response; retrying with {self.fallback_model_id}"
+            )
             try:
                 future = self.executor.submit(
                     self._generate_fallback_text_content, prompt
                 )
                 resp = future.result(timeout=TEXT_MODEL_TIMEOUT_SEC)
                 telemetry.mark("llm_fallback_model")
+                print("Fallback model generation completed")
             except Exception as fallback_error:
                 telemetry.mark("llm_error")
+                print(f"Fallback model also failed: {str(fallback_error)}")
 
         # Re-ingest only the original context — web facts age fast, so they
         # should not be written into permanent training data. Best-effort:
@@ -849,6 +968,9 @@ class RagModule:
                 )
             except Exception as ingest_error:
                 telemetry.mark("reingest_failed")
+                print(
+                    f"Context re-ingestion failed (response still returned): {ingest_error}"
+                )
 
         telemetry.mark("llm_ms")
 
@@ -857,9 +979,15 @@ class RagModule:
         # If the model returned an empty body, surface a friendly error message
         if not response_text or not response_text.strip():
             telemetry.mark("llm_empty_response")
+            print("AI returned an empty response; substituting UNREACHABLE_TEXT")
             response_text = UNREACHABLE_TEXT
 
         response_length = len(response_text)
+        print(f"\n{'=' * 80}")
+        print(f"RESPONSE GENERATED - Length: {response_length} chars")
+        print(f"{'=' * 80}")
+        print(f"FULL RESPONSE TEXT:\n{response_text}")
+        print(f"{'=' * 80}\n")
 
         return response_text, telemetry.export(), sources, excluded_seen
 
@@ -875,6 +1003,7 @@ class RagModule:
             )
 
             if not resp or not getattr(resp, "candidates", None):
+                print("Image generation: No candidates in response")
                 return None
 
             for part in resp.candidates[0].content.parts:
@@ -883,8 +1012,10 @@ class RagModule:
                 if hasattr(part, "image") and part.image:
                     return base64.b64encode(part.image.image_bytes).decode("utf-8")
 
+            print("Image generation: No image data found in response parts")
             return None
         except Exception as e:
+            print(f"Image generation error in _generate_image_content: {str(e)}")
             return None
 
     def generate_visual(
@@ -930,12 +1061,17 @@ class RagModule:
 
         except TimeoutError as e:
             telemetry.mark("image_timeout")
+            print(f"Image generation timeout: {str(e)}")
             return None
         except OSError as e:
             telemetry.mark("image_network_error")
+            print(f"Image generation network error (DNS/connection): {str(e)}")
+            print("  - Check internet connectivity")
+            print(f"  - Check IMAGE_MODEL_ID endpoint: {os.getenv('IMAGE_MODEL_ID')}")
             return None
         except Exception as e:
             telemetry.mark("image_error")
+            print(f"Image generation error: {type(e).__name__}: {str(e)}")
             return None
 
     # ---------------- ENTRY POINT ----------------
@@ -1019,14 +1155,17 @@ class RagModule:
                     timeout=TEXT_MODEL_TIMEOUT_SEC
                 )
             except Exception as e:
-                pass
+                print(f"Error during text generation in image_and_text mode: {str(e)}")
 
             image = None
             try:
                 image = futures["image"].result(timeout=IMAGE_MODEL_TIMEOUT_SEC)
             except Exception as e:
-                pass
+                print(f"Error during image generation in image_and_text mode: {str(e)}")
 
+            print("Completed image_and_text generation")
+            print(f"  - Generated text length: {len(text) if text else 0} chars")
+            print(f"  - Generated image present: {'Yes' if image else 'No'} ")
 
             return {
                 "text": text,
