@@ -194,6 +194,8 @@
         <div class="error-box">{{ error }}</div>
         {% endif %}
 
+        <div id="loginError" class="error-box" style="display:none;"></div>
+
         <label for="email">Email</label>
         <input type="email" placeholder="Enter your email" id="email" name="email" required>
 
@@ -236,8 +238,14 @@
         })();
 
         // Login form submit
+        const loginError = document.getElementById('loginError');
+        function showLoginError(msg) {
+            loginError.textContent = msg;
+            loginError.style.display = 'block';
+        }
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            loginError.style.display = 'none';
             const email = document.getElementById('email').value;
             const passwd = document.getElementById('passwd').value;
             try {
@@ -246,7 +254,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, passwd })
                 });
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
                 if (response.ok) {
                     localStorage.setItem('access_token', data.access_token);
                     if (data.session_token) {
@@ -256,10 +264,14 @@
                     }
                     window.location.href = '/user/dashboard';
                 } else {
-                    window.location.href = '/';
+                    // Surface the server's reason (invalid credentials, validation error, etc.)
+                    const d = data && data.detail;
+                    const msg = typeof d === 'string' ? d
+                        : (Array.isArray(d) && d.length ? (d[0].msg || 'Invalid input') : 'Invalid email or password.');
+                    showLoginError(msg);
                 }
             } catch (error) {
-                window.location.href = '/';
+                showLoginError('Could not reach the server. Please try again.');
             }
         });
     </script>
