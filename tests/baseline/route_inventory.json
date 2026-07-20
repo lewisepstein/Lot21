@@ -1,0 +1,174 @@
+{
+  "/": [
+    "GET"
+  ],
+  "/auth/login": [
+    "POST"
+  ],
+  "/auth/logout": [
+    "POST"
+  ],
+  "/auth/password-change": [
+    "POST"
+  ],
+  "/auth/password-reset": [
+    "POST"
+  ],
+  "/user/content": [
+    "GET",
+    "POST"
+  ],
+  "/user/content/draft": [
+    "POST"
+  ],
+  "/user/content/save_as_draft": [
+    "POST"
+  ],
+  "/user/content/unattached": [
+    "GET"
+  ],
+  "/user/content/{content_id}/history": [
+    "GET"
+  ],
+  "/user/content/{content_id}/restore/{version_id}": [
+    "POST"
+  ],
+  "/user/content/{page_id}": [
+    "GET"
+  ],
+  "/user/create_category": [
+    "POST"
+  ],
+  "/user/create_page": [
+    "POST"
+  ],
+  "/user/dashboard": [
+    "GET"
+  ],
+  "/user/dashboard-data": [
+    "GET"
+  ],
+  "/user/delete_page/{page_id}": [
+    "DELETE"
+  ],
+  "/user/delete_pages": [
+    "DELETE"
+  ],
+  "/user/download/category/{category_id}": [
+    "GET"
+  ],
+  "/user/download/content/{content_id}": [
+    "GET"
+  ],
+  "/user/download/freeform/{message_id}": [
+    "GET"
+  ],
+  "/user/freeform/": [
+    "GET"
+  ],
+  "/user/freeform/chat": [
+    "POST"
+  ],
+  "/user/freeform/projects": [
+    "GET",
+    "POST"
+  ],
+  "/user/freeform/projects/{project_id}": [
+    "DELETE",
+    "GET",
+    "PUT"
+  ],
+  "/user/freeform/projects/{project_id}/chat": [
+    "GET"
+  ],
+  "/user/get_page/{page_id}": [
+    "GET"
+  ],
+  "/user/page-content/{page_id}": [
+    "GET"
+  ],
+  "/user/page-settings": [
+    "GET"
+  ],
+  "/user/pages/{category_id}": [
+    "GET"
+  ],
+  "/user/projects": [
+    "GET"
+  ],
+  "/user/prompt_history/set_action": [
+    "POST"
+  ],
+  "/user/prompt_history/{prompt_session_id}/{content_id}": [
+    "GET"
+  ],
+  "/user/prompt_history_data": [
+    "GET"
+  ],
+  "/user/prompt_history_data/{prompt_session_id}": [
+    "GET"
+  ],
+  "/user/resources": [
+    "GET"
+  ],
+  "/user/settings": [
+    "GET"
+  ],
+  "/user/settings/api": [
+    "GET",
+    "POST"
+  ],
+  "/user/settings/content": [
+    "GET",
+    "POST"
+  ],
+  "/user/settings/image-model": [
+    "GET",
+    "POST"
+  ],
+  "/user/settings/model": [
+    "GET",
+    "POST"
+  ],
+  "/user/settings/schedule": [
+    "GET",
+    "POST"
+  ],
+  "/user/settings/train-model": [
+    "POST"
+  ],
+  "/user/settings/training-history": [
+    "GET"
+  ],
+  "/user/settings/training-record/{record_id}": [
+    "DELETE",
+    "PUT"
+  ],
+  "/user/settings/training-record/{record_id}/restore/{version_number}": [
+    "POST"
+  ],
+  "/user/settings/training-record/{record_id}/versions": [
+    "GET"
+  ],
+  "/user/understanding": [
+    "GET"
+  ],
+  "/user/update_page/{page_id}": [
+    "PUT"
+  ],
+  "/user/wordpress/publish/{content_id}": [
+    "POST"
+  ],
+  "/user/wordpress/published": [
+    "GET"
+  ],
+  "/user/wordpress/status/{content_id}": [
+    "GET"
+  ],
+  "/user/wordpress/test-connection": [
+    "GET"
+  ],
+  "/user/wordpress/unpublish/{content_id}": [
+    "PUT"
+  ]
+}

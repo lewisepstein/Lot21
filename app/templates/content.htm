@@ -1825,29 +1825,39 @@ async function restoreVersion(versionId) {
     const content_id = localStorage.getItem('content_id');
     const token = localStorage.getItem('access_token');
     if (!content_id || !token) return;
-    showConfirmModal('Restore this version? It will be added as the new latest version — nothing is deleted.', async () => {
-        try {
-            const res = await fetch(`/user/content/${content_id}/restore/${versionId}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) throw new Error('restore failed');
-            const data = await res.json();
-            if (data.prompt_session_id) localStorage.setItem('prompt_session_id', data.prompt_session_id);
-            // Close panel and refresh the thread so the restored version shows as latest
-            const el = document.getElementById('offcanvasHistory');
-            if (el && window.bootstrap && bootstrap.Offcanvas) {
-                const off = bootstrap.Offcanvas.getInstance(el);
-                if (off) off.hide();
+
+    const confirmRestore = () => showConfirmModal(
+        'Restore this version? It will be added as the new latest version — nothing is deleted.',
+        async () => {
+            try {
+                const res = await fetch(`/user/content/${content_id}/restore/${versionId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                });
+                if (!res.ok) throw new Error('restore failed');
+                const data = await res.json();
+                if (data.prompt_session_id) localStorage.setItem('prompt_session_id', data.prompt_session_id);
+                localStorage.removeItem('latest_response');
+                await loadPromptHistory();
+                showToast('Version restored');
+            } catch (e) {
+                console.error('Restore error:', e);
+                showToast('Could not restore this version.', 'error');
             }
-            localStorage.removeItem('latest_response');
-            await loadPromptHistory();
-            showToast('Version restored');
-        } catch (e) {
-            console.error('Restore error:', e);
-            showToast('Could not restore this version.', 'error');
-        }
-    }, 'Restore', 'btn-primary');
+        }, 'Restore', 'btn-primary');
+
+    // Close the history offcanvas FIRST — an open offcanvas keeps a backdrop and
+    // focus trap that block the confirm dialog, so the Restore button looks dead.
+    // Wait for it to finish closing, then show the confirm.
+    const el = document.getElementById('offcanvasHistory');
+    const off = (el && window.bootstrap && bootstrap.Offcanvas)
+        ? bootstrap.Offcanvas.getInstance(el) : null;
+    if (off) {
+        el.addEventListener('hidden.bs.offcanvas', confirmRestore, { once: true });
+        off.hide();
+    } else {
+        confirmRestore();
+    }
 }
 
 // Word-level diff (LCS) — highlights added tokens on the right, removed on the left
@@ -2296,22 +2306,21 @@ async function loadPromptHistory() {
                         const actionsDiv = document.createElement('div');
                         actionsDiv.className = 'message-actions';
 
+                        // Download buttons: all four formats on every response. Images embed
+                        // into the Word/PDF exports too, so they are always offered.
+                        const dlBtns = (withPid) => {
+                            const arg = withPid ? `, ${ph.id || 'null'}` : '';
+                            return `<button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this${arg})" title="Download as Word"><i class="bi bi-file-earmark-word" style="color:#4a9eda"></i></button>`
+                                + `<button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this${arg})" title="Download as PDF"><i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i></button>`
+                                + `<button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this${arg})" title="Download as PNG"><i class="bi bi-filetype-png" style="color:#4adaba"></i></button>`
+                                + `<button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this${arg})" title="Download as JPG"><i class="bi bi-filetype-jpg" style="color:#c58bff"></i></button>`;
+                        };
+
                         if(stop_text !== ai_response_text && empty_response !== true && !isRejected.includes(ai_response_text)){
                             // Render action buttons
                             if (ph.prompt_action === "SAVED_AS_DRAFT") {
                                 actionsDiv.innerHTML = `
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this, ${ph.id || 'null'})" title="Download as Word">
-                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this, ${ph.id || 'null'})" title="Download as PDF">
-                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this, ${ph.id || 'null'})" title="Download as PNG">
-                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this, ${ph.id || 'null'})" title="Download as JPG">
-                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
-                                    </button>
+                                    ${dlBtns(true)}
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
                                         <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                     </button>
@@ -2332,36 +2341,14 @@ async function loadPromptHistory() {
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
                                         <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                     </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this)" title="Download as Word">
-                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this)" title="Download as PDF">
-                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this)" title="Download as PNG">
-                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this)" title="Download as JPG">
-                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
-                                    </button>
+                                    ${dlBtns(false)}
                                 `;
                             }else{
                                 actionsDiv.innerHTML = `
                                     <button class="btn btn-ai-response" onclick="saveDraftFromResponse(${ph.id || 'null'})">
                                         <i class="bi bi-file-earmark" style="color:#ffd639"></i>
                                     </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('docx', this, ${ph.id || 'null'})" title="Download as Word">
-                                        <i class="bi bi-file-earmark-word" style="color:#4a9eda"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('pdf', this, ${ph.id || 'null'})" title="Download as PDF">
-                                        <i class="bi bi-file-earmark-pdf" style="color:#ff9d5c"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('png', this, ${ph.id || 'null'})" title="Download as PNG">
-                                        <i class="bi bi-filetype-png" style="color:#4adaba"></i>
-                                    </button>
-                                    <button class="btn btn-ai-response" onclick="downloadApprovedContent('jpg', this, ${ph.id || 'null'})" title="Download as JPG">
-                                        <i class="bi bi-filetype-jpg" style="color:#c58bff"></i>
-                                    </button>
+                                    ${dlBtns(true)}
                                     <button class="btn btn-ai-response" onclick="rejectResponse(${ph.id || 'null'})">
                                         <i class="bi bi-x-circle" style="color:#ff7171"></i>
                                     </button>

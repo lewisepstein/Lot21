@@ -112,7 +112,7 @@ async def pages_page(
 
 
 @router.post("/create_page", response_model=PageCreateResponse)
-async def create_page(
+def create_page(
     page_data: PageCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -226,7 +226,7 @@ async def page_settings(
 
 
 @router.get("/get_page/{page_id}")
-async def get_page(
+def get_page(
     page_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -270,7 +270,7 @@ async def get_page(
 
 
 @router.put("/update_page/{page_id}")
-async def update_page_endpoint(
+def update_page_endpoint(
     page_id: int,
     page_data: PageCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -337,7 +337,7 @@ async def update_page_endpoint(
         )
 
 @router.delete("/delete_page/{page_id}")
-async def delete_page_record(
+def delete_page_record(
     page_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -366,7 +366,7 @@ async def delete_page_record(
         )
 
 @router.delete("/delete_pages")
-async def delete_pages(
+def delete_pages(
     body: dict = Body(...),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):

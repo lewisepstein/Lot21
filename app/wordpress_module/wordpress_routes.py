@@ -196,7 +196,7 @@ async def unpublish_content(
 # GET /user/wordpress/status/{content_id}
 # ---------------------------------------------------------------------------
 @router.get("/status/{content_id}", response_model=PublishStatusResponse)
-async def publish_status(
+def publish_status(
     content_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -226,7 +226,7 @@ async def publish_status(
 # GET /user/wordpress/published
 # ---------------------------------------------------------------------------
 @router.get("/published", response_model=PublishedListResponse)
-async def list_published(
+def list_published(
     limit: int = Query(default=50, le=200),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):

@@ -1,15 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-
-from testing_module.prime_sperm import prime_sperm_auth
-
-
-from service_utils.routers import register_routers
+from fastapi.templating import Jinja2Templates
 from service_utils.log_management import setup_logger
+from service_utils.routers import register_routers
 
 # Initialize logging
 logger = setup_logger(__name__)
@@ -21,11 +16,7 @@ app = FastAPI(title="Lottie", version="1.0.0")
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
-app.mount(
-    "/static",
-    StaticFiles(directory="static"),
-    name="static"
-)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Register routers
 register_routers(app)
@@ -36,9 +27,7 @@ register_routers(app)
 async def login_page(request: Request, error: str = None):
     """Render login page."""
     return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"error": error}
+        request=request, name="login.html", context={"error": error}
     )
 
 
@@ -46,26 +35,11 @@ async def login_page(request: Request, error: str = None):
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     """Custom HTTP exception handler."""
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
 
-
-@app.post("/prime-sperm/auth")
-async def prime_sperm_authtest(request: Request):
-    """Health check endpoint."""
-
-    request = await request.json()
-
-    return prime_sperm_auth(
-        email = request["email"], 
-        product_key = request["product_key"],
-        app_ssuid = request["app_ssuid"]
-    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="192.168.9.198", port=8000, reload=False)

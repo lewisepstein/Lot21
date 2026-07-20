@@ -6,14 +6,17 @@ Content bodies are LLM-generated markdown. A small parser maps them to
 headings, bullets and styled runs so the exported documents look formatted
 rather than raw.
 """
+import base64
 import io
 import os
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+import requests
+
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt, RGBColor, Inches
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -24,12 +27,27 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, PageBreak, HRFlowable
+    SimpleDocTemplate, Paragraph, Spacer, PageBreak, HRFlowable, Image as RLImage
 )
 
 from service_utils.log_management import get_logger
 
 logger = get_logger(__name__)
+
+
+def _fetch_image(url: str) -> Optional[bytes]:
+    """Fetch raw image bytes from an http(s) URL or a data: URI, or None on failure."""
+    try:
+        if url.startswith("data:"):
+            b64 = url.split(",", 1)[1] if "," in url else ""
+            return base64.b64decode(b64) if b64 else None
+        if url.startswith(("http://", "https://")):
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            return resp.content
+    except Exception as e:  # network/decode errors must not abort the whole export
+        logger.warning("Could not fetch export image %s: %s", url[:80], e)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +228,17 @@ def build_docx(doc_title: str, items: List[Dict[str, Any]]) -> bytes:
                     p_run.bold = bold
                     p_run.italic = italic
 
+        for url in item.get("images") or []:
+            data = _fetch_image(url)
+            if not data:
+                document.add_paragraph(url)  # fallback: keep the link if fetch fails
+                continue
+            try:
+                document.add_picture(io.BytesIO(data), width=Inches(6))
+            except Exception as e:
+                logger.warning("Could not embed image in docx: %s", e)
+                document.add_paragraph(url)
+
     buffer = io.BytesIO()
     document.save(buffer)
     return buffer.getvalue()
@@ -308,6 +337,21 @@ def build_pdf(doc_title: str, items: List[Dict[str, Any]]) -> bytes:
             else:
                 story.append(Paragraph(_runs_to_pdf_markup(block["runs"]), styles["body"]))
 
+        for url in item.get("images") or []:
+            data = _fetch_image(url)
+            if not data:
+                story.append(Paragraph(_pdf_escape(url), styles["body"]))  # fallback
+                continue
+            try:
+                iw, ih = Image.open(io.BytesIO(data)).size
+                max_w = A4[0] - 40 * mm
+                scale = min(1.0, max_w / iw)
+                story.append(Spacer(1, 6))
+                story.append(RLImage(io.BytesIO(data), width=iw * scale, height=ih * scale))
+            except Exception as e:
+                logger.warning("Could not embed image in pdf: %s", e)
+                story.append(Paragraph(_pdf_escape(url), styles["body"]))
+
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -380,6 +424,26 @@ def _build_image(doc_title: str, items: List[Dict[str, Any]], fmt: str) -> bytes
             "color": color,
         })
 
+    def add_image_op(data, gap=18):
+        """Decode image bytes, flatten transparency onto white, fit to text width."""
+        try:
+            pil = Image.open(io.BytesIO(data))
+            if pil.mode in ("RGBA", "LA", "P"):
+                pil = pil.convert("RGBA")
+                flat = Image.new("RGB", pil.size, "white")
+                flat.paste(pil, mask=pil.split()[-1])
+                pil = flat
+            else:
+                pil = pil.convert("RGB")
+        except Exception as e:
+            logger.warning("Could not decode export image: %s", e)
+            return
+        w, h = pil.size
+        if w > text_width:
+            scale = text_width / w
+            pil = pil.resize((int(w * scale), max(1, int(h * scale))))
+        ops.append({"image": pil, "gap": gap, "height": pil.size[1]})
+
     grey = (136, 136, 136)
     dark = (10, 10, 10)
 
@@ -411,10 +475,19 @@ def _build_image(doc_title: str, items: List[Dict[str, Any]], fmt: str) -> bytes
             else:
                 add_text(block["runs"], 18, gap=14)
 
+        for url in item.get("images") or []:
+            data = _fetch_image(url)
+            if data:
+                add_image_op(data)
+            else:
+                add_text([(url, False, True)], 14, gap=10, color=grey)  # fallback
+
     total_height = 2 * _IMG_MARGIN
     for op in ops:
         if op.get("rule"):
             total_height += 2 + op["gap"]
+        elif op.get("image"):
+            total_height += op["height"] + op["gap"]
         else:
             total_height += len(op["lines"]) * op["line_height"] + op["gap"]
 
@@ -428,6 +501,10 @@ def _build_image(doc_title: str, items: List[Dict[str, Any]], fmt: str) -> bytes
                 fill=(204, 204, 204), width=2,
             )
             y += 2 + op["gap"]
+            continue
+        if op.get("image"):
+            image.paste(op["image"], (_IMG_MARGIN, y))
+            y += op["height"] + op["gap"]
             continue
         for line in op["lines"]:
             x = _IMG_MARGIN + op["indent"]

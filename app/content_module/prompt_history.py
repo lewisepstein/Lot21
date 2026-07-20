@@ -34,7 +34,7 @@ templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/prompt_history/{prompt_session_id}/{content_id}", response_model=List[PromptHistoryResponse])
-async def get_prompt_history(
+def get_prompt_history(
     prompt_session_id: str,
     content_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -76,7 +76,7 @@ async def get_prompt_history(
     
 
 @router.get("/content/{content_id}/history")
-async def get_content_history(
+def get_content_history(
     content_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -98,7 +98,7 @@ async def get_content_history(
 
 
 @router.post("/content/{content_id}/restore/{version_id}")
-async def restore_content_history_version(
+def restore_content_history_version(
     content_id: int,
     version_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -131,7 +131,7 @@ async def restore_content_history_version(
 
 
 @router.post("/prompt_history/set_action", response_model=AddDraftContentResponse)
-async def set_action_prompt_history(
+def set_action_prompt_history(
     request: SaveAsDraftRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -190,7 +190,7 @@ async def set_action_prompt_history(
 
 @router.get("/prompt_history_data",response_class=HTMLResponse)
 @router.get("/prompt_history_data/{prompt_session_id:str}", response_class=HTMLResponse)
-async def get_all_prompt_history(
+def get_all_prompt_history(
     request: Request,
     prompt_session_id: Optional[str] = None,
     content_id: Optional[int] = None,

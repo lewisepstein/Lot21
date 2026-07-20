@@ -126,7 +126,6 @@ def get_user(username: str) -> Optional[Dict[str, Any]]:
         db = PostgresDB()
         users = db.read('users', conditions={'email': username, 'is_active': True})
 
-        print(users, username)
         
         if not users:
             return None
@@ -154,11 +153,9 @@ def authenticate_user(username: str, password: str) -> Tuple[bool, int, str, Opt
         Tuple of (success: bool, status_code: int, message: str, user_data: dict or None)
     """
 
-    print(username, password)
 
     user = get_user(username)
 
-    print(user)
 
     if not user:
         return False, 401, "User not found", None
@@ -239,7 +236,7 @@ def blacklist_token(token: str) -> Tuple[bool, int, str]:
         jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         token_blacklist.add(token)
         return True, 200, "Token blacklisted successfully"
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         return False, 401, "Invalid token"
 
 

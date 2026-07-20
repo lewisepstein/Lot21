@@ -80,7 +80,7 @@ async def dashboard_page(
 
 # API Endpoints
 @router.get("/dashboard-data", response_model=DashboardResponse)
-async def dashboard_data(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def dashboard_data(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Dashboard data API endpoint - returns dashboard data for authenticated user.
     

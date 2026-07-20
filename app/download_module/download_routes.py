@@ -60,7 +60,7 @@ def _file_response(data: bytes, media_type: str, filename: str) -> Response:
 
 
 @router.get("/content/{content_id}")
-async def download_content(
+def download_content(
     content_id: int,
     file_format: str = Query(default="docx", description="'docx' or 'pdf'"),
     prompt_id: Optional[int] = Query(default=None, description="Download this specific response instead of the latest approved one"),
@@ -98,7 +98,7 @@ async def download_content(
 
 
 @router.get("/freeform/{message_id}")
-async def download_freeform_message(
+def download_freeform_message(
     message_id: int,
     file_format: str = Query(default="docx", description="'docx', 'pdf', 'png' or 'jpg'"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -125,7 +125,7 @@ async def download_freeform_message(
 
 
 @router.get("/category/{category_id}")
-async def download_category(
+def download_category(
     category_id: int,
     file_format: str = Query(default="docx", description="'docx' or 'pdf'"),
     credentials: HTTPAuthorizationCredentials = Depends(security),

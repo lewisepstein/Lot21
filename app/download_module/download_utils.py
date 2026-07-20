@@ -23,30 +23,25 @@ def _enum_value(value: Any) -> Any:
     return value.value if hasattr(value, "value") else value
 
 
-def _normalize_body(raw: Any) -> Optional[str]:
+def _split_body(raw: Any) -> Tuple[Optional[str], List[str]]:
     """
     Content bodies are stored either as plain markdown or as JSON like
-    {"text": "...", "images": ["url", ...]}. Return printable markdown,
-    or None when there is nothing to export.
+    {"text": "...", "images": ["url", ...]}. Return (markdown_text, image_urls)
+    so exporters can embed the images instead of printing their URLs.
     """
     if not raw:
-        return None
+        return None, []
     text = str(raw).strip()
+    images: List[str] = []
     if text.startswith("{"):
         try:
             data = json.loads(text)
         except (ValueError, TypeError):
             data = None
         if isinstance(data, dict):
-            parts = []
-            inner = (data.get("text") or "").strip()
-            if inner:
-                parts.append(inner)
-            images = data.get("images") or []
-            if images:
-                parts.append("\n".join(f"- Image: {url}" for url in images if url))
-            text = "\n\n".join(parts)
-    return text or None
+            images = [url for url in (data.get("images") or []) if url]
+            text = (data.get("text") or "").strip()
+    return (text or None), images
 
 
 def _latest_approved_response(db: PostgresDB, content_id: int) -> Optional[Dict[str, Any]]:
@@ -77,18 +72,21 @@ def _build_export_item(db: PostgresDB, content: Dict[str, Any],
     approved_prompt = _latest_approved_response(db, content["id"])
 
     body = None
+    images: List[str] = []
     approved_on = None
     title = None
 
-    if approved_prompt and _normalize_body(approved_prompt.get("ai_response")):
-        body = _normalize_body(approved_prompt.get("ai_response"))
-        approved_on = approved_prompt.get("updated_on")
-        title = approved_prompt.get("prompt_name")
-    elif _enum_value(content.get("approval_status")) == "APPROVED":
-        body = _normalize_body(content.get("generated_content"))
+    if approved_prompt:
+        p_body, p_images = _split_body(approved_prompt.get("ai_response"))
+        if p_body or p_images:
+            body, images = p_body, p_images
+            approved_on = approved_prompt.get("updated_on")
+            title = approved_prompt.get("prompt_name")
+    if not body and not images and _enum_value(content.get("approval_status")) == "APPROVED":
+        body, images = _split_body(content.get("generated_content"))
         approved_on = content.get("approval_status_date")
 
-    if not body:
+    if not body and not images:
         return None
 
     if not title:
@@ -106,7 +104,8 @@ def _build_export_item(db: PostgresDB, content: Dict[str, Any],
         "quarter": content.get("quarter"),
         "approved_on": approved_on,
         "created_on": content.get("created_on"),
-        "body": body,
+        "body": body or "",
+        "images": images,
     }
 
 
@@ -153,8 +152,8 @@ def get_prompt_response_item(content_id: int, prompt_id: int) -> Optional[Dict[s
         return None
     prompt = prompts[0]
 
-    body = _normalize_body(prompt.get("ai_response"))
-    if not body:
+    body, images = _split_body(prompt.get("ai_response"))
+    if not body and not images:
         return {"content_id": content_id}
 
     title = prompt.get("prompt_name")
@@ -173,7 +172,8 @@ def get_prompt_response_item(content_id: int, prompt_id: int) -> Optional[Dict[s
         "quarter": content.get("quarter"),
         "approved_on": approved_on,
         "created_on": content.get("created_on"),
-        "body": body,
+        "body": body or "",
+        "images": images,
     }
 
 
@@ -192,8 +192,11 @@ def get_freeform_message_item(message_id: int) -> Optional[Dict[str, Any]]:
     message = rows[0]
 
     content = str(message.get("content") or "")
-    body = None if content.strip().startswith("data:image/") else _normalize_body(content)
-    if not body:
+    if content.strip().startswith("data:image/"):
+        body, images = None, [content.strip()]
+    else:
+        body, images = _split_body(content)
+    if not body and not images:
         return {"message_id": message_id}
 
     title = "Free Form AI"
@@ -213,7 +216,8 @@ def get_freeform_message_item(message_id: int) -> Optional[Dict[str, Any]]:
         "quarter": None,
         "approved_on": None,
         "created_on": message.get("created_on"),
-        "body": body,
+        "body": body or "",
+        "images": images,
     }
 
 

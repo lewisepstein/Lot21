@@ -98,7 +98,7 @@ async def content_generation_page(
 
 
 @router.post("/content", response_model=ContentCreateResponse)
-async def create_content(
+def create_content(
     content_data: ContentCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -190,7 +190,7 @@ async def create_content(
 
 
 @router.post("/content/draft", response_model=AddDraftContentResponse)
-async def add_draft_content(
+def add_draft_content(
     draft_data: AddDraftContentRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -297,7 +297,7 @@ async def get_unattached(
         )
 
 @router.post("/content/save_as_draft", response_model=AddDraftContentResponse)
-async def user_save_as_draft(
+def user_save_as_draft(
     draft_data: SaveAsDraftRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):

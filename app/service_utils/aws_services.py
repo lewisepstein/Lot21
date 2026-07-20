@@ -72,7 +72,6 @@ def connect_s3():
 # -----------------------------------------------------------
 def create_img_from_base64(image_base64, prefix="attachments") -> str:
 
-    print("Creating image from base64 data...", type(image_base64))
 
     image_bytes = validate_image_base64(image_base64)
 
@@ -132,5 +131,4 @@ def safe_upload_image_to_s3(
             prefix=prefix
         )
     except Exception as e:
-        print(f"S3 upload failed [prefix={prefix}]: {e}")
         return None

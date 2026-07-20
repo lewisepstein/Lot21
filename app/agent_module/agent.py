@@ -86,7 +86,7 @@ async def save_api_credentials(
 
 
 @router.get("/settings/api")
-async def get_api_credentials(
+def get_api_credentials(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -147,7 +147,7 @@ async def save_schedule_settings(
 
 
 @router.get("/settings/schedule")
-async def get_schedule_settings(
+def get_schedule_settings(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -211,7 +211,7 @@ async def save_content_settings(
 
 
 @router.get("/settings/content")
-async def get_content_settings(
+def get_content_settings(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -275,7 +275,7 @@ async def save_model_settings(
 
 
 @router.get("/settings/model")
-async def get_model_settings(
+def get_model_settings(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -335,7 +335,7 @@ async def save_image_model_settings(
 
 
 @router.get("/settings/image-model")
-async def get_image_model_settings(
+def get_image_model_settings(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -362,7 +362,7 @@ async def get_image_model_settings(
 
 
 @router.get("/settings/training-history")
-async def get_training_history_endpoint(
+def get_training_history_endpoint(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
@@ -453,7 +453,7 @@ async def load_training_data(
 
 
 @router.delete("/settings/training-record/{record_id}")
-async def delete_training_record(
+def delete_training_record(
     record_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -546,7 +546,7 @@ async def update_training_record_endpoint(
 
 
 @router.get("/settings/training-record/{record_id}/versions")
-async def get_training_record_versions(
+def get_training_record_versions(
     record_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -594,7 +594,7 @@ async def get_training_record_versions(
 
 
 @router.post("/settings/training-record/{record_id}/restore/{version_number}")
-async def restore_training_record_version(
+def restore_training_record_version(
     record_id: int,
     version_number: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)

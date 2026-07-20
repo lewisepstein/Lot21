@@ -36,7 +36,7 @@ security = HTTPBearer()
 
 # API Endpoints
 @router.post("/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest, request: Request):
+def login(login_data: LoginRequest, request: Request):
     """
     Login endpoint - authenticates user, creates session, and returns JWT token.
     
@@ -53,7 +53,6 @@ async def login(login_data: LoginRequest, request: Request):
         login_data.passwd
     )
     
-    print(success, status_code, message, user)
 
     if not success:
         raise HTTPException(status_code=status_code, detail=message)
@@ -114,7 +113,7 @@ async def login(login_data: LoginRequest, request: Request):
 
 
 @router.post("/logout", response_model=LogoutResponse)
-async def logout(
+def logout(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     session_token: Optional[str] = None
 ):
@@ -151,7 +150,7 @@ async def logout(
 
 
 @router.post("/password-reset", response_model=PasswordResetResponse)
-async def password_reset(reset_data: PasswordResetRequest):
+def password_reset(reset_data: PasswordResetRequest):
     """
     Password reset endpoint - initiates password reset process.
     
@@ -186,7 +185,7 @@ async def password_reset(reset_data: PasswordResetRequest):
 
 
 @router.post("/password-change", response_model=PasswordChangeResponse)
-async def password_change(
+def password_change(
     change_data: PasswordChangeRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):

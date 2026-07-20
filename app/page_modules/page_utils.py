@@ -453,7 +453,6 @@ def get_page_by_id(page_id: int) -> Optional[Dict[str, Any]]:
         
         page = pages[0]
 
-        print("Retrieved page:", page)
         
         # Get content from content table
         content_data = db.read(
@@ -527,11 +526,9 @@ def update_page(
     
     try:
 
-        print("Scrape data flag:", scrape_data)
 
         if scrape_data:
 
-            print("Scrape data is enabled")
 
             if not source_url:
                 raise ValueError("Source URL is required when scrape data is enabled")

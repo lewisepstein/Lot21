@@ -166,3 +166,6 @@ wrapt
 xxhash
 yarl
 zstandard
+pytest
+pytest-asyncio
+httpx

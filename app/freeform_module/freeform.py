@@ -65,7 +65,7 @@ async def freeform_page(
 # ============= PROJECT API ROUTES =============
 
 @router.post("/projects", response_model=ProjectResponse)
-async def create_new_project(
+def create_new_project(
     project_data: ProjectCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -98,7 +98,7 @@ async def create_new_project(
 
 
 @router.get("/projects", response_model=ProjectListResponse)
-async def list_projects(
+def list_projects(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     include_inactive: bool = False
 ):
@@ -129,7 +129,7 @@ async def list_projects(
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
-async def get_project(
+def get_project(
     project_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -157,7 +157,7 @@ async def get_project(
 
 
 @router.put("/projects/{project_id}", response_model=ProjectResponse)
-async def update_existing_project(
+def update_existing_project(
     project_id: int,
     project_data: ProjectUpdateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -191,7 +191,7 @@ async def update_existing_project(
 
 
 @router.delete("/projects/{project_id}")
-async def delete_existing_project(
+def delete_existing_project(
     project_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -221,7 +221,7 @@ async def delete_existing_project(
 # ============= CHAT API ROUTES =============
 
 @router.get("/projects/{project_id}/chat", response_model=ChatHistoryResponse)
-async def get_project_chat_history(
+def get_project_chat_history(
     project_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     limit: Optional[int] = None
@@ -250,7 +250,7 @@ async def get_project_chat_history(
 
 
 @router.post("/chat")
-async def send_chat_message(
+def send_chat_message(
     chat_request: ChatCompletionRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):

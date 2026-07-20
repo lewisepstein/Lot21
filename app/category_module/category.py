@@ -67,7 +67,7 @@ async def understanding_page(
 
 
 @router.post("/create_category", response_model=CategoryCreateResponse)
-async def create_category(
+def create_category(
     category_data: CategoryCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
