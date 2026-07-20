@@ -108,7 +108,6 @@ nvidia-nccl-cu12
 nvidia-nvjitlink-cu12
 nvidia-nvshmem-cu12
 nvidia-nvtx-cu12
-open_clip_torch
 orjson
 ormsgpack
 packaging
