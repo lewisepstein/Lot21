@@ -907,9 +907,12 @@ class RagModule:
             )
 
         # Dedup: projects the user has already seen on this page must not come
-        # back as new items in project-list sections (case studies, lots)
+        # back as new items in project-list sections (case studies, lots).
+        # Skipped on follow-ups — there the conversation history governs what to
+        # keep/extend, and a "don't reintroduce these" rule would contradict it
+        # (e.g. "add KPF to project 3" / "give me 5 more" need the existing list).
         excluded_seen = 0
-        if DEDUP_ENABLED and seen_items and category_id in DEDUP_CATEGORY_IDS:
+        if DEDUP_ENABLED and seen_items and category_id in DEDUP_CATEGORY_IDS and not is_follow_up:
             excluded_seen = len(seen_items)
             prompt += (
                 "\n\nPREVIOUSLY GENERATED PROJECTS (already shown to the user on "
