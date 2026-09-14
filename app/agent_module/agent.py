@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Request, Depends, HTTPException, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -85,6 +86,17 @@ async def save_api_credentials(
         raise HTTPException(status_code=500, detail="Unable to save API credentials at this time")
 
 
+def api_status() -> Dict[str, bool]:
+    """What is actually wired up, from the environment the app runs with."""
+    web_on = os.getenv("WEB_SEARCH_ENABLED", "true").lower() in ("1", "true", "yes")
+    return {
+        "web_search_configured": bool(web_on and os.getenv("GEMINI_TEXT_API_KEY")),
+        "image_gen_configured": bool(
+            os.getenv("GEMINI_IMAGE_API_KEY") and os.getenv("IMAGE_MODEL_ID")
+        ),
+    }
+
+
 @router.get("/settings/api")
 def get_api_credentials(
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -99,12 +111,7 @@ def get_api_credentials(
             logger.warning("Invalid token attempt in get_api_credentials")
             raise HTTPException(status_code=status_code, detail="Authentication failed")
         
-        # TODO: Implement logic to check if API credentials exist in database
-        
-        return {
-            "web_search_configured": False,
-            "image_gen_configured": False
-        }
+        return api_status()
         
     except HTTPException:
         raise

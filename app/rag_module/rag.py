@@ -74,6 +74,13 @@ WEB_SEARCH_TRIGGERS = (
     "news",
     "up to date",
     "up-to-date",
+    # explicit research asks, any category
+    "research",
+    "search for",
+    "credible",
+    "sources",
+    "statistics",
+    "data on",
 )
 
 # Deduplication: sections that list projects must not repeat ones the user
@@ -133,19 +140,25 @@ def detect_season_and_year(query: str):
     q = (query or "").lower()
     today = datetime.now()
 
+    # A prompt naming several seasons or years ("between Fall/2023 and
+    # Spring/2026") describes a range, not the issue to write, so only a
+    # single unambiguous mention is taken from the query.
     season = os.getenv("NEWSLETTER_SEASON")
     if not season:
-        for name in ("winter", "spring", "summer", "autumn", "fall"):
-            if name in q:
-                season = "Fall" if name in ("autumn", "fall") else name.title()
-                break
+        found = [
+            "Fall" if name in ("autumn", "fall") else name.title()
+            for name in ("winter", "spring", "summer", "autumn", "fall")
+            if re.search(rf"\b{name}\b", q)
+        ]
+        if len(set(found)) == 1:
+            season = found[0]
     if not season:
         season = SEASON_BY_MONTH[today.month]
 
     year = os.getenv("NEWSLETTER_YEAR")
     if not year:
-        year_match = re.search(r"\b(20\d{2})\b", query or "")
-        year = year_match.group(1) if year_match else str(today.year)
+        years = set(re.findall(r"\b(20\d{2})\b", query or ""))
+        year = years.pop() if len(years) == 1 else str(today.year)
 
     return season, year
 
@@ -232,6 +245,27 @@ def detect_case_study_category(query: str, context_str: str = None) -> int:
 
     # 1: Adapt (Default fallback)
     return 1
+
+
+_QUESTION_OPENERS = re.compile(
+    r"^\s*(which|when|where|who|whom|whose|how many|how much|how often|"
+    r"is there|are there|was there|were there|did|does|"
+    r"list|find|show me|tell me which|tell me when)\b",
+    re.IGNORECASE,
+)
+
+
+def is_question_query(query: str) -> bool:
+    """
+    A lookup question about existing content ("Which issue mentioned X?",
+    "List the newsletters that ...") as opposed to a content request that
+    happens to be phrased as a question ("What is circularity?", which the
+    Understanding template should answer as page content).
+    """
+    q = (query or "").strip()
+    if not q or is_rewrite_intent(q):
+        return False
+    return bool(_QUESTION_OPENERS.match(q))
 
 
 def is_follow_up_query(query: str) -> bool:
@@ -610,12 +644,26 @@ class RagModule:
             return NO_CONTENT_TO_REFINE_TEXT, telemetry.export(), [], 0
 
         sources = []
+        # Page context (the page's formatted data) and the knowledge base are
+        # combined: on thin pages such as the newsletter archive index the page
+        # text alone is just a list of issue names, so retrieval must run too.
+        # base_context stays page-only because it is re-ingested below.
+        try:
+            retrieved, retrieved_doc_ids = self._retrieve_chunks(query)
+        except Exception as retrieval_error:
+            print(f"Knowledge base retrieval failed, continuing without it: {retrieval_error}")
+            retrieved, retrieved_doc_ids = "", ()
+        sources.extend(self._resolve_source_labels(retrieved_doc_ids))
         if context:
             base_context = context
+            context_str = (
+                base_context + "\n\nRELATED KNOWLEDGE BASE CONTENT:\n" + retrieved
+                if retrieved
+                else base_context
+            )
         else:
-            base_context, retrieved_doc_ids = self._retrieve_chunks(query)
-            sources.extend(self._resolve_source_labels(retrieved_doc_ids))
-        context_str = base_context
+            base_context = retrieved
+            context_str = base_context
 
         # Live web search: fetch current facts and fold them into the context —
         # prompt builders treat context as internal research, so even prompts
@@ -632,7 +680,7 @@ class RagModule:
                 if live_facts:
                     sources.extend(web_sources)
                     context_str = (
-                        base_context
+                        context_str
                         + "\n\nLIVE WEB DATA (current figures fetched via Google Search"
                         + " — prefer these for statistics and recent events, and state"
                         + " their dates):\n"
@@ -699,7 +747,14 @@ class RagModule:
         )
 
         # ---- ROUTING (category templates unchanged) ----
-        if is_follow_up and not is_focused_rewrite:
+        # A lookup question ("Which issue mentioned X?") is answered from the
+        # context instead of being reshaped into a fresh page or newsletter.
+        if is_question_query(query) and not is_follow_up and not is_rewrite:
+            prompt = LottiePrompts.build_answer_prompt(query=query, context_str=context_str)
+            telemetry.mark("question_answer")
+            print("Lookup question: answering from context instead of generating")
+
+        elif is_follow_up and not is_focused_rewrite:
             prompt = LottiePrompts.build_multi_turn_prompt(
                 query=query,
                 conversation_history=conversation_history,
@@ -1022,14 +1077,22 @@ class RagModule:
             return None
 
     def generate_visual(
-        self, prompt, context=None, ref_images_b64=None, force_style=None
+        self,
+        prompt,
+        context=None,
+        ref_images_b64=None,
+        force_style=None,
+        conversation_history=None,
     ):
         telemetry = Telemetry()
         telemetry.mark("image_ms")
 
         visual_mode = force_style or detect_visual_mode(prompt)
         final_prompt = build_image_prompt(
-            query=prompt, context=context, style_key=visual_mode
+            query=prompt,
+            context=context,
+            style_key=visual_mode,
+            conversation_history=conversation_history,
         )
 
         try:
@@ -1116,7 +1179,10 @@ class RagModule:
 
         if image_attachment_mode == "image_only":
             image = self.generate_visual(
-                prompt=query, context=context, ref_images_b64=image_base_64
+                prompt=query,
+                context=context,
+                ref_images_b64=image_base_64,
+                conversation_history=conversation_history,
             )
             return {
                 "text": "",
@@ -1145,6 +1211,7 @@ class RagModule:
                     prompt=query,
                     context=context,
                     ref_images_b64=image_base_64,
+                    conversation_history=conversation_history,
                 ),
             }
 

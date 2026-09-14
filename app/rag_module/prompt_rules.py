@@ -26,6 +26,33 @@ class LottiePrompts:
     """
 
     @staticmethod
+    def build_answer_prompt(query, context_str=""):
+        """
+        Lookup question about existing content: answer from the context only,
+        naming where each fact comes from, and say plainly when the context
+        does not hold the answer instead of inventing one.
+        """
+        return f"""{LottiePrompts.GUARDRAIL_RULES}
+
+            {LottiePrompts.PLAIN_TEXT_RULES}
+
+            You are Lottie, answering a question about Lot21's existing content.
+
+            QUESTION:
+            {query}
+
+            KNOWLEDGE CONTEXT (page content, knowledge base and any live web data):
+            {context_str}
+
+            STRICT RULES:
+            - Answer the question directly using ONLY the knowledge context.
+            - For each match, name the source item (for example the newsletter issue, season and year, or page) and quote or closely paraphrase the relevant passage.
+            - If the context does not contain the answer, reply exactly: "No match found in the available content." and then list what content is available, so the user knows what to add.
+            - Never invent issues, dates, projects or sources.
+            - Do not generate a newsletter, page or article; this is an answer, not new content.
+            """
+
+    @staticmethod
     def build_multi_turn_prompt(
         query,
         conversation_history,
