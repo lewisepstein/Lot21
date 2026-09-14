@@ -29,6 +29,17 @@ def _extract_response_text(raw: Any) -> str:
     return text
 
 
+def _response_has_images(raw: Any) -> bool:
+    """Image-only responses carry no text, only an images list."""
+    text = str(raw or "").strip()
+    if not text.startswith("{"):
+        return False
+    try:
+        return bool(json.loads(text).get("images"))
+    except (ValueError, TypeError):
+        return False
+
+
 # Project titles appear in three shapes across generated content:
 # a standalone title line right above the year line ("POWERHOUSE TELEMARK"
 # then "2020 - BREEAM OUTSTANDING"), an explicit "PROJECT X" header, or a
@@ -136,6 +147,10 @@ def _get_conversation_history(
         for row in rows or []:  # newest first
             user_prompt = (row.get("user_prompt") or "").strip()
             response_text = _extract_response_text(row.get("ai_response"))
+            # Image-only turns have no text; keep them so their instructions
+            # ("directly overhead, no words") still apply to later images.
+            if not response_text and _response_has_images(row.get("ai_response")):
+                response_text = "(image generated)"
             if not user_prompt or not response_text:
                 continue
             if any(m in response_text.lower() for m in skip_markers):

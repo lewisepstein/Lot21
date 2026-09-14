@@ -193,3 +193,27 @@ def test_user_guide_documents_aerial_mode_and_image_limits():
         assert f"**{word}**" in guide
     assert "one image per request" in guide
     assert "do not have a source URL" in guide
+
+
+# ---------- session history keeps image-only turns ----------
+
+def test_conversation_history_keeps_image_only_turns():
+    import json
+    from content_module import prompt_history_utils as phu
+
+    rows = [  # newest first, as the database returns them
+        {"user_prompt": "Provide three more images", "ai_response": json.dumps({"text": "", "images": ["s3://b"]})},
+        {"user_prompt": "Images must be taken directly overhead, no words.", "ai_response": json.dumps({"text": "", "images": ["s3://a"]})},
+        {"user_prompt": "placeholder without response", "ai_response": None},
+    ]
+
+    class FakeDB:
+        def read(self, *a, **kw):
+            return rows
+
+    turns = phu._get_conversation_history(FakeDB(), "session-1")
+    assert [t["prompt"] for t in turns] == [
+        "Images must be taken directly overhead, no words.",
+        "Provide three more images",
+    ]
+    assert all(t["response"] == "(image generated)" for t in turns)
