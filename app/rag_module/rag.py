@@ -248,9 +248,13 @@ def detect_case_study_category(query: str, context_str: str = None) -> int:
 
 
 _QUESTION_OPENERS = re.compile(
-    r"^\s*(which|when|where|who|whom|whose|how many|how much|how often|"
+    # optional polite lead-in: "please", "can you", "could you tell me", "I want to know"
+    r"^\s*(?:(?:please|kindly|hi|hello)[,\s]+)?"
+    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?"
+    r"(?:(?:tell|show|let)\s+(?:me|us)\s+(?:please\s+)?|i(?:'d| would)? (?:want|need|like) to know\s+)?"
+    r"(which|when|where|who|whom|whose|how many|how much|how often|"
     r"is there|are there|was there|were there|did|does|"
-    r"list|find|show me|tell me which|tell me when)\b",
+    r"list|find|search|identify|locate)\b",
     re.IGNORECASE,
 )
 

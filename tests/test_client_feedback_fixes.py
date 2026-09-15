@@ -42,6 +42,11 @@ def test_single_season_and_year_still_detected(rag, monkeypatch):
         "When did we last cover timber construction?",
         "List the issues that mention concrete",
         "Is there a newsletter about mass timber?",
+        "Please tell me which newsletter covered concrete",
+        "Can you find which issue mentioned concrete?",
+        "Could you please list the issues on timber",
+        "I want to know when we last covered biochar",
+        "Search the archive for issues mentioning concrete",
     ],
 )
 def test_questions_are_detected(rag, q):
