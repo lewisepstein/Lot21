@@ -160,8 +160,10 @@ def _get_conversation_history(
                 continue
             if any(m in response_text.lower() for m in skip_markers):
                 continue
+            # A follow-up ("add 2 more in the same format") returns the whole
+            # previous list, so a 5-project answer (~6,000 chars) must fit
             turns.append(
-                {"prompt": user_prompt[:1000], "response": response_text[:4000]}
+                {"prompt": user_prompt[:1000], "response": response_text[:12000]}
             )
             if len(turns) >= limit:
                 break

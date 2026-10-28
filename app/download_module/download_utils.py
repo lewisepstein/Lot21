@@ -196,6 +196,11 @@ def get_freeform_message_item(message_id: int) -> Optional[Dict[str, Any]]:
         body, images = None, [content.strip()]
     else:
         body, images = _split_body(content)
+    # A Text & Image answer keeps its image in attachments (a user message
+    # keeps a JSON list of uploaded files there instead)
+    extra = str(message.get("attachments") or "").strip()
+    if extra.startswith("data:image/"):
+        images = (images or []) + [extra]
     if not body and not images:
         return {"message_id": message_id}
 

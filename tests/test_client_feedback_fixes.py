@@ -412,3 +412,41 @@ def test_overhead_style_carries_to_next_image_in_session():
     assert detect_visual_mode("Watercolour of a rooftop farm", history) == "editorial"
     assert detect_visual_mode("A rooftop farm", [{"prompt": "Explain the water flow system", "response": ""}]) == "photo"
     assert detect_visual_mode("A rooftop farm") == "photo"
+    # The latest style instruction wins over an older one
+    mixed = [{"prompt": "Watercolour illustration of a park", "response": ""}] + history
+    assert detect_visual_mode("Provide another image of a rooftop farm", mixed) == "aerial"
+
+
+def test_follow_up_history_keeps_a_whole_five_project_answer():
+    # PR-07: the 6,251-char PR-04 list was cut to 4,000 chars before the follow-up
+    import json
+    from content_module import prompt_history_utils as phu
+
+    long_answer = "PROJECT\n" + "x" * 6500
+    rows = [{"user_prompt": "Find 5 new restore projects", "ai_response": json.dumps({"text": long_answer})}]
+
+    class FakeDB:
+        def read(self, *a, **kw):
+            return rows
+
+    turns = phu._get_conversation_history(FakeDB(), "session-1")
+    assert turns[0]["response"] == long_answer
+
+
+def test_reference_image_data_url_is_decoded_with_its_type(rag):
+    # AT-04: "data:image/jpeg;base64,..." was decoded whole, corrupting the image
+    import base64
+
+    raw = b"\xff\xd8\xff\xe0 jpeg bytes"
+    seen = {}
+
+    class FakeModels:
+        def generate_content(self, model, contents, config):
+            seen["parts"] = contents[0].parts
+            return None
+
+    obj = rag.RagModule.__new__(rag.RagModule)
+    obj.image_client = types.SimpleNamespace(models=FakeModels())
+    obj.generate_visual("A park", ref_images_b64=["data:image/jpeg;base64," + base64.b64encode(raw).decode()])
+    img = seen["parts"][1].inline_data
+    assert img.data == raw and img.mime_type == "image/jpeg"

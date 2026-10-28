@@ -69,13 +69,13 @@ def detect_visual_mode(query: str, conversation_history=None) -> str:
     # A style set earlier in the session ("images must be directly overhead")
     # still applies to a plain follow-up. Diagram words are not carried: text
     # prompts often say "system" or "process" without wanting a diagram.
-    earlier = " ".join(
-        t.get("prompt", "") for t in (conversation_history or [])[-3:]
-    ).lower()
-    if _mentions(earlier, ILLUSTRATION_KEYWORDS):
-        return "editorial"
-    if _mentions(earlier, AERIAL_KEYWORDS):
-        return "aerial"
+    # The most recent style instruction wins.
+    for turn in reversed((conversation_history or [])[-3:]):
+        earlier = (turn.get("prompt") or "").lower()
+        if _mentions(earlier, ILLUSTRATION_KEYWORDS):
+            return "editorial"
+        if _mentions(earlier, AERIAL_KEYWORDS):
+            return "aerial"
     return "photo"
 
 

@@ -100,3 +100,39 @@ def test_image_mode_long_message_still_returns_an_image(ff):
     long_prompt = "Make it brighter and use this brief: " + "coastal park details " * 60
     _, image, kind = fu.generate_ai_response(long_prompt, chat_history=PREVIOUS_IMAGE, mode="image")
     assert kind == "IMAGE" and image in ("NEWIMG", "EDITED")
+
+
+def test_text_beside_edited_attachment_is_based_on_the_images(ff, monkeypatch):
+    # FO-11: the text step only saw the chat, so it described earlier documents
+    fu, calls = ff
+    edited = "data:image/png;base64," + base64.b64encode(b"night").decode()
+    monkeypatch.setattr(fu, "edit_image", lambda prompt, data, mime: edited)
+    history = [{"role": "ASSISTANT", "content": "Summary of the Manhattan PDF", "content_type": "TEXT"}]
+    text, image, kind = fu.generate_ai_response(
+        "Turn this into a night scene and describe the changes", chat_history=history, attachments=[IMG], mode="text_and_image"
+    )
+    assert (image, kind) == (edited, "MULTIMODAL")
+    sent = calls["text"][-1]
+    assert isinstance(sent, list)
+    assert {"mime_type": "image/png", "data": b"png-bytes"} in sent
+    assert {"mime_type": "image/png", "data": b"night"} in sent
+
+
+def test_text_and_image_download_includes_the_image(monkeypatch):
+    # RG-07: the image of a Text & Image answer lives in attachments and was left out
+    from download_module import download_utils as du
+
+    img = "data:image/png;base64," + base64.b64encode(b"night").decode()
+    tables = {
+        "freeform_chat": [{"id": 9, "project_id": 1, "content": "Here are the changes.", "attachments": img, "created_on": None}],
+        "freeform_projects": [{"project_name": "QA"}],
+    }
+
+    class FakeDB:
+        def read(self, table, **kw):
+            return tables[table]
+
+    monkeypatch.setattr(du, "PostgresDB", FakeDB)
+    item = du.get_freeform_message_item(9)
+    assert item["body"] == "Here are the changes."
+    assert item["images"] == [img]

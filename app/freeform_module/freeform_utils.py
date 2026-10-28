@@ -2042,19 +2042,40 @@ def clean_markdown_formatting(text: str) -> str:
     return text
 
 
+def _data_url_image(data_url: str) -> Tuple[str, bytes]:
+    """("image/jpeg", bytes) from a "data:image/jpeg;base64,..." URL."""
+    header, _, data = data_url.partition(",")
+    return header[5:].split(";")[0] or "image/png", base64.b64decode(data)
+
+
 def _text_alongside_image(
-    context_str: str, user_message: str, instructions: str, standing_instructions: str = ""
+    context_str: str,
+    user_message: str,
+    instructions: str,
+    standing_instructions: str = "",
+    images: Optional[List[Tuple[str, bytes]]] = None,
 ) -> Optional[str]:
-    """Plain-text reply shown next to a generated or edited image; None if it cannot be made."""
+    """
+    Plain-text reply shown next to a generated or edited image; None if it cannot be made.
+    images: (mime_type, bytes) pairs for the reply to describe, e.g. the
+    attached photo and the edited result. Without them the model only sees
+    the chat, and writes about earlier messages instead of the photo.
+    """
     if not GEMINI_API_KEY:
         return None
     try:
         parts = [context_str] if context_str else []
         parts += [f"User: {user_message}", f"\nIMPORTANT INSTRUCTIONS: {instructions}"]
+        if images:
+            parts.append(
+                "The attached images are the original and the result: base your "
+                "reply on them, not on earlier messages."
+            )
         if standing_instructions:
             parts.append(standing_instructions.strip())
+        prompt = "\n\n".join(parts)
         response = generate_with_model_fallback(
-            "\n\n".join(parts),
+            [prompt] + [{"mime_type": m, "data": d} for m, d in images] if images else prompt,
             generation_config={
                 "temperature": 0.9,
                 "top_p": 0.95,
@@ -2284,6 +2305,7 @@ def generate_ai_response(
                                 "Do NOT output any JSON, action objects, structured data, or tool calls. "
                                 "Just write natural, conversational plain text.",
                                 standing_instructions,
+                                images=[(img_type, img_data), _data_url_image(edited_image)],
                             )
                             if text:
                                 return (text, edited_image, "MULTIMODAL")
@@ -2354,6 +2376,7 @@ def generate_ai_response(
                                 "Do NOT output any JSON, action objects, structured data, or tool calls. "
                                 "Just write natural, conversational plain text.",
                                 standing_instructions,
+                                images=[(img_type, img_data), _data_url_image(edited_image)],
                             )
                             if text:
                                 return (text, edited_image, "MULTIMODAL")

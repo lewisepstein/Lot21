@@ -622,8 +622,10 @@ class RagModule:
     # ---------------- TEXT ----------------
     def _generate_text_content(self, prompt):
         """Generate text content without caching - each request gets a fresh response"""
+        # The model's thinking counts against this limit: at 8096 a long
+        # follow-up could think for ~7,700 tokens and cut the answer short
         generation_config = genai.types.GenerationConfig(
-            temperature=0.9, max_output_tokens=8096, candidate_count=1
+            temperature=0.9, max_output_tokens=32768, candidate_count=1
         )
         return self.text_model.generate_content(
             prompt, generation_config=generation_config
@@ -632,7 +634,7 @@ class RagModule:
     def _generate_fallback_text_content(self, prompt):
         """Same generation settings as the primary, on the backup model."""
         generation_config = genai.types.GenerationConfig(
-            temperature=0.9, max_output_tokens=8096, candidate_count=1
+            temperature=0.9, max_output_tokens=32768, candidate_count=1
         )
         return self.fallback_text_model.generate_content(
             prompt, generation_config=generation_config
@@ -1272,10 +1274,12 @@ class RagModule:
             if ref_images_b64:
                 parts = [types.Part.from_text(text=final_prompt)]
                 for img in ref_images_b64:
+                    # The page sends data URLs ("data:image/jpeg;base64,..."):
+                    # decoding the prefix too corrupts the image
+                    header, _, data = img.rpartition(",")
+                    mime = header[5:].split(";")[0] if header.startswith("data:") else "image/png"
                     parts.append(
-                        types.Part.from_bytes(
-                            data=base64.b64decode(img), mime_type="image/png"
-                        )
+                        types.Part.from_bytes(data=base64.b64decode(data), mime_type=mime)
                     )
 
                 resp = self.image_client.models.generate_content(
