@@ -30,6 +30,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, PageBreak, HRFlowable, Image as RLImage
 )
 
+from service_utils.aws_services import presign_s3_url
 from service_utils.log_management import get_logger
 
 logger = get_logger(__name__)
@@ -42,7 +43,7 @@ def _fetch_image(url: str) -> Optional[bytes]:
             b64 = url.split(",", 1)[1] if "," in url else ""
             return base64.b64decode(b64) if b64 else None
         if url.startswith(("http://", "https://")):
-            resp = requests.get(url, timeout=15)
+            resp = requests.get(presign_s3_url(url), timeout=15)
             resp.raise_for_status()
             return resp.content
     except Exception as e:  # network/decode errors must not abort the whole export

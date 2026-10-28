@@ -6,7 +6,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict
 
 from auth_module.auth_utils import verify_token, require_session_auth
+from pydantic import BaseModel
+
+from agent_module.standing_instructions import (
+    get_standing_instructions,
+    save_standing_instructions,
+)
 from agent_module.agent_utils import (
+    fetch_training_page,
     load_training_data_to_weaviate,
     get_training_history,
     delete_training_record as delete_training_record_util,
@@ -248,6 +255,44 @@ def get_content_settings(
         raise HTTPException(status_code=500, detail="Unable to retrieve content preferences at this time")
 
 
+class StandingInstructionsRequest(BaseModel):
+    instructions: str = ""
+
+
+def _authenticated_user_id(credentials: HTTPAuthorizationCredentials) -> int:
+    success, status_code, message, payload = verify_token(credentials.credentials)
+    if not success or not payload or not payload.get("user_id"):
+        raise HTTPException(status_code=status_code if not success else 401, detail="Authentication failed")
+    return payload["user_id"]
+
+
+@router.get("/settings/standing-instructions")
+def get_standing_instructions_endpoint(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """The user's saved standing instructions ("" when none)."""
+    user_id = _authenticated_user_id(credentials)
+    return {"instructions": get_standing_instructions(user_id)}
+
+
+@router.put("/settings/standing-instructions")
+def save_standing_instructions_endpoint(
+    body: StandingInstructionsRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Save or clear the standing instructions Lottie applies to every text prompt."""
+    user_id = _authenticated_user_id(credentials)
+    try:
+        saved = save_standing_instructions(user_id, body.instructions)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error saving standing instructions: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to save standing instructions at this time")
+    logger.info(f"Standing instructions {'saved' if saved else 'cleared'} for user {user_id}")
+    return {"success": True, "instructions": saved}
+
+
 @router.post("/settings/model")
 async def save_model_settings(
     request: Request,
@@ -400,6 +445,26 @@ def get_training_history_endpoint(
         raise HTTPException(status_code=500, detail="Unable to fetch training history at this time")
 
 
+class TrainingUrlRequest(BaseModel):
+    url: str
+
+
+@router.post("/settings/fetch-training-url")
+def fetch_training_url(
+    body: TrainingUrlRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Fetch a web page's readable text so it can be reviewed, then loaded as training data."""
+    _authenticated_user_id(credentials)
+    try:
+        return fetch_training_page(body.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching training URL: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to fetch that page at this time")
+
+
 @router.post("/settings/train-model")
 async def load_training_data(
     request: Request,
@@ -428,6 +493,9 @@ async def load_training_data(
         training_data = data.get("training_data", "")
         collection_name = data.get("collection_name", "training_data")
         description = data.get("description", "")
+        source_url = (data.get("source_url") or "").strip() or None
+        if source_url and not source_url.lower().startswith(("http://", "https://")):
+            source_url = None
         
         if not training_data.strip():
             raise HTTPException(status_code=400, detail="Training data cannot be empty")
@@ -440,7 +508,8 @@ async def load_training_data(
             training_data=training_data,
             collection_name=collection_name,
             user_id=user_id,
-            description=description
+            description=description,
+            source_url=source_url
         )
         
         logger.info(f"Training data loaded successfully for user {user_id}")

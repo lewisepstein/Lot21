@@ -77,7 +77,7 @@ AUTHORITATIVE SOURCES FOR REFERENCE:
 {sources}
 
 
-ADDITIONAL RESEARCH SOURCES (FALLBACK):
+GENERAL REFERENCE SITES (background only, see note):
 {get_links_as_string("resources")}
 
 """

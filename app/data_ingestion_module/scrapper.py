@@ -124,7 +124,7 @@ def _extract_definition_list(dl_tag: Tag) -> str:
     return "\n".join(parts)
 
 
-def scrape_page(url: str):
+def scrape_page(url: str, html: str = None):
     """
     Scrape complete content from a web page.
 
@@ -133,14 +133,17 @@ def scrape_page(url: str):
 
     Args:
         url: The URL to scrape
+        html: The page's HTML when the caller already fetched it (skips the request)
 
     Returns:
         Dictionary with title, blocks, and full content text
     """
-    response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    response.raise_for_status()
+    if html is None:
+        response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        response.raise_for_status()
+        html = response.text
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
 
     # Clean noise elements first
     _clean_soup(soup)

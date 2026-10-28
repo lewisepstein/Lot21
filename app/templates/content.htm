@@ -742,12 +742,12 @@
                             <option value="image_only">Image Only</option>
                             <option value="image_and_text">Image & Text</option>
                         </select>
-                        <!-- <div style="display: none; gap: 8px;" id="imageUploadContainer">
-                            <input type="file" id="uploadInput" style="display: none;" accept="*/*">
-                            <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;">
+                        <div style="display: none; gap: 8px; align-items: center;" id="imageUploadContainer">
+                            <input type="file" id="uploadInput" style="display: none;" accept="image/*">
+                            <label for="uploadInput" class="ai-action-btn" style="margin: 0; cursor: pointer;" title="Attach reference images (Image Only mode)">
                                 <i class="bi bi-paperclip"></i> Attach
                             </label>
-                        </div> -->
+                        </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <label for="contentType" style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Content Type:</label>
                             <select id="contentType" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer; min-width: 150px;"
@@ -1071,7 +1071,8 @@ function handleFileUpload(event) {
             checkAndEnablePromptInput();
         }
         
-        alert('Image uploaded and converted to base64 successfully! Click on the image to view it.');
+        // Allow attaching the same file again later
+        event.target.value = '';
     };
     
     reader.onerror = function(error) {
@@ -2287,11 +2288,13 @@ async function loadPromptHistory() {
                             const sourcesDiv = document.createElement('div');
                             sourcesDiv.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);font-size:12px;color:var(--text-secondary);line-height:1.7;';
                             let sourcesHtml = '<strong>Sources:</strong><br>';
+                            // Source titles/addresses come from training data and web pages: escape before inserting
+                            const esc = v => String(v).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
                             ai_response.sources.forEach(s => {
-                                const title = (s && (s.title || s.url)) || String(s);
+                                const title = esc((s && (s.title || s.url)) || String(s));
                                 const url = s && s.url;
-                                if (url && /^https?:/i.test(url)) {
-                                    sourcesHtml += `&bull; <a href="${url}" target="_blank" rel="noopener" style="color:#4a9eda;">${title}</a><br>`;
+                                if (url && /^https?:\/\//i.test(url)) {
+                                    sourcesHtml += `&bull; <a href="${esc(url)}" target="_blank" rel="noopener" style="color:#4a9eda;">${title}</a><br>`;
                                 } else {
                                     sourcesHtml += `&bull; ${title}<br>`;
                                 }
@@ -2645,6 +2648,7 @@ const IMAGE_KEYWORDS = [
   "diagram",
   "visual",
   "draw",
+  "drawing",
   "generate image",
   "create image",
   "reference image"
@@ -2652,8 +2656,9 @@ const IMAGE_KEYWORDS = [
 
 function promptRequestsImage(prompt = "") {
   const normalizedPrompt = prompt.toLowerCase();
+  // Whole words only (plurals allowed): "photosynthesis" and "Drawdown" are not image requests
   return IMAGE_KEYWORDS.some(keyword =>
-    normalizedPrompt.includes(keyword)
+    new RegExp(`\\b${keyword}(?:s|es)?\\b`).test(normalizedPrompt)
   );
 }
 
@@ -2673,10 +2678,11 @@ function validatePromptAgainstMode(prompt, select_image_attachment_mode) {
 }
 
 
-imageAttachmentMode.addEventListener('change', function () {
+function syncImageUploadVisibility() {
     const imageUploadContainer = document.getElementById('imageUploadContainer');
+    if (!imageUploadContainer) return;
 
-    switch (this.value) {
+    switch (imageAttachmentMode.value) {
         case 'image_only':
             // Allow manual image attachment
             imageUploadContainer.style.display = 'flex';
@@ -2693,7 +2699,11 @@ imageAttachmentMode.addEventListener('change', function () {
             window.lastUploadedImage = null;
             break;
     }
-});
+}
+
+imageAttachmentMode.addEventListener('change', syncImageUploadVisibility);
+// Browsers can restore the selected mode on reload; match the Attach button to it
+syncImageUploadVisibility();
 
 
 

@@ -49,6 +49,7 @@ class LottiePrompts:
             - For each match, name the source item (for example the newsletter issue, season and year, or page) and quote or closely paraphrase the relevant passage.
             - If the context does not contain the answer, reply exactly: "No match found in the available content." and then list what content is available, so the user knows what to add.
             - Never invent issues, dates, projects or sources.
+            - Only give a web address that appears verbatim in the knowledge context. Never construct, guess or complete a URL. If a link is marked as removed or unverified, say that no verified link was found.
             - Do not generate a newsletter, page or article; this is an answer, not new content.
             """
 

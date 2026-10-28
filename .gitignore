@@ -228,3 +228,10 @@ CHANGES_FROM_CLIENT_PDF.md
 DAILY_UPDATE_2026-07-09.md
 Lottie_User_Guide.md
 PROJECT_ANALYSIS.md
+
+# Runtime logs
+app/logs/
+
+# Database dumps (never commit — contains data)
+*.sql
+ektimo.ds25.projectstatus.co.uk.27-05-2026

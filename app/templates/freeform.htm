@@ -903,6 +903,9 @@
             <button class="new-project-btn" onclick="openNewProjectModal()">
                 <i class="bi bi-plus-circle"></i> Add Project
             </button>
+            <input type="search" id="projectSearch" class="form-input" placeholder="Search projects..."
+                   aria-label="Search projects by name or description" oninput="renderProjects()"
+                   style="margin-top: 10px; padding: 8px 12px; font-size: 13px;">
         </div>
         <div class="projects-list" id="projectsList">
             <!-- Projects will be loaded here -->
@@ -934,6 +937,15 @@
                 onchange="handleFileSelect(event)"
             >
             <div id="attachmentPreview" class="attachment-preview"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary);">
+                <label for="outputMode">Output:</label>
+                <select id="outputMode" onchange="saveOutputMode()" title="Choose what Free Form AI should produce"
+                        style="padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; cursor: pointer;">
+                    <option value="text">Text</option>
+                    <option value="image">Image</option>
+                    <option value="text_and_image">Text &amp; Image</option>
+                </select>
+            </div>
             <div class="chat-input-container">
                 <button class="attach-btn" id="attachBtn" onclick="document.getElementById('fileInput').click()" title="Attach files" disabled>
                     <i class="bi bi-paperclip"></i>
@@ -1008,6 +1020,7 @@ let isTypingAnimationActive = false;
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadProjects();
+    restoreOutputMode();
 
     // Auto-resize textarea
     const chatInput = document.getElementById('chatInput');
@@ -1064,7 +1077,19 @@ function renderProjects() {
         return;
     }
 
-    projectsList.innerHTML = projects.map(project => `
+    // Search box: every typed word must appear in the name or description
+    const searchInput = document.getElementById('projectSearch');
+    const words = (searchInput ? searchInput.value : '').toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = projects.filter(p => {
+        const text = `${p.project_name || ''} ${p.project_description || ''}`.toLowerCase();
+        return words.every(w => text.includes(w));
+    });
+    if (shown.length === 0) {
+        projectsList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px;">No projects match your search.</div>';
+        return;
+    }
+
+    projectsList.innerHTML = shown.map(project => `
         <div class="project-item ${project.id === currentProjectId ? 'active' : ''}">
             <div onclick="selectProject(${project.id})">
                 <div class="project-item-name">${escapeHtml(project.project_name)}</div>
@@ -1719,6 +1744,23 @@ function stopGeneration() {
 }
 
 // Send message
+// Output selector (Text / Image / Text & Image), remembered in this browser
+function getOutputMode() {
+    const select = document.getElementById('outputMode');
+    return select ? select.value : 'text';
+}
+
+function saveOutputMode() {
+    try { localStorage.setItem('freeformOutputMode', getOutputMode()); } catch (e) {}
+}
+
+function restoreOutputMode() {
+    let saved = null;
+    try { saved = localStorage.getItem('freeformOutputMode'); } catch (e) {}
+    const select = document.getElementById('outputMode');
+    if (select && ['text', 'image', 'text_and_image'].includes(saved)) select.value = saved;
+}
+
 async function sendMessage() {
     const chatInput = document.getElementById('chatInput');
     const message = chatInput.value.trim();
@@ -1739,14 +1781,19 @@ async function sendMessage() {
     // Create abort controller for this request
     currentAbortController = new AbortController();
 
-    // Determine loader type
+    // Determine loader type from the output selector
     const hasImageFiles = selectedFiles.some(f => f.type.startsWith('image/'));
     const hasDocFiles = selectedFiles.some(f => !f.type.startsWith('image/'));
+    let outputMode = getOutputMode();
+    if (outputMode === 'text' && !hasImageFiles && isImageRequest(message)
+        && confirm('This looks like an image request, but Output is set to Text.\n\nOK = switch to Image and send\nCancel = send as Text')) {
+        document.getElementById('outputMode').value = 'image';
+        saveOutputMode();
+        outputMode = 'image';
+    }
     let loaderType = 'text';
-    if (hasImageFiles && isImageEditRequest(message)) {
-        loaderType = 'image_edit';
-    } else if (isImageRequest(message)) {
-        loaderType = 'image_generate';
+    if (outputMode !== 'text') {
+        loaderType = (hasImageFiles || isImageEditRequest(message)) ? 'image_edit' : 'image_generate';
     } else if (hasDocFiles) {
         loaderType = 'document';
     }
@@ -1788,7 +1835,8 @@ async function sendMessage() {
                 project_id: currentProjectId,
                 message: originalMessage,
                 attachments: attachments,
-                include_history: true
+                include_history: true,
+                mode: outputMode
             }),
             signal: currentAbortController.signal
         });
@@ -2086,6 +2134,14 @@ function formatTextContent(text) {
     formatted = formatted.replace(/<\/ul><br>/g, '</ul>');
     formatted = formatted.replace(/<br><ol/g, '<ol');
     formatted = formatted.replace(/<\/ol><br>/g, '</ol>');
+
+    // Make web addresses clickable; trailing sentence punctuation stays outside the link.
+    // escapeHtml leaves quotes as-is, so they are escaped here before going into href
+    formatted = formatted.replace(/https?:\/\/[^\s<]+/g, function(match) {
+        var url = match.replace(/[.,;:!?)\]"']+$/, '');
+        var safe = url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return '<a href="' + safe + '" target="_blank" rel="noopener noreferrer" style="color: #4a9eda; word-break: break-all;">' + safe + '</a>' + match.slice(url.length);
+    });
 
     return formatted;
 }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, func
 from models.base import Base
 
 class User(Base):
@@ -21,6 +21,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_on = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_on = Column(DateTime(timezone=True), nullable=True)
+    # Rules Lottie follows on every text prompt for this user (Settings > Content Style)
+    standing_instructions = Column(Text, nullable=True)
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', is_active={self.is_active})>"

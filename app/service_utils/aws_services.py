@@ -14,6 +14,61 @@ AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
 
+# Generated images and uploaded attachments are stored as plain S3 URLs. The
+# bucket is private, so every URL handed to a browser or fetched server-side
+# is signed first and expires; stored URLs stay unsigned and permanent.
+SIGNED_URL_TTL_SEC = int(os.getenv("S3_SIGNED_URL_TTL_SEC", "21600"))  # 6 hours
+
+
+def _s3_url_prefix() -> str:
+    return f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/"
+
+
+def presign_s3_url(url, expires: int = SIGNED_URL_TTL_SEC):
+    """Time-limited link for an object in our bucket; anything else is returned unchanged."""
+    prefix = _s3_url_prefix()
+    if not isinstance(url, str) or not url.startswith(prefix):
+        return url
+    key = url[len(prefix):].split("?", 1)[0]
+    try:
+        # Regional endpoint so the signed link keeps the same host as the stored URL
+        client = boto3.client(
+            "s3",
+            region_name=AWS_REGION,
+            endpoint_url=f"https://s3.{AWS_REGION}.amazonaws.com",
+            aws_access_key_id=AWS_ACCESS_KEY,
+            aws_secret_access_key=AWS_SECRET_KEY,
+            config=boto3.session.Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+        )
+        return client.generate_presigned_url(
+            "get_object", Params={"Bucket": AWS_S3_BUCKET, "Key": key}, ExpiresIn=expires
+        )
+    except Exception:
+        return url
+
+
+def sign_ai_response(raw):
+    """
+    ai_response is stored as JSON {"text": ..., "images": [url, ...]} (a string
+    in the database, a dict once parsed). Return the same shape with signed
+    image links; plain text or unparseable values pass through untouched.
+    """
+    import json
+
+    if isinstance(raw, dict):
+        if raw.get("images"):
+            raw = {**raw, "images": [presign_s3_url(u) for u in raw["images"]]}
+        return raw
+    if isinstance(raw, str) and raw.lstrip().startswith("{"):
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return raw
+        if isinstance(data, dict) and data.get("images"):
+            data["images"] = [presign_s3_url(u) for u in data["images"]]
+            return json.dumps(data)
+    return raw
+
 
 # Validate base64 image data
 # -----------------------------------------------------------

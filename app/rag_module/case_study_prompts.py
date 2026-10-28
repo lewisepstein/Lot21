@@ -68,7 +68,7 @@ def build_project_case_study_prompt(
                 {links_str}
 
                 
-ADDITIONAL RESEARCH SOURCES (FALLBACK):
+GENERAL REFERENCE SITES (background only, see note):
 {get_links_as_string(["projects", "policy"])}
 
 """

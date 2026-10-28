@@ -2,7 +2,7 @@
 import base64
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from datetime import datetime
 from functools import lru_cache
 
@@ -15,6 +15,7 @@ from service_utils.db_utils.weaviate_db import WeaviateDB
 from sqlalchemy import text as sql_text
 from weaviate_module.weaviate_utils import load_data_with_tracking
 
+from agent_module.standing_instructions import standing_instructions_block
 from rag_module.case_study_prompts import build_project_case_study_prompt
 from rag_module.definition_prompt import build_definition_prompt
 from rag_module.image_prompts import build_image_prompt, detect_visual_mode
@@ -46,6 +47,11 @@ load_dotenv()
 # ---------------- CONFIG ----------------
 TEXT_MODEL_TIMEOUT_SEC = 60  # Increased from 20 to 60 seconds
 IMAGE_MODEL_TIMEOUT_SEC = 90  # Increased from 30 to 90 seconds
+# Grounded research can run dozens of searches for a coverage question;
+# it gets its own budget so results are not thrown away at 60 s
+WEB_SEARCH_TIMEOUT_SEC = int(os.getenv("WEB_SEARCH_TIMEOUT_SEC", "120"))
+# Checking the links in the search result, all in parallel, within this limit
+LINK_CHECK_BUDGET_SEC = 20
 
 # Context depth per generation — richer context improves draft quality;
 # Gemini's context window is far larger than even the raised values
@@ -67,7 +73,9 @@ WEB_SEARCH_CATEGORY_IDS = {5, 7}  # 5 = policy, 7 = newsletter
 WEB_SEARCH_TRIGGERS = (
     "latest",
     "current",
+    "currently",
     "recent",
+    "recently",
     "today",
     "this year",
     "this week",
@@ -76,12 +84,33 @@ WEB_SEARCH_TRIGGERS = (
     "up-to-date",
     # explicit research asks, any category
     "research",
-    "search for",
+    "search",
+    "internet",
+    "online",
+    "web",
     "credible",
     "sources",
     "statistics",
     "data on",
+    # verification of a specific project or claim
+    "verify",
+    "verified",
+    "confirm",
+    "status",
+    "completed",
+    "completion",
+    # requests for external coverage or links
+    "link",
+    "url",
+    "article",
+    "journal",
+    "publication",
+    "coverage",
+    "covered",
+    "designed",
 )
+# A year in the prompt ("completed in 2026") is a request for dated facts
+WEB_SEARCH_YEAR_RE = re.compile(r"\b20\d{2}\b")
 
 # Deduplication: sections that list projects must not repeat ones the user
 # has already seen on the same page (case studies and lots/initiatives only —
@@ -259,17 +288,41 @@ _QUESTION_OPENERS = re.compile(
 )
 
 
+# Lookups: the user wants a fact, a link or a verification, not new content
+_LOOKUP_TERMS = re.compile(
+    r"\b(links?|urls?|articles?|journals?|publications?|covered|coverage|status|"
+    r"completed|completion|verify|confirm|sources?|who designed|designed by)\b",
+    re.IGNORECASE,
+)
+# Content requests: even when phrased with lookup words they must still generate
+_GENERATION_TERMS = re.compile(
+    r"\b(write|generate|create|draft|compose|produce|rewrite|summari[sz]e|"
+    r"case stud(?:y|ies)|same format|images?|photos?|photographs?|pictures?|"
+    r"\d+\s+(?:\w+\s+){0,3}?(?:projects|companies|examples|"
+    r"organi[sz]ations|firms|initiatives|lots|items|resources)|"
+    r"(?:new|more|additional|other)\s+(?:\w+\s+){0,2}?(?:projects|companies|examples|"
+    r"organi[sz]ations|firms|initiatives|lots))\b",
+    re.IGNORECASE,
+)
+
+
 def is_question_query(query: str) -> bool:
     """
-    A lookup question about existing content ("Which issue mentioned X?",
-    "List the newsletters that ...") as opposed to a content request that
-    happens to be phrased as a question ("What is circularity?", which the
-    Understanding template should answer as page content).
+    A lookup ("Which issue mentioned X?", "Only provide the link to…",
+    "Was the project completed in 2026?") as opposed to a content request
+    ("Provide 5 more companies…", "What is circularity?", which the category
+    templates must still generate as page content).
     """
     q = (query or "").strip()
     if not q or is_rewrite_intent(q):
         return False
-    return bool(_QUESTION_OPENERS.match(q))
+    if _GENERATION_TERMS.search(q):
+        return False
+    if _QUESTION_OPENERS.match(q) or _LOOKUP_TERMS.search(q):
+        return True
+    # A bare question mark counts, except the explanatory openers the
+    # Understanding template answers as content
+    return q.endswith("?") and not re.match(r"\s*(what|how|why|explain|describe)\b", q, re.I)
 
 
 def is_follow_up_query(query: str) -> bool:
@@ -312,7 +365,8 @@ def is_follow_up_query(query: str) -> bool:
         " these ",
         " those ",
     )
-    return any(c in q for c in cues)
+    # Whole words only: "the listings" must not read as "the list"
+    return any(re.search(rf"\b{re.escape(c.strip())}\b", q) for c in cues)
 
 
 # Verbs that, on their own, only make sense as edits of existing content
@@ -417,6 +471,47 @@ def is_contentless_edit_command(query: str) -> bool:
     return all(w in _EDIT_VERBS or w in _EDIT_FILLERS for w in words)
 
 
+def fetch_live_web_data(search_client, model_id, query):
+    """
+    Research step: grounded Gemini call that returns a current-data fact
+    sheet, plus the web sources it cited. Shared by Lot21 AI and Free Form AI.
+    """
+    resp = search_client.models.generate_content(
+        model=model_id,
+        contents=RagModule._research_prompt(query),
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.5,
+            max_output_tokens=2048,
+        ),
+    )
+    gm = (
+        resp.candidates[0].grounding_metadata
+        if getattr(resp, "candidates", None)
+        else None
+    )
+    searches = getattr(gm, "web_search_queries", None) or []
+    print(f"Live web research ran {len(searches)} searches")
+
+    web_sources = []
+    seen = set()
+    for grounding_chunk in getattr(gm, "grounding_chunks", None) or []:
+        web = getattr(grounding_chunk, "web", None)
+        uri = getattr(web, "uri", None) if web else None
+        if not uri:
+            continue
+        title = getattr(web, "title", None) or uri
+        # grounding redirect URIs are unique per chunk, so dedupe on the
+        # displayed title (usually the domain) as well
+        key = title.lower()
+        if key not in seen:
+            seen.add(key)
+            web_sources.append({"title": f"Web: {title}", "url": uri})
+
+    live_text = RagModule._strip_unverified_urls((resp.text or "").strip())
+    return live_text, web_sources
+
+
 class RagModule:
     # ---------------- INIT ----------------
     def __init__(self):
@@ -512,7 +607,7 @@ class RagModule:
                 else:
                     with db.engine.connect() as conn:
                         source_url = conn.execute(lookup, {"doc_id": doc_id}).scalar()
-                    if source_url and source_url.startswith("http"):
+                    if source_url and source_url.startswith(("http://", "https://")):
                         title, url = source_url, source_url
                     else:
                         title, url = "Internal training data", None
@@ -559,7 +654,45 @@ class RagModule:
         if category_id in WEB_SEARCH_CATEGORY_IDS:
             return True
         q = (query or "").lower()
-        return any(trigger in q for trigger in WEB_SEARCH_TRIGGERS)
+        if WEB_SEARCH_YEAR_RE.search(q):
+            return True
+        # Whole words plus simple endings: "searches", "linked" match;
+        # "website", "LinkedIn", "newsletter" do not
+        return any(re.search(rf"\b{re.escape(t)}(?:s|es|ed|ing)?\b", q) for t in WEB_SEARCH_TRIGGERS)
+
+    # Which kind of live research the prompt needs
+    _RESEARCH_SOURCES_RE = re.compile(
+        r"\b(links?|urls?|articles?|journals?|publications?|covered|coverage|press|sources?)\b",
+        re.IGNORECASE,
+    )
+    _RESEARCH_STATUS_RE = re.compile(
+        r"\b(status|completed|completion|verify|confirm|finished|under construction|phases?)\b",
+        re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _research_prompt(query):
+        """
+        The grounded search prompt is shaped to the question: a list of
+        publications and article links when coverage is asked for, a status
+        summary when completion is asked for, otherwise the dated fact sheet
+        used for newsletters and policy.
+        """
+        if RagModule._RESEARCH_SOURCES_RE.search(query or ""):
+            return (
+                "Use Google Search (at most 6 searches) to find publications and articles that cover the topic below. "
+                "Return up to 10 entries, one per line, each with: publication name, article title, "
+                "month and year published, and the full article URL exactly as found. Only include "
+                "pages you actually found; if none, say so. No commentary.\n\nTopic: {query}"
+            ).format(query=query)
+        if RagModule._RESEARCH_STATUS_RE.search(query or ""):
+            return (
+                "Use Google Search (at most 6 searches) to establish the current status of the project or subject below. "
+                "Report: completed phases with dates, work still in development, projected completion "
+                "dates, the design firm(s) and client, and the most recent reporting date for each fact. "
+                "State clearly when something could not be verified. No commentary.\n\nTopic: {query}"
+            ).format(query=query)
+        return WEB_SEARCH_RESEARCH_PROMPT.format(query=query)
 
     @staticmethod
     def _build_research_topic(query, category_id):
@@ -581,44 +714,56 @@ class RagModule:
             return f"{scope} climate and environmental policy developments {year}"
         return None
 
+    _URL_RE = re.compile(r"https?://[^\s<>()\"'\]]+")
+
+    @staticmethod
+    def _url_is_live(url, timeout=8):
+        """True when the address answers with a non-error status."""
+        import requests as _requests
+
+        # A browser User-Agent: many publishers refuse the default python-requests one
+        from data_ingestion_module.scrapper import HEADERS
+
+        try:
+            resp = _requests.head(url, headers=HEADERS, allow_redirects=True, timeout=timeout)
+            if resp.status_code in (405, 403):  # HEAD not allowed: try GET
+                with _requests.get(url, headers=HEADERS, allow_redirects=True, timeout=timeout, stream=True) as resp:
+                    return resp.status_code < 400
+            return resp.status_code < 400
+        except Exception:
+            return False
+
+    @classmethod
+    def _strip_unverified_urls(cls, text, checker=None):
+        """
+        Grounded answers sometimes contain constructed addresses that do not
+        exist. Every URL in the research text is checked, and dead ones are
+        replaced so they can never be presented to the user as a source.
+        """
+        checker = checker or cls._url_is_live
+        urls = {m.group(0).rstrip(".,;") for m in cls._URL_RE.finditer(text or "")}
+        seen = dict.fromkeys(urls, False)
+        # All addresses are checked in parallel within one time limit; any
+        # not confirmed in time count as unverified
+        if urls:
+            pool = ThreadPoolExecutor(max_workers=min(len(urls), 10))
+            futures = {pool.submit(checker, url): url for url in urls}
+            try:
+                for future in as_completed(futures, timeout=LINK_CHECK_BUDGET_SEC):
+                    seen[futures[future]] = bool(future.result())
+            except TimeoutError:
+                pass
+            pool.shutdown(wait=False, cancel_futures=True)
+
+        def swap(m):
+            url = m.group(0).rstrip(".,;")
+            tail = m.group(0)[len(url):]  # keep sentence punctuation after the address
+            return (url if seen[url] else "[link could not be verified and was removed]") + tail
+
+        return cls._URL_RE.sub(swap, text or "")
+
     def _fetch_live_web_data(self, query):
-        """
-        Research step: grounded Gemini call that returns a current-data fact
-        sheet, plus the web sources it cited.
-        """
-        resp = self.search_client.models.generate_content(
-            model=self.text_model_id,
-            contents=WEB_SEARCH_RESEARCH_PROMPT.format(query=query),
-            config=types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.5,
-                max_output_tokens=2048,
-            ),
-        )
-        gm = (
-            resp.candidates[0].grounding_metadata
-            if getattr(resp, "candidates", None)
-            else None
-        )
-        searches = getattr(gm, "web_search_queries", None) or []
-        print(f"Live web research ran {len(searches)} searches")
-
-        web_sources = []
-        seen = set()
-        for grounding_chunk in getattr(gm, "grounding_chunks", None) or []:
-            web = getattr(grounding_chunk, "web", None)
-            uri = getattr(web, "uri", None) if web else None
-            if not uri:
-                continue
-            title = getattr(web, "title", None) or uri
-            # grounding redirect URIs are unique per chunk, so dedupe on the
-            # displayed title (usually the domain) as well
-            key = title.lower()
-            if key not in seen:
-                seen.add(key)
-                web_sources.append({"title": f"Web: {title}", "url": uri})
-
-        return (resp.text or "").strip(), web_sources
+        return fetch_live_web_data(self.search_client, self.text_model_id, query)
 
     def generate_content(
         self,
@@ -680,7 +825,7 @@ class RagModule:
         if research_topic:
             try:
                 future = self.executor.submit(self._fetch_live_web_data, research_topic)
-                live_facts, web_sources = future.result(timeout=TEXT_MODEL_TIMEOUT_SEC)
+                live_facts, web_sources = future.result(timeout=WEB_SEARCH_TIMEOUT_SEC)
                 if live_facts:
                     sources.extend(web_sources)
                     context_str = (
@@ -694,7 +839,8 @@ class RagModule:
                     print("Live web search ENABLED — current facts added to context")
             except Exception as web_error:
                 print(
-                    f"Live web research failed, continuing with training data only: {web_error}"
+                    "Live web research failed, continuing with training data only: "
+                    f"{type(web_error).__name__}: {web_error}"
                 )
 
         # Detect limits
@@ -984,6 +1130,29 @@ class RagModule:
             )
             telemetry.mark("dedup_filter")
             print(f"Dedup: excluding {excluded_seen} previously generated project(s)")
+
+        # Asking for new/more/other projects means "not already on Lot21":
+        # the loaded Lot21 pages are in the knowledge context, so name them
+        # as off-limits instead of leaving the model to guess.
+        if (
+            category_id in DEDUP_CATEGORY_IDS
+            and not is_follow_up
+            and re.search(
+                r"\b(new|more|additional|other|not (?:already|currently) (?:on|in|listed)|excluding|exclude)\b",
+                (query or "").lower(),
+            )
+        ):
+            prompt += (
+                "\n\nEXISTING LOT21 LISTINGS: The knowledge context above may include "
+                "projects and initiatives already published on lot21.org. Treat every "
+                "project named in the knowledge context as already listed. STRICT RULE: "
+                "do NOT propose any of them as new; choose projects that are not yet on "
+                "Lot21, and say so if you cannot find enough."
+            )
+            telemetry.mark("exclude_existing")
+
+        # The user's saved standing instructions apply to every text prompt
+        prompt += standing_instructions_block(user_id)
 
         telemetry.add_text_cost(prompt)
 

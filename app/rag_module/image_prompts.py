@@ -1,3 +1,5 @@
+import re
+
 STYLE_PRESETS = {
     "photo": (
         "Professional, high-resolution environmental photography. "
@@ -40,15 +42,29 @@ AERIAL_KEYWORDS = (
 DIAGRAM_KEYWORDS = (
     "diagram", "workflow", "process", "architecture",
     "how it works", "system", "flow", "chart", "schematic",
+    "flowchart", "infographic",
+)
+
+ILLUSTRATION_KEYWORDS = (
+    "illustration", "illustrated", "illustrate", "drawing", "painting",
+    "watercolour", "watercolor", "sketch", "vector art", "line art",
+    "flat colour", "flat color", "graphic style", "house style",
 )
 
 
+def _mentions(q: str, keywords) -> bool:
+    """Whole-word match (plurals allowed): "flow" must not fire on "flowers"."""
+    return any(re.search(rf"\b{re.escape(k)}(?:s|es)?\b", q) for k in keywords)
+
+
 def detect_visual_mode(query: str) -> str:
-    """Decide between a diagram, a straight-down aerial photo, or a photo."""
+    """Decide between a diagram, an illustration, a straight-down aerial photo, or a photo."""
     q = (query or "").lower()
-    if any(k in q for k in DIAGRAM_KEYWORDS):
+    if _mentions(q, DIAGRAM_KEYWORDS):
         return "diagram"
-    if any(k in q for k in AERIAL_KEYWORDS):
+    if _mentions(q, ILLUSTRATION_KEYWORDS):
+        return "editorial"
+    if _mentions(q, AERIAL_KEYWORDS):
         return "aerial"
     return "photo"
 

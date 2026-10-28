@@ -119,7 +119,7 @@ KNOWLEDGE CONTEXT:
 {context_str}
 
 
-ADDITIONAL RESEARCH SOURCES (FALLBACK):
+GENERAL REFERENCE SITES (background only, see note):
 {get_links_as_string(["lots", "policy"])}
 
 """

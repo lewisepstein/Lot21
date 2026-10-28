@@ -113,7 +113,13 @@ class WeaviateDB:
             WeaviateConnectionError: If client is not initialized
         """
         if not self._connection_initialized or self._client is None:
-            raise WeaviateConnectionError("Weaviate client not initialized")
+            # An earlier attempt failed (e.g. Weaviate started after Lottie):
+            # try again instead of failing until the server is restarted
+            with self._lock:
+                try:
+                    self._initialize_connection()
+                except Exception as e:
+                    raise WeaviateConnectionError(f"Weaviate client not initialized: {e}")
         return self._client
 
     def collection_exists(self, collection_name: str) -> bool:

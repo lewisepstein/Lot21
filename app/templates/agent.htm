@@ -202,6 +202,32 @@
                 Save Preferences
             </button>
         </div>
+
+        <div class="settings-section">
+            <h2 class="section-title">Standing Instructions</h2>
+
+            <div class="upload-info">
+                <i class="bi bi-info-circle"></i>
+                <span>Rules Lottie follows on every text prompt in Lot21 AI and Free Form AI. If a prompt asks for something different, the prompt wins. Image-only requests are not affected.</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="standingInstructions">Instructions</label>
+                <textarea class="form-textarea" id="standingInstructions" maxlength="4000" style="min-height: 140px;"
+                    placeholder="For example:&#10;Always end with the source name and full URL for each claim.&#10;Answer only what I ask; do not repeat earlier answers.&#10;Ask before summarising the work so far."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="save-btn" onclick="saveStandingInstructions(false)">
+                    <i class="bi bi-save"></i>
+                    Save Instructions
+                </button>
+                <button class="save-btn" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color);" onclick="saveStandingInstructions(true)">
+                    <i class="bi bi-x-circle"></i>
+                    Clear
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- AI Model Tab -->
@@ -275,7 +301,19 @@
                     
                     <div class="upload-info">
                         <i class="bi bi-info-circle"></i>
-                        <span>Paste your training data below. This data will be processed and stored in Weaviate for AI model training and retrieval.</span>
+                        <span>Paste your training data below, or fetch it from a web page. This data will be processed and stored in Weaviate for AI model training and retrieval.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="trainingUrl">Load from a web page (optional)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="url" class="form-input" id="trainingUrl" placeholder="https://example.org/article">
+                            <button type="button" class="save-btn" style="white-space: nowrap;" onclick="fetchTrainingUrl(this)">
+                                <i class="bi bi-cloud-download"></i>
+                                Fetch Page
+                            </button>
+                        </div>
+                        <small style="display: block; margin-top: 6px; color: var(--text-secondary); font-size: 12px;">Lottie copies the page's readable text into the box below so you can review it, then click Load Data to Weaviate.</small>
                     </div>
 
                     <div class="form-group">
@@ -767,6 +805,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     const trainingDataTextarea = document.getElementById('trainingData');
     if (trainingDataTextarea) {
         trainingDataTextarea.addEventListener('input', updateDataStats);
+        // Fetched text emptied or replaced by a paste: it no longer comes from the fetched page
+        trainingDataTextarea.addEventListener('input', () => {
+            if (!trainingDataTextarea.value.trim()) fetchedSourceUrl = '';
+        });
+        trainingDataTextarea.addEventListener('paste', () => {
+            if (trainingDataTextarea.selectionStart === 0 && trainingDataTextarea.selectionEnd === trainingDataTextarea.value.length) {
+                fetchedSourceUrl = '';
+            }
+        });
     }
     
     // Add event listener for edit training data textarea to update stats
@@ -777,6 +824,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Load training history
     await loadTrainingHistory();
+    await loadStandingInstructions();
 });
 
 // Load Training History
@@ -883,7 +931,12 @@ function displayTrainingHistory(history) {
                         </div>
                         ${record.description ? `
                             <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
-                                ${record.description}
+                                ${escapeAttr(record.description)}
+                            </div>
+                        ` : ''}
+                        ${record.data_details && record.data_details.source_url ? `
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; word-break: break-all;">
+                                <i class="bi bi-link-45deg"></i> ${escapeAttr(record.data_details.source_url)}
                             </div>
                         ` : ''}
                     </div>
@@ -950,7 +1003,7 @@ function showRecordDetails(record) {
     if (record.data_details) {
         try {
             const jsonFormatted = JSON.stringify(record.data_details, null, 2);
-            dataDetailsHTML = `<pre style="background: var(--bg-primary); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0; font-size: 12px; color: var(--text-primary);">${jsonFormatted}</pre>`;
+            dataDetailsHTML = `<pre style="background: var(--bg-primary); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0; font-size: 12px; color: var(--text-primary);">${escapeAttr(jsonFormatted)}</pre>`;
         } catch (e) {
             dataDetailsHTML = `<div style="color: #ef4444;">Error parsing JSON data</div>`;
         }
@@ -976,7 +1029,7 @@ function showRecordDetails(record) {
             ${record.description ? `
             <div>
                 <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Description</div>
-                <div style="padding: 10px; background: var(--bg-primary); border-radius: 6px; color: var(--text-primary); font-size: 14px;">${record.description}</div>
+                <div style="padding: 10px; background: var(--bg-primary); border-radius: 6px; color: var(--text-primary); font-size: 14px;">${escapeAttr(record.description)}</div>
             </div>
             ` : ''}
             
@@ -985,7 +1038,7 @@ function showRecordDetails(record) {
             <div>
                 <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Training Content</div>
                 <div style="padding: 12px; background: var(--bg-primary); border-radius: 6px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--accent-teal) var(--bg-primary);">
-                    <pre style="margin: 0; font-size: 13px; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; line-height: 1.5;">${record.content}</pre>
+                    <pre style="margin: 0; font-size: 13px; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; line-height: 1.5;">${escapeAttr(record.content || '')}</pre>
                 </div>
             </div>
             ` : ''}
@@ -1316,6 +1369,94 @@ function updateDataStats() {
 }
 
 // Load Data to Weaviate
+// ---------- Standing instructions ----------
+async function loadStandingInstructions() {
+    const box = document.getElementById('standingInstructions');
+    if (!box) return;
+    try {
+        const response = await fetch('/user/settings/standing-instructions', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            box.value = data.instructions || '';
+        }
+    } catch (error) {
+        console.error('Error loading standing instructions:', error);
+    }
+}
+
+async function saveStandingInstructions(clear) {
+    const box = document.getElementById('standingInstructions');
+    if (clear) {
+        if (!box.value.trim() || !confirm('Clear all standing instructions?')) return;
+        box.value = '';
+    }
+    try {
+        const response = await fetch('/user/settings/standing-instructions', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ instructions: box.value })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            box.value = data.instructions || '';
+            showAlert('success', data.instructions ? 'Standing instructions saved. Lottie will follow them on every text prompt.' : 'Standing instructions cleared.');
+        } else {
+            showAlert('error', data.detail || 'Failed to save standing instructions');
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving standing instructions: ' + error.message);
+    }
+}
+
+// ---------- Training data from a web page ----------
+let fetchedSourceUrl = '';
+
+function escapeAttr(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+}
+
+async function fetchTrainingUrl(btn) {
+    const url = document.getElementById('trainingUrl').value.trim();
+    if (!url) {
+        showAlert('error', 'Please enter a web address');
+        return;
+    }
+    const label = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Fetching...';
+    try {
+        const response = await fetch('/user/settings/fetch-training-url', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            showAlert('error', data.detail || 'Could not fetch that page');
+            return;
+        }
+        document.getElementById('trainingData').value = data.content;
+        const description = document.getElementById('dataDescription');
+        if (!description.value.trim() && data.title) description.value = data.title;
+        fetchedSourceUrl = data.source_url;
+        updateDataStats();
+        showAlert('success', 'Page text fetched. Review it below, then click Load Data to Weaviate.');
+    } catch (error) {
+        showAlert('error', 'Error fetching page: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
+    }
+}
+
 async function loadDataToWeaviate() {
     const token = localStorage.getItem('access_token');
     const trainingData = document.getElementById('trainingData').value;
@@ -1342,7 +1483,8 @@ async function loadDataToWeaviate() {
             body: JSON.stringify({
                 training_data: trainingData,
                 collection_name: collectionName,
-                description: dataDescription
+                description: dataDescription,
+                source_url: fetchedSourceUrl || null
             })
         });
         
@@ -1353,6 +1495,8 @@ async function loadDataToWeaviate() {
             // Clear the form
             document.getElementById('trainingData').value = '';
             document.getElementById('dataDescription').value = '';
+            document.getElementById('trainingUrl').value = '';
+            fetchedSourceUrl = '';
             updateDataStats();
             
             // Reload training history

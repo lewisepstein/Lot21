@@ -222,3 +222,169 @@ def test_conversation_history_keeps_image_only_turns():
         "Provide three more images",
     ]
     assert all(t["response"] == "(image generated)" for t in turns)
+
+
+# ---------- Projects research fixes (October 2026) ----------
+
+LEW_LOOKUPS = [
+    "Use internal training data plus internet search to find and list the names and URLs for all design journals that have covered this project: SHENZHEN BAY SPONGE WATERFRONT.",
+    "Use an internet search to list the names and URLs for all design journals that have covered this project: SHENZHEN BAY SPONGE WATERFRONT. No descriptions are requested. Only respond with the listings.",
+    "ONLY provide a link to the specific article about the SHENZHEN BAY SPONGE WATERFRONT project that was covered by The World Around. Provide nothing else.",
+    "Was the Shenzhen Bay Sponge Waterfront project completed in 2026?",
+    "Verify whether the Shenzhen Bay Sponge Waterfront project was completed and what remains in development.",
+]
+
+STILL_GENERATE = [
+    "Using the same format, and without repeating the introductory statement, provide 5 more companies that transform captured carbon emissions into biodegradable plastics.",
+    "Provide a case study on the Shenzhen Bay Sponge Waterfront project",
+    "Find 5 new restore projects in Asia",
+    "Write the Summer 2026 quarterly newsletter",
+    "What is circularity?",
+    "Generate three projects about adaptive reuse",
+    "refine it",
+]
+
+
+def test_internet_wording_and_years_trigger_web_search_in_projects(rag, monkeypatch):
+    monkeypatch.setattr(rag, "WEB_SEARCH_ENABLED", True)
+    for q in LEW_LOOKUPS:
+        assert rag.RagModule._should_use_web_search(q, 3), q
+    assert not rag.RagModule._should_use_web_search("Write a case study about adaptive reuse", 3)
+
+
+def test_lookup_requests_are_answered_directly(rag):
+    for q in LEW_LOOKUPS:
+        assert rag.is_question_query(q), q
+
+
+def test_generation_requests_still_generate(rag):
+    for q in STILL_GENERATE:
+        assert not rag.is_question_query(q), q
+
+
+def test_the_listings_is_not_a_follow_up_but_edits_are(rag):
+    assert not rag.is_follow_up_query(LEW_LOOKUPS[1])
+    assert rag.is_follow_up_query("Add KPF as the lead design firm for project 3")
+    assert rag.is_follow_up_query("remove project 7 from the list")
+    assert rag.is_follow_up_query("give me 5 more projects not on this list")
+
+
+def test_research_prompt_matches_the_question(rag):
+    p = rag.RagModule._research_prompt(LEW_LOOKUPS[1])
+    assert "URL" in p and "publication" in p.lower()
+    p = rag.RagModule._research_prompt(LEW_LOOKUPS[3])
+    assert "status" in p.lower() and "completion" in p.lower()
+    p = rag.RagModule._research_prompt("latest statistics on embodied carbon in concrete")
+    assert "fact sheet" in p
+
+
+def test_static_links_are_background_only():
+    from rag_module.static_links import get_links_as_string
+    from rag_module.case_study_prompts import build_project_case_study_prompt
+
+    s = get_links_as_string(["projects"])
+    assert "background only" in s.lower() and "do not cite" in s.lower()
+    p = build_project_case_study_prompt(query="x", context_str="", project_sources={}, category_id=3)
+    assert "ADDITIONAL RESEARCH SOURCES" not in p
+
+
+def test_new_project_requests_exclude_existing_lot21_listings(rag, monkeypatch):
+    monkeypatch.setattr(rag, "WEB_SEARCH_ENABLED", False)
+    monkeypatch.setattr(rag, "load_data_with_tracking", lambda **kw: None)
+    captured = {}
+    obj = _bare_rag(rag, captured)
+    obj.generate_content(query="Provide 5 new restore projects not already on Lot21", category_id=3, context="EXISTING PAGE TEXT")
+    assert "EXISTING LOT21 LISTINGS" in captured["prompt"]
+    obj.generate_content(query="Write a case study on the Shenzhen Bay Sponge Waterfront project", category_id=3, context="EXISTING PAGE TEXT")
+    assert "EXISTING LOT21 LISTINGS" not in captured["prompt"]
+
+
+def test_illustration_wording_selects_editorial_style():
+    from rag_module.image_prompts import detect_visual_mode
+
+    assert detect_visual_mode("Illustration of a coastal park in the style of the attached references") == "editorial"
+    assert detect_visual_mode("watercolour drawing of a green roof") == "editorial"
+    assert detect_visual_mode("photograph of a green roof") == "photo"
+
+
+def test_dead_links_are_removed_from_live_research(rag):
+    text = ("The World Around: https://theworldaround.org/project/shenzhen-bay-sponge-waterfront/ (May 2024)\n"
+            "Dezeen: https://www.dezeen.com/real-article/ (2023)")
+    alive = {"https://www.dezeen.com/real-article/": True,
+             "https://theworldaround.org/project/shenzhen-bay-sponge-waterfront/": False}
+    out = rag.RagModule._strip_unverified_urls(text, checker=lambda u: alive[u])
+    assert "https://www.dezeen.com/real-article/" in out
+    assert "shenzhen-bay-sponge-waterfront" not in out
+    assert "could not be verified" in out
+
+
+def test_answer_prompt_forbids_constructed_urls():
+    from rag_module.prompt_rules import LottiePrompts
+
+    p = LottiePrompts.build_answer_prompt("Only provide the link", "ctx")
+    assert "Never construct, guess or complete a URL" in p
+
+
+# ---------- prompt history pages require a session ----------
+
+@pytest.mark.asyncio
+async def test_prompt_history_pages_redirect_without_session(client):
+    for path in ("/user/prompt_history_data", "/user/prompt_history_data/some-session-id"):
+        r = await client.get(path)
+        assert r.status_code == 302, path
+        assert r.headers["location"] == "/"
+
+
+@pytest.mark.asyncio
+async def test_prompt_history_page_rejects_bogus_session(client):
+    r = await client.get("/user/prompt_history_data", cookies={"session_token": "not-a-real-session"})
+    assert r.status_code != 200
+    assert "user_prompt" not in r.text
+
+
+# ---------- private S3: links are signed on the way out ----------
+
+@pytest.fixture
+def aws(monkeypatch):
+    from service_utils import aws_services as a
+
+    monkeypatch.setattr(a, "AWS_S3_BUCKET", "lottie-test-bucket")
+    monkeypatch.setattr(a, "AWS_REGION", "us-east-2")
+    monkeypatch.setattr(a, "AWS_ACCESS_KEY", "AKIATEST")
+    monkeypatch.setattr(a, "AWS_SECRET_KEY", "secret")
+    return a
+
+
+def test_presign_signs_only_our_bucket(aws):
+    url = "https://lottie-test-bucket.s3.us-east-2.amazonaws.com/generated/generated_images/a.png"
+    signed = aws.presign_s3_url(url)
+    assert signed.startswith(url + "?")
+    assert "X-Amz-Signature" in signed and "X-Amz-Expires=21600" in signed
+    assert aws.presign_s3_url("https://example.com/x.png") == "https://example.com/x.png"
+    assert aws.presign_s3_url(None) is None
+
+
+def test_sign_ai_response_handles_string_and_dict(aws):
+    import json
+
+    url = "https://lottie-test-bucket.s3.us-east-2.amazonaws.com/generated/generated_images/a.png"
+    raw = json.dumps({"text": "hello", "images": [url], "sources": None})
+    out = json.loads(aws.sign_ai_response(raw))
+    assert out["text"] == "hello" and "X-Amz-Signature" in out["images"][0]
+    assert "X-Amz-Signature" in aws.sign_ai_response({"text": "", "images": [url]})["images"][0]
+    assert aws.sign_ai_response("plain text answer") == "plain text answer"
+    assert aws.sign_ai_response(json.dumps({"text": "no images", "images": None})) == json.dumps({"text": "no images", "images": None})
+
+
+def test_document_export_fetches_signed_link(aws, monkeypatch):
+    from download_module import document_builder as db
+
+    seen = {}
+
+    class R:
+        content = b"png"
+        def raise_for_status(self): pass
+
+    monkeypatch.setattr(db.requests, "get", lambda url, timeout: seen.setdefault("url", url) and R())
+    db._fetch_image("https://lottie-test-bucket.s3.us-east-2.amazonaws.com/generated/generated_images/a.png")
+    assert "X-Amz-Signature" in seen["url"]

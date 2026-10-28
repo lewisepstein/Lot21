@@ -1,7 +1,7 @@
 """Pydantic models for Free Form module API requests and responses."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -74,3 +74,7 @@ class ChatCompletionRequest(BaseModel):
     message: str
     include_history: bool = Field(default=True, description="Include chat history in context")
     attachments: Optional[List[AttachmentItem]] = Field(default=None, description="List of file attachments")
+    mode: Optional[Literal["text", "image", "text_and_image"]] = Field(
+        default=None,
+        description="Output selector: text, image, or text_and_image. Omitted = detect from the message wording.",
+    )

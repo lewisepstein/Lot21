@@ -122,6 +122,9 @@
     "GET",
     "POST"
   ],
+  "/user/settings/fetch-training-url": [
+    "POST"
+  ],
   "/user/settings/image-model": [
     "GET",
     "POST"
@@ -133,6 +136,10 @@
   "/user/settings/schedule": [
     "GET",
     "POST"
+  ],
+  "/user/settings/standing-instructions": [
+    "GET",
+    "PUT"
   ],
   "/user/settings/train-model": [
     "POST"

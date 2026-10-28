@@ -116,8 +116,13 @@ def get_links_as_string(keys):
     """
     if isinstance(keys, str):
         keys = [keys]
-    
-    output = []
+
+    output = [
+        "GENERAL REFERENCE SITES (background only). These are standing reference "
+        "sites, not research results. Do not cite them as sources for a specific "
+        "project, article or claim unless the content was actually drawn from them, "
+        "and never present them as coverage of the topic being discussed."
+    ]
     
     for key in keys:
         if key in FALLBACK_LINKS:

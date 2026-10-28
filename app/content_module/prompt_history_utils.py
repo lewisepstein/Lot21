@@ -5,7 +5,12 @@ import re
 import uuid
 from rag_module.rag import RagModule
 from datetime import datetime, timezone
-from service_utils.aws_services import safe_upload_image_to_s3, upload_base64_image_to_s3
+from service_utils.aws_services import (
+    presign_s3_url,
+    safe_upload_image_to_s3,
+    sign_ai_response,
+    upload_base64_image_to_s3,
+)
 import json
 
 from service_utils.log_management import get_logger
@@ -552,18 +557,23 @@ def get_prompt_histories(
             }
         )
 
+        # Browser-bound links are signed; the stored URLs stay unsigned
+        attachments = [
+            {**att, "attachments_data": presign_s3_url(att.get("attachments_data"))}
+            for att in (attachments or [])
+        ]
         response_list.append(PromptHistoryResponse(
             id=ph["id"],
             prompt_session_id=ph["prompt_session_id"],
             content_id=ph["content_id"],
             user_prompt=ph["user_prompt"],
-            ai_response=ph["ai_response"],
+            ai_response=sign_ai_response(ph["ai_response"]),
             prompt_type=ph["prompt_type"],
             created_on=ph["created_on"],
             deleted_on=ph["deleted_on"],
             prompt_action=ph["prompt_action"],
             updated_on=ph["updated_on"],
-            attachments=attachments if attachments else [] 
+            attachments=attachments
         ))
     
     return response_list
@@ -746,7 +756,7 @@ def get_all_prompts(
 
         if ph[4]:
             try:
-                data[session_id]["ai_response"] = json.loads(ph[4]) if ph[4] else None
+                data[session_id]["ai_response"] = sign_ai_response(json.loads(ph[4])) if ph[4] else None
             except Exception as e:
                 data[session_id]["ai_response"] = ph[4]
 

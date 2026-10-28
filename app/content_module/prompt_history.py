@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, Cookie
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, List, Optional
 from fastapi.templating import Jinja2Templates
 
 from content_module.content_responses import PromptHistoryResponse
-from auth_module.auth_utils import verify_token
+from auth_module.auth_utils import verify_token, verify_session_auth
 from service_utils.log_management import get_logger
+from service_utils.aws_services import sign_ai_response
 from content_module.prompt_history_utils import (
     get_prompt_histories,
     update_prompt_action,
@@ -171,7 +172,7 @@ def set_action_prompt_history(
                     prompt_session_id=prompt_history["prompt_session_id"],
                     content_id=prompt_history["content_id"],
                     user_prompt=prompt_history.get("user_prompt"),
-                    ai_response=prompt_history.get("ai_response"),
+                    ai_response=sign_ai_response(prompt_history.get("ai_response")),
                     prompt_type=prompt_history["prompt_type"],
                     created_on=prompt_history["created_on"],
                     deleted_on=prompt_history.get("deleted_on"),
@@ -205,6 +206,15 @@ def get_all_prompt_history(
         content_id: ID of the content record
         credentials: Bearer token from Authorization header
     """
+    # Session check done inline (not via require_session_auth) so this route
+    # stays a sync `def`: its database call would otherwise block the loop.
+    # Without it, this page rendered every prompt and response to anyone.
+    if not session_token:
+        return RedirectResponse(url="/", status_code=302)
+    success, _, message, _ = verify_session_auth(session_token)
+    if not success:
+        logger.warning(f"Invalid session on prompt_history_data: {message}")
+        return RedirectResponse(url="/", status_code=302)
 
     data = get_all_prompts(
         prompt_session_id=prompt_session_id,

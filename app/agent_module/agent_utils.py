@@ -2,13 +2,19 @@
 Agent utility functions.
 Business logic for agent-related operations including training data management.
 """
+import ipaddress
 import json
+import socket
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from urllib.parse import urljoin, urlparse
 
+import requests
 from sqlalchemy import text
 
+from data_ingestion_module.scrapper import HEADERS, TIMEOUT, scrape_page
 from service_utils.db_utils.pg_db import PostgresDB
+from service_utils.helpers import validate_url
 from service_utils.log_management import get_logger
 from weaviate_module.weaviate_utils import (
     chunk_text, 
@@ -26,11 +32,91 @@ from weaviate_module.weaviate_utils import (
 logger = get_logger(__name__)
 
 
+MIN_TRAINING_PAGE_CHARS = 200
+MAX_TRAINING_PAGE_REDIRECTS = 5
+PUBLIC_ONLY_MESSAGE = "Only public web pages can be used as training data."
+
+
+def _is_public_ip(address: str) -> bool:
+    return ipaddress.ip_address(address.split("%")[0]).is_global
+
+
+def _check_public_host(url: str) -> None:
+    """Refuse addresses that resolve to the server itself or an internal network."""
+    host = urlparse(url).hostname
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except (socket.gaierror, UnicodeError):
+        raise ValueError("That web address could not be found. Please check it and try again.")
+    if not addresses or not all(_is_public_ip(a) for a in addresses):
+        raise ValueError(PUBLIC_ONLY_MESSAGE)
+
+
+def _fetch_public_html(url: str) -> str:
+    """
+    GET a public page, following redirects one hop at a time so every hop is
+    checked, and checking the address actually connected to (DNS can change
+    between the check and the request).
+    """
+    for _ in range(MAX_TRAINING_PAGE_REDIRECTS + 1):
+        if urlparse(url).scheme not in ("http", "https"):
+            raise ValueError(PUBLIC_ONLY_MESSAGE)
+        _check_public_host(url)
+        response = requests.get(url, headers=HEADERS, timeout=TIMEOUT, stream=True, allow_redirects=False)
+        try:
+            # No connection here means an empty body (e.g. a bare redirect): nothing is read from it
+            connection = response.raw.connection
+            if connection is not None and not _is_public_ip(connection.sock.getpeername()[0]):
+                raise ValueError(PUBLIC_ONLY_MESSAGE)
+            if response.is_redirect:
+                url = urljoin(url, response.headers["location"])
+                continue
+            response.raise_for_status()
+            return response.text
+        finally:
+            response.close()
+    raise ValueError("That address redirects too many times. Copy and paste the page's text instead.")
+
+
+def fetch_training_page(url: str) -> Dict[str, str]:
+    """
+    Fetch a public web page's readable text for Training Data, so the user can
+    review it before loading. Raises ValueError with a user-facing message.
+    """
+    url = (url or "").strip()
+    try:
+        valid = validate_url(url)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("Please enter a valid web address starting with http:// or https://")
+
+    try:
+        page = scrape_page(url, html=_fetch_public_html(url))
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "error"
+        raise ValueError(
+            f"The page could not be fetched (HTTP {code}). It may require a login "
+            "or block automated access. Copy and paste its text instead."
+        )
+    except requests.RequestException:
+        raise ValueError("The page could not be reached. Please check the address and try again.")
+
+    content = (page.get("content") or "").strip()
+    if len(content) < MIN_TRAINING_PAGE_CHARS:
+        raise ValueError(
+            "No readable text was found on that page (it may be a PDF or document file, "
+            "built with scripts, or mostly images). Copy and paste its text instead."
+        )
+    return {"title": (page.get("title") or "").strip(), "content": content, "source_url": url}
+
+
 def load_training_data_to_weaviate(
     training_data: str,
     collection_name: str,
     user_id: int,
-    description: str = ""
+    description: str = "",
+    source_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Load training data into Weaviate vector database and store metadata in database.
@@ -117,7 +203,9 @@ def load_training_data_to_weaviate(
             start_time=db_record["start_time"],
             doc_id=doc_id,
             chunks_created=chunks_count,
-            description=description
+            description=description,
+            # source_url is what Lottie cites under "Sources" for this content
+            extra_details={"source_url": source_url} if source_url else None
         )
         
         return {
@@ -462,7 +550,9 @@ def update_training_record(
         data_details_json = json.dumps({
             "doc_id": new_doc_id,
             "chunks_created": chunks_count,
-            "collection_description": description
+            "collection_description": description,
+            # keep the page address a record was fetched from
+            **({"source_url": old_data_details["source_url"]} if old_data_details.get("source_url") else {})
         })
         
         now = datetime.now(datetime.now().astimezone().tzinfo)

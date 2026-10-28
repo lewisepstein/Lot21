@@ -17,6 +17,7 @@ from content_module.content_responses import (
     SaveAsDraftRequest
 )
 
+from service_utils.aws_services import sign_ai_response
 from content_module.prompt_history_utils import (
     create_prompt_history_record,
     add_draft_to_prompt_history,
@@ -250,7 +251,7 @@ def add_draft_content(
                 prompt_session_id=prompt_history["prompt_session_id"],
                 content_id=prompt_history["content_id"],
                 user_prompt=prompt_history.get("user_prompt"),
-                ai_response=prompt_history.get("ai_response"),
+                ai_response=sign_ai_response(prompt_history.get("ai_response")),
                 prompt_type=prompt_history["prompt_type"],
                 created_on=prompt_history["created_on"],
                 deleted_on=prompt_history.get("deleted_on"),
@@ -335,7 +336,7 @@ def user_save_as_draft(
                 prompt_session_id=prompt_history["prompt_session_id"],
                 content_id=prompt_history["content_id"],
                 user_prompt=prompt_history.get("user_prompt"),
-                ai_response=prompt_history.get("ai_response"),
+                ai_response=sign_ai_response(prompt_history.get("ai_response")),
                 prompt_type=prompt_history["prompt_type"],
                 created_on=prompt_history["created_on"],
                 deleted_on=prompt_history.get("deleted_on"),

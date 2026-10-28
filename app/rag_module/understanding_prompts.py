@@ -135,7 +135,7 @@ KNOWLEDGE CONTEXT:
 {context_str}
 
 
-ADDITIONAL RESEARCH SOURCES (FALLBACK):
+GENERAL REFERENCE SITES (background only, see note):
 If the provided KNOWLEDGE CONTEXT is insufficient, you may refer to these reliable sources for general knowledge or citations.
 {get_links_as_string("solutions")}
 

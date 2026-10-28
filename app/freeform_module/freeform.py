@@ -270,7 +270,9 @@ def send_chat_message(
             project_id=chat_request.project_id,
             user_message=chat_request.message,
             include_history=chat_request.include_history,
-            attachments=chat_request.attachments
+            attachments=chat_request.attachments,
+            mode=chat_request.mode,
+            user_id=payload.get("user_id"),
         )
 
         logger.info(f"Chat completion for project {chat_request.project_id}")

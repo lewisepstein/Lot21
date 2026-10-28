@@ -3,6 +3,7 @@
 import base64
 import io
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -14,6 +15,7 @@ import PyPDF2
 from dotenv import load_dotenv
 from google import genai as genai_new
 from google.genai import types
+from agent_module.standing_instructions import standing_instructions_block
 from service_utils.db_utils.pg_db import PostgresDB
 from service_utils.helpers import convert_datetime_to_formatted_string
 from service_utils.log_management import get_logger
@@ -112,6 +114,40 @@ def generate_with_model_fallback(content, generation_config, system_instruction=
         FREEFORM_FALLBACK_MODEL_ID, system_instruction=system_instruction
     )
     return fallback_model.generate_content(content, generation_config=generation_config)
+
+
+_web_search_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def fetch_web_context(user_message: str) -> Tuple[str, List[Dict]]:
+    """
+    Live Google-grounded research for prompts that ask for current facts,
+    sources or links — the same trigger words and research prompts as Lot21 AI.
+    Returns (fact_text, sources); empty when search is not needed or fails,
+    so a search problem never blocks the chat reply.
+    """
+    from rag_module.rag import (
+        WEB_SEARCH_TIMEOUT_SEC,
+        RagModule,
+        fetch_live_web_data,
+    )
+
+    if not RagModule._should_use_web_search(user_message, None):
+        return "", []
+    topic = RagModule._build_research_topic(user_message, None)
+    if not topic:
+        return "", []
+    try:
+        client = genai_new.Client(
+            api_key=GEMINI_API_KEY,
+            http_options={"timeout": WEB_SEARCH_TIMEOUT_SEC * 1000},
+        )
+        # One overall limit for the search and its link checks, as in Lot21 AI
+        future = _web_search_executor.submit(fetch_live_web_data, client, FREEFORM_MODEL_ID, topic)
+        return future.result(timeout=WEB_SEARCH_TIMEOUT_SEC)
+    except Exception as e:
+        logger.warning(f"Free Form live web search failed ({type(e).__name__}: {e})")
+        return "", []
 
 
 # Configure Gemini API for image generation
@@ -2006,15 +2042,48 @@ def clean_markdown_formatting(text: str) -> str:
     return text
 
 
+def _text_alongside_image(
+    context_str: str, user_message: str, instructions: str, standing_instructions: str = ""
+) -> Optional[str]:
+    """Plain-text reply shown next to a generated or edited image; None if it cannot be made."""
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        parts = [context_str] if context_str else []
+        parts += [f"User: {user_message}", f"\nIMPORTANT INSTRUCTIONS: {instructions}"]
+        if standing_instructions:
+            parts.append(standing_instructions.strip())
+        response = generate_with_model_fallback(
+            "\n\n".join(parts),
+            generation_config={
+                "temperature": 0.9,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 8192,
+            },
+        )
+        text = clean_markdown_formatting(response.text)
+        return text if text and text.strip() else None
+    except Exception as e:
+        logger.error(f"Error generating text alongside image: {e}")
+        return None
+
+
 def generate_ai_response(
     user_message: str,
     chat_history: Optional[List[Dict]] = None,
     attachments: Optional[List[Dict]] = None,
+    mode: Optional[str] = None,
+    standing_instructions: str = "",
 ) -> Tuple[str, Optional[str], str]:
     """
     Generate AI response using Gemini.
     Returns tuple of (response_text, image_base64, content_type)
     content_type is one of: "TEXT", "IMAGE", "MULTIMODAL"
+
+    mode is the user's output selector: "text" (never an image), "image",
+    "text_and_image", or None to decide from the message wording.
+    standing_instructions is the user's saved-rules prompt block (applies to text only).
     """
     try:
         # Check if user has attached files
@@ -2029,11 +2098,37 @@ def generate_ai_response(
             f"Has attachments: {has_attachments}, Has image attachments: {has_image_attachments}"
         )
 
+        # Output selector. Image modes always produce an image: an attached
+        # image is used as the starting point, an edit request reworks the
+        # previous image, anything else generates a new one.
+        mode = mode if mode in ("text", "image", "text_and_image") else None
+        wants_image = mode in ("image", "text_and_image")
+        # Cap guards against huge pasted-document dumps being treated as edits, but must be
+        # high enough to allow multi-point correction prompts (e.g. "make these corrections: 1)... 2)...").
+        is_short_enough_for_edit = len(user_message.strip()) <= 1000
+        edits_previous_image = (
+            wants_image
+            and not has_image_attachments
+            and is_short_enough_for_edit
+            and detect_image_edit_request(user_message)
+            and find_last_generated_image(chat_history) is not None
+        )
+
+        def wants_text_with_image():
+            if mode is None:
+                return detect_content_with_image_request(user_message)
+            return mode == "text_and_image"
+
         # Check if user is requesting image generation
         # BUT if user has attached images, they want to ANALYZE the image, not generate a new one
-        is_image_request = (
-            detect_image_request(user_message) and not has_image_attachments
-        )
+        if mode is None:
+            is_image_request = (
+                detect_image_request(user_message) and not has_image_attachments
+            )
+        else:
+            is_image_request = (
+                wants_image and not has_image_attachments and not edits_previous_image
+            )
         logger.info(
             f"Message: '{user_message[:100]}...' | Image generation request: {is_image_request}"
         )
@@ -2103,44 +2198,21 @@ def generate_ai_response(
 
             if image_b64:
                 logger.info("Image generated successfully")
-                # Check if user also wants text content alongside the image
-                wants_text_too = detect_content_with_image_request(user_message)
-                logger.info(f"User wants text alongside image: {wants_text_too}")
-
-                if wants_text_too:
-                    # User asked for both text and image - generate text response too
-                    try:
-                        if GEMINI_API_KEY:
-                            text_parts = []
-                            if context_str:
-                                text_parts.append(context_str)
-                            text_parts.append(f"User: {user_message}")
-                            text_parts.append(
-                                "\nIMPORTANT INSTRUCTIONS: An image has already been generated separately. "
-                                "Your job is ONLY to provide a clean, plain text informational response about the topic. "
-                                "Do NOT output any JSON, action objects, structured data, tool calls, or code blocks. "
-                                'Do NOT include anything like {"action": ...} or {"thought": ...} or dalle prompts. '
-                                "Do NOT mention generating images or that you cannot create images. "
-                                "Just write natural, conversational plain text about the topic."
-                            )
-                            text_prompt = "\n\n".join(text_parts)
-                            text_response = generate_with_model_fallback(
-                                text_prompt,
-                                generation_config={
-                                    "temperature": 0.9,
-                                    "top_p": 0.95,
-                                    "top_k": 40,
-                                    "max_output_tokens": 8192,
-                                },
-                            )
-                            cleaned_text = clean_markdown_formatting(text_response.text)
-                            if cleaned_text and cleaned_text.strip():
-                                logger.info("Combined text+image response generated")
-                                return (cleaned_text, image_b64, "MULTIMODAL")
-                    except Exception as e:
-                        logger.error(
-                            f"Error generating text for combined response: {e}"
-                        )
+                if wants_text_with_image():
+                    text = _text_alongside_image(
+                        context_str,
+                        user_message,
+                        "An image has already been generated separately. "
+                        "Your job is ONLY to provide a clean, plain text informational response about the topic. "
+                        "Do NOT output any JSON, action objects, structured data, tool calls, or code blocks. "
+                        'Do NOT include anything like {"action": ...} or {"thought": ...} or dalle prompts. '
+                        "Do NOT mention generating images or that you cannot create images. "
+                        "Just write natural, conversational plain text about the topic.",
+                        standing_instructions,
+                    )
+                    if text:
+                        logger.info("Combined text+image response generated")
+                        return (text, image_b64, "MULTIMODAL")
 
                 # Image only - user only asked for an image
                 logger.info("Returning image-only response")
@@ -2153,7 +2225,11 @@ def generate_ai_response(
                 # so the user still gets a useful text response about their topic.
 
         # If user uploaded an image and wants to edit/modify it, use image model
-        if has_image_attachments and detect_image_edit_request(user_message):
+        if (
+            has_image_attachments
+            and mode != "text"
+            and (wants_image or detect_image_edit_request(user_message))
+        ):
             logger.info("=== IMAGE EDITING PATH ===")
 
             if not image_client:
@@ -2199,6 +2275,18 @@ def generate_ai_response(
 
                     if edited_image:
                         logger.info("Image edited successfully, returning to user")
+                        if wants_text_with_image():
+                            text = _text_alongside_image(
+                                context_str,
+                                user_message,
+                                "An image has been created from the attached image and is shown separately. "
+                                "Your job is ONLY to provide a clean, plain text response about it. "
+                                "Do NOT output any JSON, action objects, structured data, or tool calls. "
+                                "Just write natural, conversational plain text.",
+                                standing_instructions,
+                            )
+                            if text:
+                                return (text, edited_image, "MULTIMODAL")
                         return (
                             "",  # Empty text - just show the edited image
                             edited_image,
@@ -2222,11 +2310,9 @@ def generate_ai_response(
                     )
 
         # If user wants to edit a previously generated image (no attachment, but edit request + image in history)
-        # Cap guards against huge pasted-document dumps being treated as edits, but must be
-        # high enough to allow multi-point correction prompts (e.g. "make these corrections: 1)... 2)...").
-        is_short_enough_for_edit = len(user_message.strip()) <= 1000
         if (
-            not has_image_attachments
+            mode != "text"
+            and not has_image_attachments
             and is_short_enough_for_edit
             and detect_image_edit_request(user_message)
         ):
@@ -2259,44 +2345,18 @@ def generate_ai_response(
 
                     if edited_image:
                         logger.info("Image from history edited successfully")
-                        # Check if user also wants text with the edit
-                        wants_text_too = detect_content_with_image_request(user_message)
-                        if wants_text_too:
-                            try:
-                                if GEMINI_API_KEY:
-                                    text_parts = []
-                                    if context_str:
-                                        text_parts.append(context_str)
-                                    text_parts.append(f"User: {user_message}")
-                                    text_parts.append(
-                                        "\nIMPORTANT INSTRUCTIONS: An image has been edited and is shown separately. "
-                                        "Your job is ONLY to provide a clean, plain text response about the changes made. "
-                                        "Do NOT output any JSON, action objects, structured data, or tool calls. "
-                                        "Just write natural, conversational plain text."
-                                    )
-                                    text_prompt = "\n\n".join(text_parts)
-                                    text_response = generate_with_model_fallback(
-                                        text_prompt,
-                                        generation_config={
-                                            "temperature": 0.9,
-                                            "top_p": 0.95,
-                                            "top_k": 40,
-                                            "max_output_tokens": 8192,
-                                        },
-                                    )
-                                    cleaned_text = clean_markdown_formatting(
-                                        text_response.text
-                                    )
-                                    if cleaned_text and cleaned_text.strip():
-                                        return (
-                                            cleaned_text,
-                                            edited_image,
-                                            "MULTIMODAL",
-                                        )
-                            except Exception as e:
-                                logger.error(
-                                    f"Error generating text for edited image: {e}"
-                                )
+                        if wants_text_with_image():
+                            text = _text_alongside_image(
+                                context_str,
+                                user_message,
+                                "An image has been edited and is shown separately. "
+                                "Your job is ONLY to provide a clean, plain text response about the changes made. "
+                                "Do NOT output any JSON, action objects, structured data, or tool calls. "
+                                "Just write natural, conversational plain text.",
+                                standing_instructions,
+                            )
+                            if text:
+                                return (text, edited_image, "MULTIMODAL")
 
                         return ("", edited_image, "IMAGE")
                     else:
@@ -2377,6 +2437,15 @@ def generate_ai_response(
                     f"[ATTACHED DOCUMENT CONTENT - Read this carefully and use it to answer the user's question]:\n{attachment_context}"
                 )
 
+        # Live web research (Google Search) for prompts that need current facts
+        live_facts, web_sources = fetch_web_context(user_message)
+        if live_facts:
+            conversation_parts.append(
+                "[LIVE WEB DATA - current facts fetched via Google Search just now. "
+                "Prefer these for statistics, recent events and sources, and state their dates. "
+                f"Only give a web address that appears in this data; never construct one]:\n{live_facts}"
+            )
+
         # Add the current user message
         conversation_parts.append(f"User: {user_message}")
 
@@ -2388,13 +2457,24 @@ def generate_ai_response(
         # (Plain concatenation, NOT an f-string: the text below contains literal
         # {"action"} braces that would break f-string parsing.)
         current_date_line = datetime.now().strftime("Today's date is %A, %B %d, %Y.")
+        if live_facts:
+            internet_rule = (
+                "Live web data from a Google Search made for this request is included in the "
+                "conversation. Use it for current facts and state the dates it gives; do not say "
+                "you lack internet access."
+            )
+        else:
+            internet_rule = (
+                "You do NOT have live internet access: if the user asks for real-time information "
+                "you cannot verify (today's weather, live prices, breaking news), say clearly that "
+                "you cannot fetch live data and that any figures you mention may be outdated — "
+                "never present invented numbers as today's real values."
+            )
         system_instruction = (
             current_date_line
-            + """ Always use this as the current date.
-You do NOT have live internet access: if the user asks for real-time information you cannot
-verify (today's weather, live prices, breaking news), say clearly that you cannot fetch live
-data and that any figures you mention may be outdated — never present invented numbers as
-today's real values.
+            + " Always use this as the current date.\n"
+            + internet_rule
+            + """
 
 You are a helpful, creative AI assistant with no restrictions on topics or scope.
 You can help with:
@@ -2407,6 +2487,10 @@ You can help with:
 - General questions and conversations
 - Document analysis (PDF, Word, Excel, CSV, text files)
 - Image analysis and description
+
+This reply is text only: you cannot create or edit images in it. If the user asks for an image,
+never say you have generated, created or attached one. Give a short written description of the
+image instead, and say that choosing Output: Image above the message box will create it.
 
 IMPORTANT RULES FOR ATTACHED DOCUMENTS:
 - When document content is provided in the conversation, you MUST read and analyze it thoroughly before responding.
@@ -2434,6 +2518,7 @@ Do not include any "thought" or "action" or "action_input" fields.
 
 Write naturally with proper paragraphs, line breaks, and use bullet/numbered lists when the user requests them. Be conversational and engaging."""
         )
+        system_instruction += standing_instructions
 
         # Safety check: truncate full_prompt if it's too large (~750K chars ≈ ~187K tokens)
         MAX_PROMPT_CHARS = 750000
@@ -2530,6 +2615,11 @@ Write naturally with proper paragraphs, line breaks, and use bullet/numbered lis
         ai_response = clean_markdown_formatting(ai_response)
         logger.info("Cleaned markdown formatting from AI response")
 
+        if web_sources:
+            ai_response += "\n\nSources:\n" + "\n".join(
+                f"- {s['title']}: {s['url']}" for s in web_sources
+            )
+
         return (ai_response, None, "TEXT")
 
     except Exception as e:
@@ -2546,6 +2636,8 @@ def chat_completion(
     user_message: str,
     include_history: bool = True,
     attachments: Optional[List[Dict]] = None,
+    mode: Optional[str] = None,
+    user_id: Optional[int] = None,
 ) -> Tuple[Dict, Dict]:
     """
     Complete chat interaction: save user message, generate AI response, save AI response.
@@ -2586,7 +2678,11 @@ def chat_completion(
 
         # Generate AI response (text and/or image)
         ai_response_text, image_url, content_type = generate_ai_response(
-            user_message, chat_history, attachments
+            user_message,
+            chat_history,
+            attachments,
+            mode=mode,
+            standing_instructions=standing_instructions_block(user_id),
         )
         logger.info(
             f"Generated response - content_type: {content_type}, has_image_url: {image_url is not None}"
