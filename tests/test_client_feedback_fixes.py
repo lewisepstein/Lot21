@@ -388,3 +388,27 @@ def test_document_export_fetches_signed_link(aws, monkeypatch):
     monkeypatch.setattr(db.requests, "get", lambda url, timeout: seen.setdefault("url", url) and R())
     db._fetch_image("https://lottie-test-bucket.s3.us-east-2.amazonaws.com/generated/generated_images/a.png")
     assert "X-Amz-Signature" in seen["url"]
+
+
+# ---------- 28-Oct QA fails: PR-02, RG-05 ----------
+
+def test_what_is_status_question_is_a_lookup_not_a_rewrite(rag):
+    # PR-02: "what is" read as a rewrite, so the page was rewritten instead
+    q = "What is the current status of the Shenzhen Bay Sponge Waterfront project? Which phases are completed?"
+    assert not rag.is_rewrite_intent(q)
+    assert not rag.is_follow_up_query(q)
+    assert rag.is_question_query(q)
+    assert not rag.is_question_query("What is circularity?")
+
+
+def test_overhead_style_carries_to_next_image_in_session():
+    # RG-05: the second image fell back to the eye-level photo style
+    from rag_module.image_prompts import detect_visual_mode
+
+    history = [{"prompt": "Images must be taken directly overhead, no words.", "response": ""}]
+    assert detect_visual_mode("Provide another image of a rooftop farm", history) == "aerial"
+    assert detect_visual_mode("Now show a wetland boardwalk", history) == "aerial"
+    # Watercolour asked for now wins; diagram words earlier do not leak
+    assert detect_visual_mode("Watercolour of a rooftop farm", history) == "editorial"
+    assert detect_visual_mode("A rooftop farm", [{"prompt": "Explain the water flow system", "response": ""}]) == "photo"
+    assert detect_visual_mode("A rooftop farm") == "photo"

@@ -35,7 +35,8 @@ REWRITE_KEYWORDS = [
     "make it more engaging", "make it more compelling", "make it more persuasive",
 
     # --- Instructional Phrases ---
-    "explain", "what is", "give me a summary", "explain in simple terms",
+    # "what is" is not here: "What is the status of X?" is a question, not a rewrite
+    "explain", "give me a summary", "explain in simple terms",
     "explain like i'm five", "eli5", "clarify", "explain me", "give me a summary of",
     "simplify the explanation of"
 ]

@@ -1260,7 +1260,7 @@ class RagModule:
         telemetry = Telemetry()
         telemetry.mark("image_ms")
 
-        visual_mode = force_style or detect_visual_mode(prompt)
+        visual_mode = force_style or detect_visual_mode(prompt, conversation_history)
         final_prompt = build_image_prompt(
             query=prompt,
             context=context,

@@ -57,7 +57,7 @@ def _mentions(q: str, keywords) -> bool:
     return any(re.search(rf"\b{re.escape(k)}(?:s|es)?\b", q) for k in keywords)
 
 
-def detect_visual_mode(query: str) -> str:
+def detect_visual_mode(query: str, conversation_history=None) -> str:
     """Decide between a diagram, an illustration, a straight-down aerial photo, or a photo."""
     q = (query or "").lower()
     if _mentions(q, DIAGRAM_KEYWORDS):
@@ -65,6 +65,16 @@ def detect_visual_mode(query: str) -> str:
     if _mentions(q, ILLUSTRATION_KEYWORDS):
         return "editorial"
     if _mentions(q, AERIAL_KEYWORDS):
+        return "aerial"
+    # A style set earlier in the session ("images must be directly overhead")
+    # still applies to a plain follow-up. Diagram words are not carried: text
+    # prompts often say "system" or "process" without wanting a diagram.
+    earlier = " ".join(
+        t.get("prompt", "") for t in (conversation_history or [])[-3:]
+    ).lower()
+    if _mentions(earlier, ILLUSTRATION_KEYWORDS):
+        return "editorial"
+    if _mentions(earlier, AERIAL_KEYWORDS):
         return "aerial"
     return "photo"
 
